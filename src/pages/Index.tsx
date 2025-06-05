@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import Header from '../components/Header';
 import ScoreCard from '../components/ScoreCard';
@@ -10,6 +9,7 @@ import SmartRecommendations from '../components/SmartRecommendations';
 import UserProfile from '../components/UserProfile';
 import MascotCustomization from '../components/MascotCustomization';
 import EnergyNews from '../components/EnergyNews';
+import GamificationDashboard from '../components/gamification/GamificationDashboard';
 
 interface InvoiceData {
   consumption: number;
@@ -126,6 +126,11 @@ const Index = () => {
               userProfile={userProfile}
             />
           </div>
+        </div>
+
+        {/* Central de Gamificação */}
+        <div className="max-w-6xl mx-auto">
+          <GamificationDashboard />
         </div>
 
         {/* Seção de Notícias */}
