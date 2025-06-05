@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Lightbulb, TrendingUp, Target, Zap } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,9 +27,21 @@ interface SmartRecommendationsProps {
   invoiceData?: InvoiceData;
   currentScore: number;
   userLevel: number;
+  userProfile?: {
+    consumerType: string;
+    location: string;
+    propertySize: number;
+    peopleCount: number;
+    energyPreference: string;
+  };
 }
 
-const SmartRecommendations = ({ invoiceData, currentScore, userLevel }: SmartRecommendationsProps) => {
+const SmartRecommendations = ({ 
+  invoiceData, 
+  currentScore, 
+  userLevel,
+  userProfile 
+}: SmartRecommendationsProps) => {
   const generateRecommendations = (): Recommendation[] => {
     const recommendations: Recommendation[] = [];
     
@@ -114,7 +125,54 @@ const SmartRecommendations = ({ invoiceData, currentScore, userLevel }: SmartRec
     return recommendations.slice(0, 3); // Máximo 3 recomendações
   };
 
-  const recommendations = generateRecommendations();
+  const generateContextualRecommendations = () => {
+    if (!invoiceData || !userProfile) return [];
+
+    const recommendations = [];
+    const { consumerType, propertySize, peopleCount, energyPreference } = userProfile;
+
+    // Recomendações específicas por tipo de consumidor
+    if (consumerType === 'Restaurante') {
+      recommendations.push({
+        id: 'restaurant-led',
+        title: 'LEDs para Cozinha Comercial',
+        description: 'Substitua lâmpadas da cozinha por LEDs de alta potência específicos para área comercial.',
+        impact: '25% redução no consumo de iluminação',
+        difficulty: 'Médio',
+        points: 150,
+        icon: '💡'
+      });
+    } else if (consumerType === 'Escola') {
+      recommendations.push({
+        id: 'school-solar',
+        title: 'Painel Solar Educativo',
+        description: 'Instale sistema fotovoltaico que serve como ferramenta educativa para alunos.',
+        impact: '40% redução na conta de energia',
+        difficulty: 'Alto',
+        points: 300,
+        icon: '☀️'
+      });
+    }
+
+    // Recomendações baseadas no tamanho do imóvel
+    if (propertySize > 200) {
+      recommendations.push({
+        id: 'large-property-automation',
+        title: 'Automação Residencial',
+        description: 'Sistema inteligente para gerenciar iluminação e climatização automaticamente.',
+        impact: '30% economia energética',
+        difficulty: 'Alto',
+        points: 250,
+        icon: '🏠'
+      });
+    }
+
+    return recommendations.slice(0, 3);
+  };
+
+  const contextualRecommendations = generateContextualRecommendations();
+  const baseRecommendations = generateRecommendations();
+  const allRecommendations = [...contextualRecommendations, ...baseRecommendations].slice(0, 4);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -144,7 +202,7 @@ const SmartRecommendations = ({ invoiceData, currentScore, userLevel }: SmartRec
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {recommendations.map((rec) => {
+          {allRecommendations.map((rec) => {
             const IconComponent = rec.icon;
             return (
               <div

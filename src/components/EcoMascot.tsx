@@ -5,57 +5,119 @@ import { Crown, Star, Sparkles } from 'lucide-react';
 interface EcoMascotProps {
   score: number;
   level: number;
+  consumerType?: string;
+  customization?: {
+    name: string;
+    emoji: string;
+    colorPalette: string;
+    borderEffect: string;
+  };
 }
 
-const EcoMascot = ({ score, level }: EcoMascotProps) => {
-  const getMascotData = (level: number) => {
+const EcoMascot = ({ score, level, consumerType = 'Residencial', customization }: EcoMascotProps) => {
+  const getMascotData = (level: number, consumerType: string, customization?: any) => {
+    // Nome baseado no tipo de consumidor
+    const getNameByType = (type: string) => {
+      const names = {
+        'Residencial': 'EcoFamília',
+        'Comercial': 'EcoBiz',
+        'Restaurante': 'EcoChef',
+        'Escola': 'EcoAluno',
+        'Indústria': 'EcoTech'
+      };
+      return names[type as keyof typeof names] || 'EcoFriend';
+    };
+
+    const baseName = customization?.name || getNameByType(consumerType);
+    const emoji = customization?.emoji || '🌱';
+
     if (level >= 10) {
       return {
-        name: 'Eco Master',
-        emoji: '🌳',
+        name: `${baseName} Master`,
+        emoji: emoji,
         size: 'text-8xl',
-        color: 'from-emerald-600 to-green-700',
-        effect: 'animate-pulse',
+        color: getColorPalette(customization?.colorPalette || 'emerald', 'master'),
+        effect: getBorderEffect(customization?.borderEffect || 'pulse'),
         description: 'Guardião da Sustentabilidade'
       };
     } else if (level >= 7) {
       return {
-        name: 'Eco Champion',
-        emoji: '🌲',
+        name: `${baseName} Champion`,
+        emoji: emoji,
         size: 'text-7xl',
-        color: 'from-emerald-500 to-green-600',
-        effect: 'hover:scale-110',
+        color: getColorPalette(customization?.colorPalette || 'emerald', 'champion'),
+        effect: getBorderEffect(customization?.borderEffect || 'glow'),
         description: 'Campeão Ecológico'
       };
     } else if (level >= 4) {
       return {
-        name: 'Eco Warrior',
-        emoji: '🌿',
+        name: `${baseName} Warrior`,
+        emoji: emoji,
         size: 'text-6xl',
-        color: 'from-emerald-400 to-green-500',
-        effect: 'hover:scale-105',
+        color: getColorPalette(customization?.colorPalette || 'emerald', 'warrior'),
+        effect: getBorderEffect(customization?.borderEffect || 'hover:scale-105'),
         description: 'Guerreiro Verde'
       };
     } else {
       return {
-        name: 'Eco Sprout',
-        emoji: '🌱',
+        name: baseName,
+        emoji: emoji,
         size: 'text-5xl',
-        color: 'from-emerald-300 to-green-400',
-        effect: 'hover:scale-105',
+        color: getColorPalette(customization?.colorPalette || 'emerald', 'basic'),
+        effect: getBorderEffect(customization?.borderEffect || 'hover:scale-105'),
         description: 'Broto Sustentável'
       };
     }
   };
 
-  const mascot = getMascotData(level);
+  const getColorPalette = (palette: string, tier: string) => {
+    const palettes = {
+      emerald: {
+        basic: 'from-emerald-300 to-green-400',
+        warrior: 'from-emerald-400 to-green-500',
+        champion: 'from-emerald-500 to-green-600',
+        master: 'from-emerald-600 to-green-700'
+      },
+      blue: {
+        basic: 'from-blue-300 to-cyan-400',
+        warrior: 'from-blue-400 to-cyan-500',
+        champion: 'from-blue-500 to-cyan-600',
+        master: 'from-blue-600 to-cyan-700'
+      },
+      purple: {
+        basic: 'from-purple-300 to-indigo-400',
+        warrior: 'from-purple-400 to-indigo-500',
+        champion: 'from-purple-500 to-indigo-600',
+        master: 'from-purple-600 to-indigo-700'
+      },
+      orange: {
+        basic: 'from-orange-300 to-red-400',
+        warrior: 'from-orange-400 to-red-500',
+        champion: 'from-orange-500 to-red-600',
+        master: 'from-orange-600 to-red-700'
+      }
+    };
+    return palettes[palette as keyof typeof palettes]?.[tier as keyof typeof palettes.emerald] || palettes.emerald[tier as keyof typeof palettes.emerald];
+  };
+
+  const getBorderEffect = (effect: string) => {
+    const effects = {
+      none: 'hover:scale-110',
+      glow: 'hover:scale-110 shadow-lg animate-glow',
+      pulse: 'hover:scale-110 animate-pulse',
+      rainbow: 'hover:scale-110 animate-pulse border-4 border-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-500'
+    };
+    return effects[effect as keyof typeof effects] || effects.none;
+  };
+
+  const mascot = getMascotData(level, consumerType, customization);
   const nextLevelScore = level * 200;
   const progressToNext = Math.min(((score % 200) / 200) * 100, 100);
 
   return (
     <div className="text-center">
       <div className="relative inline-block">
-        {/* Círculo de fundo com gradiente */}
+        {/* Círculo de fundo com gradiente personalizado */}
         <div className={`w-32 h-32 rounded-full bg-gradient-to-br ${mascot.color} flex items-center justify-center shadow-lg transition-all duration-500 ${mascot.effect}`}>
           <div className={`${mascot.size} transition-all duration-500`}>
             {mascot.emoji}

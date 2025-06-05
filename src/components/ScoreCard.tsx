@@ -7,9 +7,21 @@ import EcoMascot from './EcoMascot';
 interface ScoreCardProps {
   score?: number;
   level?: number;
+  consumerType?: string;
+  mascotCustomization?: {
+    name: string;
+    emoji: string;
+    colorPalette: string;
+    borderEffect: string;
+  };
 }
 
-const ScoreCard = ({ score = 1247, level = 7 }: ScoreCardProps) => {
+const ScoreCard = ({ 
+  score = 1247, 
+  level = 7, 
+  consumerType = 'Residencial',
+  mascotCustomization 
+}: ScoreCardProps) => {
   const weeklyGain = 156;
 
   return (
@@ -51,7 +63,12 @@ const ScoreCard = ({ score = 1247, level = 7 }: ScoreCardProps) => {
           {/* Seção do Mascote */}
           <div className="flex justify-center">
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6">
-              <EcoMascot score={score} level={level} />
+              <EcoMascot 
+                score={score} 
+                level={level} 
+                consumerType={consumerType}
+                customization={mascotCustomization}
+              />
             </div>
           </div>
         </div>
