@@ -137,6 +137,12 @@ const Index = () => {
         <div className="max-w-6xl mx-auto">
           <EnergyNews />
         </div>
+
+        {/* Nova seção - Perfil do Usuário */}
+        <div className="container mx-auto px-4 py-12">
+          <h1 className="text-4xl font-bold text-gray-800">Perfil do Usuário</h1>
+          <p className="mt-4 text-gray-600">Bem-vindo à sua página de perfil!</p>
+        </div>
       </main>
     </div>
   );

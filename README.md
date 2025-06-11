@@ -1,73 +1,180 @@
-# Welcome to your Lovable project
+# Score Energy - Verse 1
 
-## Project info
+Bem-vindo ao **Score Energy - Verse 1**, um projeto desenvolvido com tecnologias modernas para criar experiências incríveis. Este README fornece todas as informações necessárias para configurar, editar e implantar o projeto.
 
-**URL**: https://lovable.dev/projects/c1cfbf03-5b9f-4e15-a5f6-b5cc50e27a23
+---
 
-## How can I edit this code?
+## 📋 Informações do Projeto
 
-There are several ways of editing your application.
+- **URL do Projeto**: [Lovable Project](https://lovable.dev/projects/c1cfbf03-5b9f-4e15-a5f6-b5cc50e27a23)
+- **Tecnologias Utilizadas**:
+  - [Vite](https://vitejs.dev/)
+  - [TypeScript](https://www.typescriptlang.org/)
+  - [React](https://reactjs.org/)
+  - [shadcn-ui](https://shadcn.dev/)
+  - [Tailwind CSS](https://tailwindcss.com/)
 
-**Use Lovable**
+---
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/c1cfbf03-5b9f-4e15-a5f6-b5cc50e27a23) and start prompting.
+## 🚀 Como Configurar o Projeto
 
-Changes made via Lovable will be committed automatically to this repo.
+### Pré-requisitos
 
-**Use your preferred IDE**
+Certifique-se de ter o seguinte instalado no seu sistema:
+- [Node.js](https://nodejs.org/) (recomendado usar [nvm](https://github.com/nvm-sh/nvm#installing-and-updating))
+- npm (instalado junto com o Node.js)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Passos para Configuração
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+1. **Clone o repositório**:
+   ```bash
+   git clone <YOUR_GIT_URL>
+   ```
 
-Follow these steps:
+2. **Navegue até o diretório do projeto**:
+   ```bash
+   cd <YOUR_PROJECT_NAME>
+   ```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+3. **Instale as dependências**:
+   ```bash
+   npm install
+   ```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+4. **Inicie o servidor de desenvolvimento**:
+   ```bash
+   npm run dev
+   ```
 
-# Step 3: Install the necessary dependencies.
-npm i
+5. **Acesse o projeto no navegador**:
+   O servidor estará disponível em `http://localhost:3000` (ou outra porta especificada no terminal).
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+---
+
+## ✏️ Como Editar o Código
+
+### Opções de Edição
+
+1. **Usando o Lovable**  
+   Acesse o [Lovable Project](https://lovable.dev/projects/c1cfbf03-5b9f-4e15-a5f6-b5cc50e27a23) e edite diretamente na interface. As alterações serão automaticamente commitadas neste repositório.
+
+2. **Usando seu IDE preferido**  
+   - Clone o repositório e edite localmente.
+   - Após as alterações, faça o commit e o push para refletir no Lovable.
+
+3. **Editando diretamente no GitHub**  
+   - Navegue até o arquivo desejado no repositório.
+   - Clique no botão "Editar" (ícone de lápis).
+   - Faça as alterações e confirme o commit.
+
+4. **Usando GitHub Codespaces**  
+   - Na página principal do repositório, clique no botão "Code" (verde).
+   - Selecione a aba "Codespaces".
+   - Clique em "New Codespace" para iniciar um ambiente de edição.
+
+---
+
+## 🌐 Como Implantar o Projeto
+
+1. Acesse o [Lovable Project](https://lovable.dev/projects/c1cfbf03-5b9f-4e15-a5f6-b5cc50e27a23).
+2. Clique em **Share -> Publish** para publicar o projeto.
+
+### Conectar um Domínio Personalizado
+
+1. Navegue até **Project > Settings > Domains**.
+2. Clique em **Connect Domain**.
+3. Siga o [guia de configuração de domínio](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide).
+
+---
+
+## 🌐 Estrutura do Projeto
+
+A estrutura do projeto foi organizada da seguinte forma:
+
+- **`public/`**: Contém arquivos estáticos, como imagens e o arquivo `index.html`.
+- **`src/`**: Contém o código-fonte do projeto, incluindo componentes React, páginas e estilos.
+  - **`components/`**: Componentes reutilizáveis, como cabeçalho, rodapé e seções.
+  - **`pages/`**: Páginas completas, como a landing page.
+  - **`styles/`**: Arquivos de estilo globais (opcional, se não usar Tailwind CSS).
+- **`tailwind.config.js`**: Configuração do Tailwind CSS.
+- **`tsconfig.json`**: Configuração do TypeScript.
+
+---
+
+## 🚀 Como Rodar a Landing Page
+
+1. **Inicie o servidor de desenvolvimento**:
+   ```bash
+   npm run dev
+   ```
+
+2. **Acesse no navegador**:
+   O servidor estará disponível em `http://localhost:3000`.
+
+---
+
+## 🛠️ Scripts Disponíveis
+
+No arquivo `package.json`, você encontrará os seguintes scripts úteis:
+
+- **`npm run dev`**: Inicia o servidor de desenvolvimento.
+- **`npm run build`**: Gera a versão de produção do projeto.
+- **`npm run preview`**: Visualiza a versão de produção localmente.
+
+---
+
+## 🛡️ Segurança e Auditoria
+
+Após instalar as dependências, você pode verificar vulnerabilidades com:
+
+```bash
+npm audit
 ```
 
-**Edit a file directly in GitHub**
+Para corrigir vulnerabilidades automaticamente:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+npm audit fix
+```
 
-**Use GitHub Codespaces**
+---
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 📚 Recursos Adicionais
 
-## What technologies are used for this project?
+- [Documentação do Vite](https://vitejs.dev/guide/)
+- [Documentação do Tailwind CSS](https://tailwindcss.com/docs)
+- [Documentação do React](https://reactjs.org/docs/getting-started.html)
+- [Documentação do shadcn-ui](https://shadcn.dev/)
 
-This project is built with:
+---
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 🤝 Contribuição
 
-## How can I deploy this project?
+Contribuições são bem-vindas! Siga os passos abaixo para contribuir:
 
-Simply open [Lovable](https://lovable.dev/projects/c1cfbf03-5b9f-4e15-a5f6-b5cc50e27a23) and click on Share -> Publish.
+1. Faça um fork do repositório.
+2. Crie uma branch para sua feature ou correção:
+   ```bash
+   git checkout -b minha-feature
+   ```
+3. Faça o commit das suas alterações:
+   ```bash
+   git commit -m "Adiciona minha nova feature"
+   ```
+4. Faça o push para a branch:
+   ```bash
+   git push origin minha-feature
+   ```
+5. Abra um Pull Request.
 
-## Can I connect a custom domain to my Lovable project?
+---
 
-Yes, you can!
+## 📧 Contato
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+Se tiver dúvidas ou sugestões, entre em contato pelo e-mail: **seuemail@dominio.com**.
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+---
+
+## 📝 Licença
+
+Este projeto está licenciado sob a [MIT License](LICENSE).
