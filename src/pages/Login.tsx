@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Leaf } from 'lucide-react';
-import { SupabaseTest } from '../components/SupabaseTest';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -40,7 +39,6 @@ const Login = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-blue-50 to-cyan-50">
       <div className="w-full max-w-md space-y-4">
-        <SupabaseTest />
         <Card>
           <CardHeader className="space-y-1">
             <div className="flex items-center justify-center mb-4">
