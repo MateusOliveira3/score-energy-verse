@@ -4,7 +4,7 @@ import ScoreCard from '../components/ScoreCard';
 import ActionCards from '../components/ActionCards';
 import Leaderboard from '../components/Leaderboard';
 import LevelProgress from '../components/LevelProgress';
-import InvoiceUpload from '../components/InvoiceUpload';
+import { InvoiceUpload } from '../components/InvoiceUpload';
 import InvoiceHistory from '../components/InvoiceHistory';
 import SmartRecommendations from '../components/SmartRecommendations';
 import UserProfile from '../components/UserProfile';
@@ -92,7 +92,7 @@ const Index = () => {
       <main className="container mx-auto px-4 py-8 space-y-8">
         {/* Upload de fatura - destaque no topo */}
         <div className="max-w-4xl mx-auto">
-          <InvoiceUpload onInvoiceProcessed={handleInvoiceProcessed} />
+          <InvoiceUpload />
         </div>
 
         {/* Botões de configuração */}

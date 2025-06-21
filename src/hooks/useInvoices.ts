@@ -1,169 +1,62 @@
-import { useState, useEffect } from 'react';
-import { supabase, Invoice } from '@/lib/supabase';
+import { useState, useEffect, useCallback } from 'react';
+import { Invoice } from '@/lib/data-layer';
+import * as dataService from '@/lib/data-service';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
 
 export const useInvoices = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
-  const { toast } = useToast();
 
-  // Buscar faturas do usuário
-  const fetchInvoices = async () => {
+  const fetchInvoices = useCallback(async () => {
     if (!user) return;
-
-    setLoading(true);
+    setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('invoices')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setInvoices(data || []);
+      const userInvoices = await dataService.getInvoices(user.id);
+      setInvoices(userInvoices);
     } catch (error) {
-      console.error('Erro ao buscar faturas:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar suas faturas.",
-        variant: "destructive"
-      });
+      console.error("Erro ao buscar faturas:", error);
+      setInvoices([]);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
-  };
-
-  // Adicionar nova fatura
-  const addInvoice = async (invoiceData: Omit<Invoice, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
-    if (!user) {
-      toast({
-        title: "Erro",
-        description: "Você precisa estar logado para adicionar faturas.",
-        variant: "destructive"
-      });
-      return null;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('invoices')
-        .insert({
-          ...invoiceData,
-          user_id: user.id
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setInvoices(prev => [data, ...prev]);
-      
-      toast({
-        title: "Fatura salva! ⚡",
-        description: "Sua fatura foi processada e salva com sucesso.",
-      });
-
-      return data;
-    } catch (error) {
-      console.error('Erro ao salvar fatura:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível salvar a fatura. Tente novamente.",
-        variant: "destructive"
-      });
-      return null;
-    }
-  };
-
-  // Upload de arquivo para storage (opcional)
-  const uploadFile = async (file: File): Promise<string | null> => {
-    if (!user) return null;
-
-    try {
-      const fileName = `${user.id}/${Date.now()}-${file.name}`;
-      const { data, error } = await supabase.storage
-        .from('invoices')
-        .upload(fileName, file);
-
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('invoices')
-        .getPublicUrl(fileName);
-
-      return publicUrl;
-    } catch (error) {
-      console.error('Erro no upload do arquivo:', error);
-      return null;
-    }
-  };
-
-  // Deletar fatura
-  const deleteInvoice = async (invoiceId: string) => {
-    try {
-      const { error } = await supabase
-        .from('invoices')
-        .delete()
-        .eq('id', invoiceId)
-        .eq('user_id', user?.id);
-
-      if (error) throw error;
-
-      setInvoices(prev => prev.filter(invoice => invoice.id !== invoiceId));
-      
-      toast({
-        title: "Fatura removida",
-        description: "A fatura foi removida com sucesso.",
-      });
-    } catch (error) {
-      console.error('Erro ao deletar fatura:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível remover a fatura.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Calcular estatísticas das faturas
-  const getInvoiceStats = () => {
-    if (invoices.length === 0) {
-      return {
-        totalConsumption: 0,
-        averageConsumption: 0,
-        totalValue: 0,
-        averageValue: 0,
-        totalInvoices: 0
-      };
-    }
-
-    const totalConsumption = invoices.reduce((sum, invoice) => sum + invoice.consumption, 0);
-    const totalValue = invoices.reduce((sum, invoice) => sum + invoice.total_value, 0);
-
-    return {
-      totalConsumption,
-      averageConsumption: Math.round(totalConsumption / invoices.length),
-      totalValue,
-      averageValue: Math.round(totalValue / invoices.length),
-      totalInvoices: invoices.length
-    };
-  };
+  }, [user]);
 
   useEffect(() => {
     if (user) {
       fetchInvoices();
+    } else {
+      // Limpa as faturas se o usuário fizer logout
+      setInvoices([]);
+      setIsLoading(false);
     }
-  }, [user]);
+  }, [user, fetchInvoices]);
 
-  return {
-    invoices,
-    loading,
-    addInvoice,
-    deleteInvoice,
-    uploadFile,
-    getInvoiceStats,
-    refreshInvoices: fetchInvoices
+  const addInvoice = async (invoiceData: Omit<Invoice, 'id' | 'created_at' | 'points_earned' | 'user_id'> & { file_url: string, file_name: string }) => {
+    if (!user) throw new Error("Usuário não autenticado");
+
+    const fullInvoiceData = {
+      ...invoiceData,
+      user_id: user.id,
+    };
+    
+    await dataService.addInvoice(fullInvoiceData);
+    
+    // Atualizar a lista localmente para refletir a nova fatura instantaneamente
+    const newInvoice: Invoice = {
+      ...fullInvoiceData,
+      id: new Date().getTime().toString(), // ID temporário para UI
+      created_at: new Date().toISOString(),
+      points_earned: 100, // Valor de exemplo
+    };
+    setInvoices(prev => [newInvoice, ...prev]);
   };
+
+  const uploadFile = async (file: File) => {
+    if (!user) throw new Error("Usuário não autenticado");
+    // Retorna o resultado da API: { message, fileUrl, fileName, fileId }
+    return await dataService.uploadFile(file, user.id);
+  };
+
+  return { invoices, isLoading, addInvoice, uploadFile, refreshInvoices: fetchInvoices };
 }; 

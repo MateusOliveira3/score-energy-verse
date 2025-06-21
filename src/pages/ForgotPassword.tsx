@@ -1,30 +1,30 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Leaf } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
-const Login = () => {
+const ForgotPassword = () => {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { resetPassword } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setMessage('');
     setLoading(true);
 
     try {
-      await signIn(email, password);
-      navigate('/perfil');
+      await resetPassword(email);
+      setMessage('Se existir uma conta com este e-mail, um link para redefinição de senha foi enviado.');
     } catch (err: any) {
-      console.error('Erro de login detalhado:', err);
-      setError(err.message);
+      setError('Ocorreu um erro ao tentar enviar o link de redefinição.');
+      console.error('Erro ao redefinir senha:', err);
     } finally {
       setLoading(false);
     }
@@ -40,9 +40,9 @@ const Login = () => {
                 <Leaf className="h-8 w-8 text-white" />
               </div>
             </div>
-            <CardTitle className="text-2xl text-center">Bem-vindo ao Score Energy</CardTitle>
+            <CardTitle className="text-2xl text-center">Redefinir Senha</CardTitle>
             <CardDescription className="text-center">
-              Entre com sua conta para continuar
+              Digite seu e-mail para receber um link de redefinição.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -56,15 +56,9 @@ const Login = () => {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Input
-                  type="password"
-                  placeholder="Senha"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
+              {message && (
+                <div className="text-sm text-green-600 text-center p-2 bg-green-50 rounded-md">{message}</div>
+              )}
               {error && (
                 <div className="text-sm text-red-500 text-center p-2 bg-red-50 rounded-md">{error}</div>
               )}
@@ -73,16 +67,12 @@ const Login = () => {
                 className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
                 disabled={loading}
               >
-                {loading ? 'Entrando...' : 'Entrar'}
+                {loading ? 'Enviando...' : 'Enviar Link'}
               </Button>
-              <div className="text-center text-sm space-x-2">
-                <a href="/registro" className="text-green-600 hover:text-green-700">
-                  Não tem uma conta? Registre-se
-                </a>
-                <span className="text-gray-400">|</span>
-                <a href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700">
-                  Esqueceu a senha?
-                </a>
+               <div className="text-center text-sm">
+                <Link to="/login" className="text-green-600 hover:text-green-700">
+                  Voltar para o Login
+                </Link>
               </div>
             </form>
           </CardContent>
@@ -92,4 +82,4 @@ const Login = () => {
   );
 };
 
-export default Login; 
+export default ForgotPassword; 
