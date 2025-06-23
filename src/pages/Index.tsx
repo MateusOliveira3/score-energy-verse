@@ -11,6 +11,8 @@ import UserProfile from '../components/UserProfile';
 import MascotCustomization from '../components/MascotCustomization';
 import EnergyNews from '../components/EnergyNews';
 import GamificationDashboard from '../components/gamification/GamificationDashboard';
+import { useInvoices } from '@/hooks/useInvoices';
+import InvoiceAlerts from '@/components/InvoiceAlerts';
 
 interface InvoiceData {
   consumption: number;
@@ -39,6 +41,7 @@ const Index = () => {
   const [invoiceData, setInvoiceData] = useState<InvoiceData | undefined>();
   const [currentScore, setCurrentScore] = useState(1247);
   const [currentLevel, setCurrentLevel] = useState(7);
+  const { latestInvoice } = useInvoices();
   const [userProfile, setUserProfile] = useState<UserProfileData>({
     consumerType: 'Residencial',
     location: '',
@@ -90,9 +93,14 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-cyan-50">
       <Header />
       <main className="container mx-auto px-4 py-8 space-y-8">
-        {/* Upload de fatura - destaque no topo */}
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-4xl mx-auto space-y-4">
+          <InvoiceAlerts latestInvoice={latestInvoice} />
           <InvoiceUpload />
+          {latestInvoice && (
+            <p className="text-xs text-center text-gray-500">
+              Último envio em: {new Date(latestInvoice.created_at).toLocaleString('pt-BR')}
+            </p>
+          )}
         </div>
 
         {/* Botões de configuração */}

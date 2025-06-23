@@ -32,7 +32,7 @@ export const useInvoices = () => {
     }
   }, [user, fetchInvoices]);
 
-  const addInvoice = async (invoiceData: Omit<Invoice, 'id' | 'created_at' | 'points_earned' | 'user_id'> & { file_url: string, file_name: string }) => {
+  const addInvoice = async (invoiceData: Omit<Invoice, 'id' | 'created_at' | 'points_earned' | 'user_id'>) => {
     if (!user) throw new Error("Usuário não autenticado");
 
     const fullInvoiceData = {
@@ -58,5 +58,7 @@ export const useInvoices = () => {
     return await dataService.uploadFile(file, user.id);
   };
 
-  return { invoices, isLoading, addInvoice, uploadFile, refreshInvoices: fetchInvoices };
+  const latestInvoice = invoices.length > 0 ? invoices[0] : null;
+
+  return { invoices, isLoading, addInvoice, uploadFile, refreshInvoices: fetchInvoices, latestInvoice };
 }; 

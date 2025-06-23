@@ -2,6 +2,7 @@ import { google } from 'googleapis';
 import dotenv from 'dotenv';
 import bcrypt from 'bcrypt';
 import { Readable } from 'stream';
+import fs from 'fs';
 
 dotenv.config();
 
@@ -25,7 +26,7 @@ let sheets: any;
 let drive: any;
 
 // Função de inicialização
-async function initializeGoogleApis() {
+export async function initializeGoogleApis() {
     if (sheets && drive) return;
 
     try {
@@ -204,94 +205,89 @@ export async function createUser(email: string, passwordHash: string) {
 export async function getInvoices(userId: string) {
     console.log(`[Google Service] Buscando faturas para user_id: ${userId}`);
     const rows = await readSheet(SHEETS.INVOICES);
-
-    if (rows.length <= 1) { // Menor ou igual a 1 para contar o cabeçalho
-        console.log(`[Google Service] A aba '${SHEETS.INVOICES}' não tem dados.`);
+    if (rows.length === 0) {
+        console.log(`[Google Service] A aba '${SHEETS.INVOICES}' está vazia ou não foi encontrada.`);
         return [];
     }
-
     const headers = rows[0];
-    const userIdIndex = headers.indexOf('user_id');
-
-    const userInvoices = rows
-        .slice(1) // Pular o cabeçalho
-        .filter(row => row[userIdIndex] === userId)
-        .map(row => rowToObject(row, headers));
+    const userInvoices = rows.slice(1).filter(row => row[headers.indexOf('user_id')] === userId);
     
-    console.log(`[Google Service] Encontradas ${userInvoices.length} faturas para ${userId}.`);
-    return userInvoices;
+    console.log(`[Google Service] Encontradas ${userInvoices.length} faturas para ${userId}`);
+    return userInvoices.map(row => rowToObject(row, headers));
 }
 
-export async function uploadFileToDrive(file: Express.Multer.File, userId: string) {
-    if (!DRIVE_FOLDER_ID) {
-        const errorMessage = "Configuração do servidor incompleta: VITE_GOOGLE_DRIVE_FOLDER_ID não foi definido no arquivo .env";
-        console.error(`[Google Service] ${errorMessage}`);
-        throw new Error(errorMessage);
-    }
-
+export async function uploadInvoice(userId: string, filePath: string, originalName: string) {
     const driveApi = await getDriveApi();
-    console.log(`[Google Service] Fazendo upload do arquivo ${file.originalname} para o usuário ${userId}`);
-    
-    try {
-        const fileMetadata = {
-            name: `${userId}_${Date.now()}_${file.originalname}`,
-            parents: [DRIVE_FOLDER_ID]
-        };
-        const media = {
-            mimeType: file.mimetype,
-            body: Readable.from(file.buffer),
-        };
+    const fileMetadata = {
+        name: originalName,
+        parents: [DRIVE_FOLDER_ID]
+    };
+    const media = {
+        mimeType: 'application/pdf',
+        body: fs.createReadStream(filePath)
+    };
 
-        const response = await driveApi.files.create({
-            requestBody: fileMetadata,
+    try {
+        const file = await driveApi.files.create({
+            resource: fileMetadata,
             media: media,
-            fields: 'id, webViewLink'
+            fields: 'id, name, webViewLink'
         });
-        
-        console.log(`[Google Service] Upload concluído. File ID: ${response.data.id}`);
-        return {
-            id: response.data.id,
-            url: response.data.webViewLink
-        };
+        console.log(`[Google Service] Upload para o Drive concluído. File ID: ${file.data.id}`);
+        return file.data;
     } catch (error) {
-        console.error(`[Google Service] Erro no upload para o Drive:`, error);
-        throw new Error('Falha ao enviar arquivo para o Google Drive');
+        console.error('[Google Service] Erro no upload para o Drive:', error);
+        throw new Error('Falha ao fazer upload do arquivo.');
     }
 }
 
-export async function createInvoiceRecord(invoiceData: any) {
-    console.log('[Google Service] Registrando nova fatura na planilha:', invoiceData);
+export async function saveInvoiceData(userId: string, data: any) {
+    const now = new Date().toISOString();
+    const invoiceId = `invoice_${Date.now()}`;
+
+    const {
+        fileId,
+        fileName,
+        month,
+        year,
+        eletricityKWh,
+        eletricityPrice,
+        sceeeKWh,
+        sceeePrice,
+        gdiKWh,
+        gdiPrice,
+        publicLightingContribution,
+        totalValue,
+        economy
+    } = data;
+
+    const row = [
+        invoiceId,
+        userId,
+        fileId,
+        fileName,
+        month,
+        year,
+        eletricityKWh,
+        eletricityPrice,
+        sceeeKWh,
+        sceeePrice,
+        gdiKWh,
+        gdiPrice,
+        publicLightingContribution,
+        totalValue,
+        economy,
+        'PENDING', // Status inicial
+        now,
+        now
+    ];
+
     try {
-        const {
-            user_id,
-            month,
-            consumption,
-            total_value,
-            tax_percentage,
-            peak_hours,
-            file_url,
-            file_name,
-        } = invoiceData;
-
-        // Cabeçalhos: user_id, month, consumption, total_value, tax_percentage, peak_hours, file_url, file_name, created_at, points_earned
-        const newRow = [
-            user_id,
-            month,
-            consumption,
-            total_value,
-            tax_percentage,
-            peak_hours,
-            file_url,
-            file_name,
-            new Date().toISOString(),
-            100 // Pontos ganhos (exemplo fixo)
-        ];
-
-        await appendToSheet(SHEETS.INVOICES, [newRow]);
-        console.log('[Google Service] Fatura registrada com sucesso.');
+        await appendToSheet(SHEETS.INVOICES, [row]);
+        console.log(`[Google Service] Dados da fatura para ${userId} salvos na planilha.`);
     } catch (error) {
-        console.error(`[Google Service] Erro ao registrar fatura na planilha:`, error);
-        throw new Error('Falha ao registrar fatura na planilha');
+        console.error('[Google Service] Erro ao salvar dados da fatura:', error);
+        throw new Error('Falha ao salvar dados da fatura na planilha.');
     }
 }
 
@@ -312,6 +308,170 @@ async function findRowByValue(sheetName: string, columnIndex: number, value: str
     
     console.log(`[Google Service] Linha NÃO encontrada para ${value} na aba '${sheetName}'.`);
     return null;
+}
+
+export async function getAllUsersForAdmin() {
+    console.log('[Google Service] Buscando todos os usuários para o painel de admin.');
+    try {
+        const usersPromise = readSheet(SHEETS.USERS);
+        const scoresPromise = readSheet(SHEETS.USER_SCORES);
+
+        const [usersRows, scoresRows] = await Promise.all([usersPromise, scoresPromise]);
+
+        if (usersRows.length < 2) return []; // Sem usuários (além do cabeçalho)
+
+        // Mapeia scores para fácil acesso: { user_id: score, ... }
+        const scoresMap = scoresRows.slice(1).reduce((acc, row) => {
+            const scoreData = rowToObject(row, scoresRows[0]);
+            acc[scoreData.user_id] = scoreData.score;
+            return acc;
+        }, {} as Record<string, number>);
+
+        // Combina dados do usuário com seu score
+        const adminUserList = usersRows.slice(1).map(row => {
+            const userData = rowToObject(row, usersRows[0]);
+            return {
+                id: userData.id,
+                email: userData.email,
+                created_at: userData.created_at,
+                score: scoresMap[userData.id] || 0 // Pega o score do mapa ou 0 se não encontrar
+            };
+        });
+
+        console.log(`[Google Service] Encontrados ${adminUserList.length} usuários.`);
+        return adminUserList;
+
+    } catch (error) {
+        console.error(`[Google Service] Erro ao buscar dados para o admin:`, error);
+        throw new Error('Falha ao buscar dados de administrador');
+    }
+}
+
+export async function getGamificationData(userId: string) {
+    console.log(`[Google Service] Buscando dados de gamificação para user_id: ${userId}`);
+    const rows = await readSheet(SHEETS.GAMIFICATION);
+    if (rows.length === 0) {
+        console.log(`[Google Service] A aba '${SHEETS.GAMIFICATION}' está vazia ou não foi encontrada.`);
+        return null;
+    }
+    const headers = rows[0];
+    const gamificationRow = rows.slice(1).find(row => row[headers.indexOf('user_id')] === userId);
+    
+    if (gamificationRow) {
+        console.log(`[Google Service] Dados de gamificação encontrados para ${userId}.`);
+        const data = rowToObject(gamificationRow, headers);
+        // Parse JSON strings back to arrays
+        data.achievements = JSON.parse(data.achievements || '[]');
+        data.completed_missions = JSON.parse(data.completed_missions || '[]');
+        return data;
+    }
+    
+    console.log(`[Google Service] Dados de gamificação NÃO encontrados para ${userId}.`);
+    return null;
+}
+
+export async function updateGamificationData(userId: string, updateData: any) {
+    console.log(`[Google Service] Atualizando dados de gamificação para user_id: ${userId}`);
+    const rows = await readSheet(SHEETS.GAMIFICATION);
+    if (rows.length === 0) {
+        console.log(`[Google Service] A aba '${SHEETS.GAMIFICATION}' está vazia.`);
+        return;
+    }
+
+    const headers = rows[0];
+    const userIndex = rows.slice(1).findIndex(row => row[headers.indexOf('user_id')] === userId);
+    
+    if (userIndex === -1) {
+        console.log(`[Google Service] Usuário ${userId} não encontrado na aba de gamificação.`);
+        return;
+    }
+
+    const rowIndex = userIndex + 1; // +1 porque userIndex é baseado em rows.slice(1)
+    const updatedRow = [...rows[rowIndex]];
+    const now = new Date().toISOString();
+
+    // Atualizar campos específicos
+    if (updateData.coins !== undefined) {
+        updatedRow[headers.indexOf('coins')] = updateData.coins;
+    }
+    if (updateData.achievements !== undefined) {
+        updatedRow[headers.indexOf('achievements')] = JSON.stringify(updateData.achievements);
+    }
+    if (updateData.completed_missions !== undefined) {
+        updatedRow[headers.indexOf('completed_missions')] = JSON.stringify(updateData.completed_missions);
+    }
+    if (updateData.current_streak !== undefined) {
+        updatedRow[headers.indexOf('current_streak')] = updateData.current_streak;
+    }
+    if (updateData.total_points !== undefined) {
+        updatedRow[headers.indexOf('total_points')] = updateData.total_points;
+    }
+    
+    updatedRow[headers.indexOf('updated_at')] = now;
+    rows[rowIndex] = updatedRow;
+
+    try {
+        const sheetsApi = await getSheetsApi();
+        await sheetsApi.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEETS.GAMIFICATION}!A${rowIndex + 1}:Z${rowIndex + 1}`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+                values: [updatedRow],
+            },
+        });
+        console.log(`[Google Service] Dados de gamificação atualizados para ${userId}.`);
+    } catch (error) {
+        console.error('[Google Service] Erro ao atualizar dados de gamificação:', error);
+        throw new Error('Falha ao atualizar dados de gamificação na planilha.');
+    }
+}
+
+export async function getLeaderboard() {
+    console.log('[Google Service] Buscando leaderboard.');
+    try {
+        const scoresPromise = readSheet(SHEETS.USER_SCORES);
+        const profilesPromise = readSheet(SHEETS.USER_PROFILES);
+
+        const [scoresRows, profilesRows] = await Promise.all([scoresPromise, profilesPromise]);
+
+        if (scoresRows.length < 2) return []; // Sem scores (além do cabeçalho)
+
+        const scoreHeaders = scoresRows[0];
+        const scoreData = scoresRows.slice(1);
+        const profileHeaders = profilesRows[0];
+        const profileData = profilesRows.slice(1);
+
+        // Mapeia perfis para fácil acesso: { user_id: profile, ... }
+        const profilesMap = profileData.reduce((acc, row) => {
+            const profileData = rowToObject(row, profileHeaders);
+            acc[profileData.user_id] = profileData;
+            return acc;
+        }, {} as Record<string, any>);
+
+        // Combina dados do score com perfil
+        const leaderboard = scoreData.map(scoreRow => {
+            const scoreData = rowToObject(scoreRow, scoreHeaders);
+            const profile = profilesMap[scoreData.user_id];
+            
+            return {
+                user_id: scoreData.user_id,
+                email: profile ? profile.email : 'Usuário Desconhecido',
+                score: parseInt(scoreData.score) || 0,
+                level: parseInt(scoreData.level) || 1
+            };
+        });
+
+        // Ordena por score decrescente
+        const sortedLeaderboard = leaderboard.sort((a, b) => b.score - a.score);
+        
+        console.log(`[Google Service] Leaderboard gerado com ${sortedLeaderboard.length} usuários.`);
+        return sortedLeaderboard;
+
+    } catch (error) {
+        console.error('[Google Service] Erro ao gerar leaderboard:', error);
+        throw new Error('Falha ao gerar leaderboard');
+    }
 }
 
 // Adicione outras funções aqui (getInvoices, updateUser, etc.) conforme necessário 

@@ -14,6 +14,8 @@ import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import AdminPage from "./pages/AdminPage";
+import RankingPage from "./pages/RankingPage";
 
 const queryClient = new QueryClient();
 
@@ -47,7 +49,15 @@ const AppRoutes = () => (
         </ProtectedRoute>
       }
     />
-    <Route path="/ranking" element={<div>Ranking Page</div>} />
+    <Route
+      path="/admin"
+      element={
+        <ProtectedRoute>
+          <AdminPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route path="/ranking" element={<RankingPage />} />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );

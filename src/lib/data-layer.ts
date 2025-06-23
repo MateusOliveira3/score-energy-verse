@@ -45,14 +45,17 @@ export interface Invoice {
   id: string;
   user_id: string;
   month: string;
-  consumption: number;
-  total_value: number;
-  tax_percentage: number;
-  peak_hours: string;
+  consumption: number | string;
+  total_value: number | string;
+  tax_percentage: number | string;
+  peak_hours: string | number;
   file_url?: string;
   file_name?: string;
   created_at: string;
   points_earned: number;
+  reactive_energy_kvarh?: string;
+  has_fine?: string;
+  due_date?: string;
 }
 
 export interface GamificationData {

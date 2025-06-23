@@ -4,9 +4,27 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Zap, DollarSign, Calendar } from "lucide-react";
+
+// Tipo para os dados do formulário de confirmação
+type FormData = {
+    totalConsumptionKwh: string | number;
+    totalValueBrl: string | number;
+    dueDate: string;
+    // Adicione outros campos que você deseja que sejam editáveis
+};
 
 export function InvoiceUpload() {
     const [isLoading, setIsLoading] = useState(false);
+    // Novo estado para controlar o modal de confirmação
+    const [showConfirmation, setShowConfirmation] = useState(false);
+    // Novo estado para armazenar dados extraídos e do formulário
+    const [formData, setFormData] = useState<FormData | null>(null);
+    // Novo estado para armazenar dados que não são do formulário mas precisam ser passados adiante
+    const [invoiceMetaData, setInvoiceMetaData] = useState<any>(null);
+
     const { addInvoice, uploadFile } = useInvoices();
     const { toast } = useToast();
 
@@ -17,30 +35,30 @@ export function InvoiceUpload() {
         setIsLoading(true);
 
         try {
-            // 1. Fazer upload do arquivo para o Drive via API
+            // 1. Fazer upload do arquivo para o Drive e extrair dados via API
             const uploadResult = await uploadFile(file);
-            
-            // Simulação de extração de dados (no futuro, isso pode vir do backend)
-            const extractedData = {
-                consumption: Math.round(Math.random() * 500) + 100,
-                total_value: Math.round(Math.random() * 300) + 50,
-                tax_percentage: 12,
-                peak_hours: (Math.random() * 50).toFixed(2),
+            console.log("Resultado do upload:", uploadResult);
+
+            // 2. Prepara os dados para o formulário de confirmação
+            setFormData({
+                totalConsumptionKwh: uploadResult.extractedData.totalConsumptionKwh,
+                totalValueBrl: uploadResult.extractedData.totalValueBrl,
+                dueDate: uploadResult.extractedData.dueDate,
+            });
+
+            // 3. Guarda os metadados restantes para o envio final
+            setInvoiceMetaData({
+                tax_percentage: uploadResult.extractedData.taxValueBrl,
+                peak_hours: uploadResult.extractedData.peakConsumptionKwh,
                 month: new Date().toLocaleString('default', { month: 'long' }),
-            };
-            
-            // 2. Registrar a fatura na planilha com a URL do Drive
-            await addInvoice({
-                ...extractedData,
                 file_url: uploadResult.fileUrl,
-                file_name: uploadResult.fileName
+                file_name: uploadResult.fileName,
+                reactive_energy_kvarh: uploadResult.extractedData.reactiveEnergyKvarh,
+                has_fine: uploadResult.extractedData.hasFine,
             });
             
-            toast({
-                title: "Upload bem-sucedido! 🚀",
-                description: "Sua fatura foi enviada e registrada.",
-                variant: "default",
-            });
+            // 4. Mostra o modal de confirmação em vez de salvar diretamente
+            setShowConfirmation(true);
 
         } catch (error) {
             console.error("Erro no processo de upload de fatura:", error);
@@ -55,30 +73,162 @@ export function InvoiceUpload() {
         }
     };
 
+    const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!formData) return;
+        setFormData({
+            ...formData,
+            [e.target.name]: e.target.value
+        });
+    };
+
+    const handleConfirmationSubmit = async () => {
+        if (!formData || !invoiceMetaData) return;
+
+        setIsLoading(true);
+        try {
+            // Convertendo os valores do formulário para número antes de enviar
+            const finalInvoiceData = {
+                consumption: parseFloat(String(formData.totalConsumptionKwh).replace(',', '.')),
+                total_value: parseFloat(String(formData.totalValueBrl).replace(',', '.')),
+                due_date: formData.dueDate,
+                ...invoiceMetaData,
+            };
+
+            await addInvoice(finalInvoiceData);
+
+            toast({
+                title: "Fatura Registrada! 🚀",
+                description: "Sua fatura foi confirmada e salva com sucesso.",
+                variant: "default",
+            });
+
+        } catch (error) {
+            console.error("Erro ao registrar a fatura:", error);
+            const errorMessage = error instanceof Error ? error.message : "Tente novamente.";
+            toast({
+                title: "Erro ao Salvar",
+                description: `Não foi possível salvar a fatura. ${errorMessage}`,
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+            setShowConfirmation(false);
+            setFormData(null);
+            setInvoiceMetaData(null);
+        }
+    };
+
     return (
-        <Card className="border-2 border-emerald-100 shadow-lg">
-            <CardHeader>
-                <CardTitle>Upload de Fatura</CardTitle>
-                <CardDescription>
-                    Envie sua fatura de energia (PDF ou imagem) para análise.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div className="grid w-full max-w-sm items-center gap-1.5">
-                    <Input
-                        id="invoice-file"
-                        type="file"
-                        onChange={handleFileUpload}
-                        disabled={isLoading}
-                        accept=".pdf,.png,.jpg,.jpeg"
-                    />
-                </div>
-                {isLoading && (
-                    <div className="mt-4 flex items-center justify-center">
-                        <p>Enviando e processando...</p>
+        <>
+            <Card className="border-2 border-emerald-100 shadow-lg">
+                <CardHeader>
+                    <CardTitle>Upload de Fatura</CardTitle>
+                    <CardDescription>
+                        Envie sua fatura de energia (PDF ou imagem) para análise.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid w-full max-w-sm items-center gap-1.5">
+                        <Input
+                            id="invoice-file"
+                            type="file"
+                            onChange={handleFileUpload}
+                            disabled={isLoading}
+                            accept=".pdf,.png,.jpg,.jpeg"
+                        />
                     </div>
-                )}
-            </CardContent>
-        </Card>
+                    {isLoading && (
+                        <div className="mt-4 flex items-center justify-center">
+                            <p>Enviando e processando...</p>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* Modal de Confirmação */}
+            <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
+                <DialogContent className="sm:max-w-[425px] bg-white">
+                    <DialogHeader>
+                        <DialogTitle>Confirme os Dados da Fatura</DialogTitle>
+                        <DialogDescription>
+                            Verifique os dados extraídos do seu PDF. Edite se for necessário.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {formData && (
+                        <div className="space-y-6 py-4">
+                            {/* Consumo */}
+                            <div className="flex items-start gap-4">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-yellow-100">
+                                    <Zap className="h-6 w-6 text-yellow-600" />
+                                </div>
+                                <div className="flex-1">
+                                    <Label htmlFor="totalConsumptionKwh" className="text-sm font-medium text-gray-700">
+                                        Consumo (kWh)
+                                    </Label>
+                                    <Input
+                                        id="totalConsumptionKwh"
+                                        name="totalConsumptionKwh"
+                                        value={formData.totalConsumptionKwh}
+                                        onChange={handleFormChange}
+                                        className="mt-1 text-lg font-bold"
+                                    />
+                                </div>
+                            </div>
+                            {/* Valor Total */}
+                            <div className="flex items-start gap-4">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
+                                    <DollarSign className="h-6 w-6 text-green-600" />
+                                </div>
+                                <div className="flex-1">
+                                    <Label htmlFor="totalValueBrl" className="text-sm font-medium text-gray-700">
+                                        Valor Total (R$)
+                                    </Label>
+                                    <Input
+                                        id="totalValueBrl"
+                                        name="totalValueBrl"
+                                        value={formData.totalValueBrl}
+                                        onChange={handleFormChange}
+                                        className="mt-1 text-lg font-bold"
+                                    />
+                                </div>
+                            </div>
+                            {/* Vencimento */}
+                            <div className="flex items-start gap-4">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
+                                    <Calendar className="h-6 w-6 text-blue-600" />
+                                </div>
+                                <div className="flex-1">
+                                    <Label htmlFor="dueDate" className="text-sm font-medium text-gray-700">
+                                        Vencimento
+                                    </Label>
+                                    <Input
+                                        id="dueDate"
+                                        name="dueDate"
+                                        value={formData.dueDate}
+                                        onChange={handleFormChange}
+                                        className="mt-1 text-lg font-bold"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <DialogClose asChild>
+                            <Button type="button" variant="secondary">
+                                Cancelar
+                            </Button>
+                        </DialogClose>
+                        <Button
+                          type="button"
+                          onClick={handleConfirmationSubmit}
+                          disabled={isLoading}
+                          className="bg-emerald-600 hover:bg-emerald-700"
+                        >
+                          {isLoading ? "Salvando..." : "Confirmar e Salvar"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 };

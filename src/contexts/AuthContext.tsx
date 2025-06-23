@@ -59,6 +59,21 @@ const signOutUser = async (): Promise<void> => {
   localStorage.removeItem(CURRENT_USER_KEY);
 };
 
+// Nova função para validar a sessão no servidor
+const validateCurrentUserOnServer = async (user: User): Promise<User | null> => {
+  try {
+    // Tenta buscar o perfil do usuário. Se falhar (ex: 404), a sessão é inválida.
+    const response = await fetch(`${API_BASE_URL}/users/${user.id}/profile`);
+    if (response.ok) {
+      return user; // Sessão válida
+    }
+    return null; // Sessão inválida
+  } catch (error) {
+    console.error("Erro ao validar sessão no servidor:", error);
+    return null; // Trata erros de rede como sessão inválida
+  }
+};
+
 const resetPasswordUser = async (email: string): Promise<void> => {
   // Implementar chamada de API para /auth/reset-password se necessário
   console.warn('Função de reset de senha ainda não implementada no backend.');
@@ -72,8 +87,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Verificar sessão atual
     const checkSession = async () => {
       try {
-        const currentUser = await getCurrentUser();
-        setUser(currentUser);
+        const localUser = await getCurrentUser();
+        if (localUser) {
+          // Valida o usuário do localStorage com o backend
+          const validUser = await validateCurrentUserOnServer(localUser);
+          setUser(validUser);
+        }
       } catch (error) {
         console.error('Erro ao verificar sessão:', error);
         setUser(null);
