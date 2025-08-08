@@ -175,14 +175,32 @@ async function parsePdf(filePath: string): Promise<any> {
 
     // Função para extrair o histórico de consumo
     function extractHistoricoConsumo(text: string): { mes: string, consumo: number, dias: number }[] {
+      // 1. Encontrar todos os meses (ex: ABR/25)
+      const mesesMatch = Array.from(text.matchAll(/([A-Z]{3}\/\d{2})/g));
+      const meses = mesesMatch.map(m => m[1]);
+      if (meses.length === 0) return [];
+
+      // 2. Encontrar o índice do primeiro mês no texto
+      const idxPrimeiroMes = mesesMatch[0].index || 0;
+      // 3. Pegar o texto a partir do primeiro mês
+      const textoAPartirDosMeses = text.slice(idxPrimeiroMes);
+
+      // 4. Extrair todos os consumos (3 dígitos) e dias (1 ou 2 dígitos) após os meses
+      const consumos = Array.from(textoAPartirDosMeses.matchAll(/\b(\d{3})\b/g)).map(m => parseInt(m[1], 10));
+      const dias = Array.from(textoAPartirDosMeses.matchAll(/\b(\d{1,2})\b/g)).map(m => parseInt(m[1], 10));
+
+      // 5. Pegar apenas os N primeiros consumos e dias
+      const N = meses.length;
+      const consumosFinal = consumos.slice(0, N);
+      const diasFinal = dias.slice(0, N);
+
+      // 6. Montar a tabela
       const historico: { mes: string, consumo: number, dias: number }[] = [];
-      const regex = /([A-Z]{3}\/\d{2})\s+(\d{1,5})\s+(\d{1,2})/g;
-      let match;
-      while ((match = regex.exec(text)) !== null) {
+      for (let i = 0; i < N; i++) {
         historico.push({
-          mes: match[1],
-          consumo: parseInt(match[2], 10),
-          dias: parseInt(match[3], 10)
+          mes: meses[i],
+          consumo: consumosFinal[i] || 0,
+          dias: diasFinal[i] || 0
         });
       }
       return historico;
@@ -287,6 +305,59 @@ function calculatePoints(economy: number, totalValue: number): number {
     points += 25; // Bônus base
     
     return points;
+}
+
+function diagnosticoEnergetico(extractedData: any): Array<{ tipo: string, mensagem: string }> {
+    const recomendacoes: Array<{ tipo: string, mensagem: string }> = [];
+    
+    // Extrair valores dos dados
+    const eletricityKWh = parseFloat(extractedData.eletricityKWh || '0');
+    const sceeeKWh = parseFloat(extractedData.sceeeKWh || '0');
+    const gdiKWh = parseFloat(extractedData.gdiKWh || '0');
+    const publicLightingContribution = parseFloat(extractedData.publicLightingContribution || '0');
+    const eletricityPrice = parseFloat(extractedData.eletricityPrice || '0');
+    
+    // Critério 1: Consumo alto
+    if (eletricityKWh + sceeeKWh > 250) {
+        recomendacoes.push({
+            tipo: "alerta",
+            mensagem: "Consumo elevado. Avalie hábitos e equipamentos."
+        });
+    }
+    
+    // Critério 2: Sem geração distribuída
+    if (gdiKWh === 0) {
+        recomendacoes.push({
+            tipo: "sugestao",
+            mensagem: "Sem GD detectada. Avalie energia solar."
+        });
+    }
+    
+    // Critério 3: CIP alta
+    if (publicLightingContribution > 50) {
+        recomendacoes.push({
+            tipo: "alerta",
+            mensagem: "CIP elevada. Possível revisão da iluminação pública."
+        });
+    }
+    
+    // Critério 4: Tarifa alta
+    if (eletricityPrice > 1.00) {
+        recomendacoes.push({
+            tipo: "sugestao",
+            mensagem: "Tarifa alta detectada. Considere mudança de hábitos ou tarifa."
+        });
+    }
+    
+    // Se não há recomendações, adicionar uma positiva
+    if (recomendacoes.length === 0) {
+        recomendacoes.push({
+            tipo: "positivo",
+            mensagem: "Consumo dentro dos padrões esperados. Continue assim!"
+        });
+    }
+    
+    return recomendacoes;
 }
 
 // Rota de Teste para verificar se o servidor está no ar
@@ -427,8 +498,11 @@ app.post(
 
       const economy = calculateEconomy(extractedData);
       const points = calculatePoints(economy, extractedData.totalValueBrl);
+      const diagnostico = diagnosticoEnergetico(extractedData);
+      
       console.log(`[API] Economia calculada: R$ ${economy}`);
       console.log(`[API] Pontos calculados: ${points}`);
+      console.log(`[API] Diagnóstico energético:`, diagnostico);
       
       const invoicePayload = {
         ...extractedData,
@@ -437,6 +511,7 @@ app.post(
         fileName: req.file.originalname,
         economy,
         points,
+        diagnostico
       };
 
       await saveInvoiceData(userId, invoicePayload);
@@ -449,6 +524,7 @@ app.post(
         fileName: req.file.originalname,
         economy,
         points,
+        diagnostico
       });
 
     } catch (error) {

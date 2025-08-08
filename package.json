@@ -9,7 +9,8 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "serve:api": "tsx --no-cache server/index.ts",
-    "build:server": "rimraf dist && tsc -p tsconfig.server.json"
+    "build:server": "rimraf dist && tsc -p tsconfig.server.json",
+    "start": "concurrently \"npm run dev\" \"npm run serve:api\""
   },
   "dependencies": {
     "@google-cloud/local-auth": "^3.0.1",
@@ -41,7 +42,7 @@
     "@radix-ui/react-toggle": "^1.1.0",
     "@radix-ui/react-toggle-group": "^1.1.0",
     "@radix-ui/react-tooltip": "^1.1.4",
-    "@supabase/supabase-js": "^2.50.0",
+    "@supabase/supabase-js": "^2.54.0",
     "@tanstack/react-query": "^5.56.2",
     "bcrypt": "^6.0.0",
     "canvas": "^3.1.1",

@@ -32,25 +32,7 @@ export const useInvoices = () => {
     }
   }, [user, fetchInvoices]);
 
-  const addInvoice = async (invoiceData: Omit<Invoice, 'id' | 'created_at' | 'points_earned' | 'user_id'>) => {
-    if (!user) throw new Error("Usuário não autenticado");
 
-    const fullInvoiceData = {
-      ...invoiceData,
-      user_id: user.id,
-    };
-    
-    await dataService.addInvoice(fullInvoiceData);
-    
-    // Atualizar a lista localmente para refletir a nova fatura instantaneamente
-    const newInvoice: Invoice = {
-      ...fullInvoiceData,
-      id: new Date().getTime().toString(), // ID temporário para UI
-      created_at: new Date().toISOString(),
-      points_earned: 100, // Valor de exemplo
-    };
-    setInvoices(prev => [newInvoice, ...prev]);
-  };
 
   const uploadFile = async (file: File) => {
     if (!user) throw new Error("Usuário não autenticado");
@@ -60,5 +42,5 @@ export const useInvoices = () => {
 
   const latestInvoice = invoices.length > 0 ? invoices[0] : null;
 
-  return { invoices, isLoading, addInvoice, uploadFile, refreshInvoices: fetchInvoices, latestInvoice };
+  return { invoices, isLoading, uploadFile, refreshInvoices: fetchInvoices, latestInvoice };
 }; 

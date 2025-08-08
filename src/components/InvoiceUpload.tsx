@@ -25,7 +25,7 @@ export function InvoiceUpload() {
     // Novo estado para armazenar dados que não são do formulário mas precisam ser passados adiante
     const [invoiceMetaData, setInvoiceMetaData] = useState<any>(null);
 
-    const { addInvoice, uploadFile } = useInvoices();
+    const { uploadFile } = useInvoices();
     const { toast } = useToast();
 
     const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,28 +86,21 @@ export function InvoiceUpload() {
 
         setIsLoading(true);
         try {
-            // Convertendo os valores do formulário para número antes de enviar
-            const finalInvoiceData = {
-                consumption: parseFloat(String(formData.totalConsumptionKwh).replace(',', '.')),
-                total_value: parseFloat(String(formData.totalValueBrl).replace(',', '.')),
-                due_date: formData.dueDate,
-                ...invoiceMetaData,
-            };
-
-            await addInvoice(finalInvoiceData);
-
+            // Os dados já foram salvos automaticamente no upload
+            // Apenas confirmamos que o usuário está satisfeito com os dados extraídos
+            
             toast({
                 title: "Fatura Registrada! 🚀",
-                description: "Sua fatura foi confirmada e salva com sucesso.",
+                description: "Sua fatura foi processada e salva com sucesso.",
                 variant: "default",
             });
 
         } catch (error) {
-            console.error("Erro ao registrar a fatura:", error);
+            console.error("Erro ao confirmar a fatura:", error);
             const errorMessage = error instanceof Error ? error.message : "Tente novamente.";
             toast({
-                title: "Erro ao Salvar",
-                description: `Não foi possível salvar a fatura. ${errorMessage}`,
+                title: "Erro ao Confirmar",
+                description: `Não foi possível confirmar a fatura. ${errorMessage}`,
                 variant: "destructive",
             });
         } finally {

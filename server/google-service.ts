@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import bcrypt from 'bcrypt';
 import { Readable } from 'stream';
 import fs from 'fs';
+import { uploadInvoiceToSupabase } from './lib/supabase-upload.js';
 
 dotenv.config();
 
@@ -216,27 +217,41 @@ export async function getInvoices(userId: string) {
     return userInvoices.map(row => rowToObject(row, headers));
 }
 
-export async function uploadInvoice(userId: string, filePath: string, originalName: string) {
-    const driveApi = await getDriveApi();
-    const fileMetadata = {
-        name: originalName,
-        parents: [DRIVE_FOLDER_ID]
-    };
-    const media = {
-        mimeType: 'application/pdf',
-        body: fs.createReadStream(filePath)
-    };
+// Função auxiliar para buscar ou criar pasta do usuário no Drive
+async function getOrCreateUserFolder(driveApi: any, userEmail: string, parentFolderId: string) {
+    // Procurar pasta existente
+    const res = await driveApi.files.list({
+        q: `name='${userEmail}' and mimeType='application/vnd.google-apps.folder' and '${parentFolderId}' in parents and trashed=false`,
+        fields: 'files(id, name)',
+    });
+    if (res.data.files.length > 0) {
+        return res.data.files[0].id;
+    }
+    // Criar nova pasta
+    const folder = await driveApi.files.create({
+        requestBody: {
+            name: userEmail,
+            mimeType: 'application/vnd.google-apps.folder',
+            parents: [parentFolderId],
+        },
+        fields: 'id',
+    });
+    return folder.data.id;
+}
 
+export async function uploadInvoice(userId: string, filePath: string, originalName: string) {
     try {
-        const file = await driveApi.files.create({
-            resource: fileMetadata,
-            media: media,
-            fields: 'id, name, webViewLink'
-        });
-        console.log(`[Google Service] Upload para o Drive concluído. File ID: ${file.data.id}`);
-        return file.data;
+        console.log('[Upload Service] Usando Supabase Storage para upload...');
+        
+        // Usar Supabase Storage para upload
+        const result = await uploadInvoiceToSupabase(userId, filePath, originalName);
+        
+        console.log(`[Upload Service] Upload para Supabase concluído: ${result.id}`);
+        
+        return result;
+        
     } catch (error) {
-        console.error('[Google Service] Erro no upload para o Drive:', error);
+        console.error('[Upload Service] Erro no upload para Supabase:', error);
         throw new Error('Falha ao fazer upload do arquivo.');
     }
 }
@@ -258,7 +273,9 @@ export async function saveInvoiceData(userId: string, data: any) {
         gdiPrice,
         publicLightingContribution,
         totalValue,
-        economy
+        economy,
+        points,
+        diagnostico
     } = data;
 
     const row = [
@@ -277,6 +294,8 @@ export async function saveInvoiceData(userId: string, data: any) {
         publicLightingContribution,
         totalValue,
         economy,
+        points || 0,
+        JSON.stringify(diagnostico || []),
         'PENDING', // Status inicial
         now,
         now
@@ -286,8 +305,57 @@ export async function saveInvoiceData(userId: string, data: any) {
         await appendToSheet(SHEETS.INVOICES, [row]);
         console.log(`[Google Service] Dados da fatura para ${userId} salvos na planilha.`);
     } catch (error) {
-        console.error('[Google Service] Erro ao salvar dados da fatura:', error);
-        throw new Error('Falha ao salvar dados da fatura na planilha.');
+        console.error('[Google Service] Erro ao salvar dados da fatura no Google Sheets:', error);
+        
+        // FALLBACK: Salvar localmente se o Google Sheets não estiver acessível
+        console.log('[Google Service] Usando fallback local para dados da fatura...');
+        
+        try {
+            // Criar pasta local para dados se não existir
+            const dataDir = './local_data';
+            if (!fs.existsSync(dataDir)) {
+                fs.mkdirSync(dataDir, { recursive: true });
+            }
+            
+            // Criar pasta do usuário se não existir
+            const userDataDir = `${dataDir}/${userId}`;
+            if (!fs.existsSync(userDataDir)) {
+                fs.mkdirSync(userDataDir, { recursive: true });
+            }
+            
+            // Salvar dados da fatura em arquivo JSON local
+            const invoiceData = {
+                id: invoiceId,
+                userId,
+                fileId,
+                fileName,
+                month,
+                year,
+                eletricityKWh,
+                eletricityPrice,
+                sceeeKWh,
+                sceeePrice,
+                gdiKWh,
+                gdiPrice,
+                publicLightingContribution,
+                totalValue,
+                economy,
+                points: points || 0,
+                diagnostico: diagnostico || [],
+                status: 'PENDING',
+                created_at: now,
+                updated_at: now
+            };
+            
+            const invoiceFilePath = `${userDataDir}/invoice_${Date.now()}.json`;
+            fs.writeFileSync(invoiceFilePath, JSON.stringify(invoiceData, null, 2));
+            
+            console.log(`[Google Service] Dados da fatura salvos localmente: ${invoiceFilePath}`);
+            
+        } catch (fallbackError) {
+            console.error('[Google Service] Erro no fallback local:', fallbackError);
+            throw new Error('Falha ao salvar dados da fatura (Google Sheets e local)');
+        }
     }
 }
 
