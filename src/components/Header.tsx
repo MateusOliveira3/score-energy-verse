@@ -1,7 +1,24 @@
 import React from 'react';
-import { Leaf, Trophy, User } from 'lucide-react';
+import { Trophy, User } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Link } from 'react-router-dom';
+
+// Inline logo symbol for SCORE ENERGY
+const ScoreEnergyLogo: React.FC<{ className?: string }> = ({ className }) => (
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <path d="M13 2 L5 14 h6 l-2 8 10-12 h-6 z" fill="currentColor" stroke="none" />
+  </svg>
+);
 
 const Header = () => {
   return (
@@ -12,7 +29,7 @@ const Header = () => {
             {/* Link para a Landing Page */}
             <Link to="/">
               <div className="p-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl">
-                <Leaf className="h-6 w-6 text-white" />
+                <ScoreEnergyLogo className="h-6 w-6 text-white" />
               </div>
             </Link>
             <div>
