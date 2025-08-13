@@ -1,50 +1,49 @@
 // server/lib/num.ts
 /**
- * Converte string numérica em número lidando com variações:
- * - "285,20" (BR) -> 285.20
- * - "285.20" (US) -> 285.20
- * - "345.000" quando representa kWh inteiros (3 casas decimais técnicas) -> 345
- * - "34.500" quando for milhar (1-3 dígitos por grupo) -> 34500
- *
- * Regras:
- * 1) Se houver vírgula, assumimos vírgula como decimal -> removemos pontos e trocamos vírgula por ponto.
- * 2) Se não houver vírgula:
- *    2.1) Se corresponder a /^\d+\.\d{3}$/ (ex.: "345.000", "41.700"), tratamos como "ponto decimal técnico" -> parseFloat direto.
- *         e arredondamos para 3 casas, depois, se for kWh típico, pode virar inteiro (345.000 -> 345).
- *    2.2) Se corresponder a padrão de milhar /^\d{1,3}(\.\d{3})+$/, remove pontos -> parseFloat.
- *    2.3) Caso contrário, parseFloat direto.
+ * Converte strings BR/Sheets/US para número de forma robusta.
+ * Casos tratados:
+ * - "285,20" -> 285.20
+ * - "285.20" -> 285.20
+ * - "345.000" / "41.700" (3 casas técnicas) -> 345 / 41.7
+ * - "34.500" (milhar) -> 34500
  */
 export function toNumberBR(x: any): number {
   if (x === null || x === undefined) return 0;
   if (typeof x === 'number' && Number.isFinite(x)) return x;
-
   const raw = String(x).trim();
   if (!raw) return 0;
 
-  // 1) tem vírgula => BR decimal
+  // Decimal BR (tem vírgula)
   if (raw.includes(',')) {
     const s = raw.replace(/\./g, '').replace(',', '.');
     const n = parseFloat(s);
     return Number.isFinite(n) ? n : 0;
   }
 
-  // 2) sem vírgula
-  // 2.1) "decimal técnico" de 3 casas: 345.000 / 41.700
+  // 3 casas "técnicas" (ex.: "41.700" => 41.7 | "345.000" => 345)
   if (/^\d+\.\d{3}$/.test(raw)) {
-    const n = parseFloat(raw); // 345.000 -> 345, 41.700 -> 41.7
+    const n = parseFloat(raw);
     return Number.isFinite(n) ? n : 0;
   }
 
-  // 2.2) padrão só de milhares: 1.234 ou 12.345.678
+  // Milhar "clássico" (ex.: "34.500", "1.234.567")
   if (/^\d{1,3}(\.\d{3})+$/.test(raw)) {
-    const s = raw.replace(/\./g, '');
-    const n = parseFloat(s);
+    const n = parseFloat(raw.replace(/\./g, ''));
     return Number.isFinite(n) ? n : 0;
   }
 
-  // 2.3) fallback: parseFloat direto (ex.: "302.240" que realmente é decimal "US")
-  const nf = parseFloat(raw);
-  return Number.isFinite(nf) ? nf : 0;
+  const n = parseFloat(raw);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export function coerceKwhIfSuspicious(n: number, raw?: any): number {
+  if (!Number.isFinite(n)) return 0;
+  const s = String(raw ?? '');
+  // se veio no formato 3 casas técnicas e o número ficou "inflado" (múltiplo de 1000), divida
+  if (/^\d+\.\d{3}$/.test(s) && n >= 10000 && n % 1000 === 0) {
+    return n / 1000;
+  }
+  return n;
 }
 
 function isoDate(x: any): number {

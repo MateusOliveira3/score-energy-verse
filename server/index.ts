@@ -1,7 +1,7 @@
 import express, { Request, Response, RequestHandler } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { initializeGoogleApis, saveInvoiceData, signInUser, createUser, getInvoices, getUserProfile, getAllUsersForAdmin, getGamificationData, updateGamificationData, getLeaderboard, detectAndFixTariffsOnce } from './google-service.js';
+import { initializeGoogleApis, saveInvoiceData, signInUser, createUser, getInvoices, getUserProfile, getAllUsersForAdmin, getGamificationData, updateGamificationData, getLeaderboard, detectAndFixTariffsOnce, getDiagnosisByUser, getLastInvoiceNormalized } from './google-service.js';
 import multer from 'multer';
 import fs from 'fs';
 import os from 'os';
@@ -23,6 +23,8 @@ console.log("--- V3: EXECUTANDO O ARQUIVO server/index.ts ---");
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+
 
 console.log("--- EXECUTANDO A VERSÃO MAIS RECENTE DO PDF-PARSER (EMBUTIDO) ---");
 
@@ -858,7 +860,6 @@ app.put('/api/users/:userId/gamification', async (req: Request, res: Response) =
 });
 
 import type { DiagnosisListOptions } from './lib/types.js';
-import { getDiagnosisByUser } from './google-service.js';
 
 type FixResult = { updated: number; checked: number };
 
@@ -1115,6 +1116,38 @@ app.post('/api/invoices/analyze-pdf', upload.single('invoice'), async (req, res)
   } catch (error: any) {
     console.error('[API] Erro em /api/invoices/analyze-pdf:', error?.message || error);
     res.status(500).json({ message: 'Erro ao analisar o PDF.' });
+  }
+});
+
+app.get('/api/users/:userId/last-invoice', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const inv = await getLastInvoiceNormalized(userId);
+    if (!inv) {
+      console.warn('[last-invoice] nenhum registro para', userId);
+      res.status(404).json({ message: 'Nenhuma fatura encontrada.' });
+      return;
+    }
+
+    // tenta casar com o diagnóstico mais recente do mesmo mês/ano
+    const diagResp = await getDiagnosisByUser(userId, { limit: 10 });
+    const diags = Array.isArray((diagResp as any)?.items)
+      ? (diagResp as any).items
+      : Array.isArray(diagResp)
+        ? (diagResp as any)
+        : [];
+
+    const match = diags.find((d: any) => Number(d.month) === Number(inv.month) && Number(d.year) === Number(inv.year));
+
+    res.json({
+      ...inv,
+      tips: match?.recommendations ?? match?.tips ?? [],
+      score_total: match?.score_total ?? 0,
+      score_breakdown: match?.score_breakdown ?? {},
+    });
+  } catch (e: any) {
+    console.error('[last-invoice] error', e?.message);
+    res.status(500).json({ message: 'Erro ao obter última fatura.' });
   }
 });
 

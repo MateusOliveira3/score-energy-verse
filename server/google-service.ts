@@ -3,72 +3,55 @@ import dotenv from 'dotenv';
 import bcrypt from 'bcrypt';
 import { Readable } from 'stream';
 import fs from 'fs';
-import { normalizeTariffUnit } from './lib/num';
+// imports no topo
+import { toNumberBR, coerceKwhIfSuspicious, safeDiv } from './lib/num.js';
 
-// === [ADICIONAR / SUBSTITUIR] utilidades no topo do arquivo ===
-type AnyRow = Record<string, any>;
+// mapeia nomes PT/EN que já vi na planilha
+const COL = {
+  id: ['id', 'invoice_id'],
+  user_id: ['user_id', 'userId'],
+  file_name: ['file_name', 'filename'],
+  uc: ['unidade_consumidora', 'customerNumber', 'consumer_unit', 'uc'],
+  month: ['mes', 'month'],
+  year: ['ano', 'year'],
+  kwh_total: ['consumo_total_kwh', 'consumption_total_kwh', 'consumo_te_kwh', 'consumption_kwh'],
+  total_brl: ['valor_total_brl', 'total_value_brl'],
+  created_at: ['data_criacao', 'created_at'],
+};
 
-function toNumberBR(x: any): number {
-  if (x === null || x === undefined) return 0;
-  if (typeof x === 'number' && Number.isFinite(x)) return x;
-  const s = String(x).trim();
-  if (!s) return 0;
-  const n = parseFloat(s.replace(/\./g, '').replace(',', '.'));
-  return Number.isFinite(n) ? n : 0;
-}
-
-function safeDateISO(x: any): string | null {
-  if (!x) return null;
-  const d = new Date(x);
-  return isNaN(d.getTime()) ? null : d.toISOString();
-}
-
-function pick<T extends object>(row: AnyRow, keys: (keyof T)[], map: Record<string, string> = {}): T {
-  const out: AnyRow = {};
-  for (const k of keys as string[]) {
-    const cand = [k, map[k]].filter(Boolean) as string[];
-    let value: any = undefined;
-    for (const name of cand) {
-      if (name in row) { value = row[name]; break; }
-    }
-    out[k] = value;
-  }
-  return out as T;
+function pick(row: any, keys: string[]) {
+  for (const k of keys) if (row[k] !== undefined) return row[k];
+  return undefined;
 }
 
 function normalizeInvoiceRow(row: Record<string, any>) {
-  const month = row.mes ?? row.month;
-  const year  = row.ano ?? row.year;
+  const rawMonth = pick(row, COL.month);
+  const rawYear  = pick(row, COL.year);
+  const rawKwh   = pick(row, COL.kwh_total);
+  const rawTotal = pick(row, COL.total_brl);
+  const rawCreated = pick(row, COL.created_at);
 
-  const consumption_kwh =
-    toNumberBR(row.consumo_total_kwh) ||
-    toNumberBR(row.consumo_te_kwh) ||
-    toNumberBR(row.consumption_kwh);
+  let consumption_kwh = toNumberBR(rawKwh);
+  consumption_kwh = coerceKwhIfSuspicious(consumption_kwh, rawKwh);
 
-  const total_value_brl =
-    toNumberBR(row.valor_total_brl) ||
-    toNumberBR(row.total_value_brl);
+  const total_value_brl = toNumberBR(rawTotal);
+  const value_per_kwh   = safeDiv(total_value_brl, consumption_kwh);
 
-  const value_per_kwh =
-    consumption_kwh > 0 ? total_value_brl / consumption_kwh : 0;
-
-  const created_at =
-    (row.data_criacao && new Date(row.data_criacao).toISOString()) ||
-    (row.created_at && new Date(row.created_at).toISOString()) ||
-    null;
+  const created_at = rawCreated ? new Date(rawCreated).toISOString() : null;
 
   return {
-    id: row.id ?? row.invoice_id ?? `invoice_${Date.now()}`,
-    user_id: row.user_id,
-    file_name: row.file_name ?? '',
-    unidade_consumidora: row.unidade_consumidora ?? row.customerNumber ?? '',
-    month: toNumberBR(month),
-    year: toNumberBR(year),
+    id: pick(row, COL.id) ?? `invoice_${Date.now()}`,
+    user_id: pick(row, COL.user_id),
+    file_name: pick(row, COL.file_name) ?? '',
+    unidade_consumidora: pick(row, COL.uc) ?? '',
+    month: toNumberBR(rawMonth),
+    year: toNumberBR(rawYear),
     consumption_kwh,
     total_value_brl,
     value_per_kwh,
     status: row.status ?? 'PROCESSED',
     created_at,
+    __raw: row, // ajuda no debug
   };
 }
 
@@ -215,10 +198,10 @@ export async function getInvoicesRaw(userId: string) {
   if (!rows.length) return [];
   const headers = rows[0];
   const payload = rows.slice(1).map(r => {
-    const obj: AnyRow = {};
-    headers.forEach((h: string, i: number) => { obj[h] = r[i]; });
-    return obj;
-  }).filter((r: AnyRow) => (r.user_id === userId));
+      const obj: Record<string, any> = {};
+  headers.forEach((h: string, i: number) => { obj[h] = r[i]; });
+  return obj;
+}).filter((r: Record<string, any>) => (r.user_id === userId));
 
   const normalized = payload.map(normalizeInvoiceRow);
   normalized.sort(sortByCreatedAtThenMY);
@@ -231,12 +214,12 @@ export async function getUserHistory(userId: string) {
 
   // diagnosis (já existente)
   const diagRows = await readSheet('invoices_diagnosis');
-  let diagnosis: AnyRow[] = [];
+  let diagnosis: Record<string, any>[] = [];
   if (diagRows.length) {
     const hdr = diagRows[0];
     diagnosis = diagRows.slice(1)
       .map(r => {
-        const o: AnyRow = {};
+        const o: Record<string, any> = {};
         hdr.forEach((h: string, i: number) => o[h] = r[i]);
         return o;
       })
@@ -256,12 +239,33 @@ export async function getUserHistory(userId: string) {
           catch { return []; }
         })(),
         value_per_kwh: toNumberBR(o.valor_por_kwh ?? o.value_per_kwh ?? 0),
-        created_at: safeDateISO(o.created_at ?? o.data_criacao) || null,
+        created_at: (o.created_at || o.data_criacao) ? new Date(o.created_at || o.data_criacao).toISOString() : null,
       }));
     diagnosis.sort(sortByCreatedAtThenMY);
   }
 
   return { invoices, diagnosis };
+}
+
+// devolve TODAS as faturas do user (como o seu getInvoices já faz);
+// se já houver a função no arquivo, mantenha e use-a.
+// AQUI, criaremos um helper de "última fatura" robusto:
+export async function getLastInvoiceNormalized(userId: string) {
+  const rows = await getInvoices(userId); // reutilize sua função existente
+  if (!rows || rows.length === 0) return null;
+
+  const normalized = rows.map(normalizeInvoiceRow).filter(r => r.user_id === userId);
+
+  // ordena por created_at desc, depois por (year,month) desc
+  normalized.sort((a, b) => {
+    const ad = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const bd = b.created_at ? new Date(b.created_at).getTime() : 0;
+    if (bd !== ad) return bd - ad;
+    if (b.year !== a.year) return (b.year || 0) - (a.year || 0);
+    return (b.month || 0) - (a.month || 0);
+  });
+
+  return normalized[0] ?? null;
 }
 
 async function appendToSheet(sheetName: string, rows: any[][]) {
@@ -521,12 +525,12 @@ export async function saveInvoiceData(userId, data) {
   const totalKwh  = formatForSheet(data.totalConsumptionKwh ?? (kwh_te + kwh_sceee), 3);
   const totalBRL  = formatForSheet(data.totalValueBrl, 2);
 
-  const te_com    = formatForSheet(normalizeTariffUnit(data.tarifa_te_com_impostos), 3);
-  const te_sem    = formatForSheet(normalizeTariffUnit(data.tarifa_te_sem_impostos), 3);
-  const tusd_com  = formatForSheet(normalizeTariffUnit(data.tarifa_tusd_com_impostos), 3);
-  const tusd_sem  = formatForSheet(normalizeTariffUnit(data.tarifa_tusd_sem_impostos), 3);
-  const band_com  = formatForSheet(normalizeTariffUnit(data.tarifa_bandeira_com_impostos), 3);
-  const band_sem  = formatForSheet(normalizeTariffUnit(data.tarifa_bandeira_sem_impostos), 3);
+      const te_com    = formatForSheet(toNumberBR(data.tarifa_te_com_impostos), 3);
+    const te_sem    = formatForSheet(toNumberBR(data.tarifa_te_sem_impostos), 3);
+    const tusd_com  = formatForSheet(toNumberBR(data.tarifa_tusd_com_impostos), 3);
+    const tusd_sem  = formatForSheet(toNumberBR(data.tarifa_tusd_sem_impostos), 3);
+    const band_com  = formatForSheet(toNumberBR(data.tarifa_bandeira_com_impostos), 3);
+    const band_sem  = formatForSheet(toNumberBR(data.tarifa_bandeira_sem_impostos), 3);
 
   const row = [
     invoiceId,
@@ -1044,4 +1048,6 @@ export async function getLastDiagnosisRow(userId: string) {
     .sort((a, b) => String(b[idxCreated]).localeCompare(String(a[idxCreated])));
 
   return items[0] || null;
-} 
+}
+
+ 

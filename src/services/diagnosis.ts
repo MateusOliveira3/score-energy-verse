@@ -37,6 +37,21 @@ export type DiagnosisLite = {
   created_at: string | null;
 };
 
+export type LastInvoiceDTO = {
+  id: string;
+  user_id: string;
+  month: number;
+  year: number;
+  consumption_kwh: number;
+  total_value_brl: number;
+  value_per_kwh: number;
+  status?: string;
+  created_at?: string | null;
+  tips?: string[];
+  score_total?: number;
+  score_breakdown?: Record<string, number>;
+};
+
 export async function fetchDiagnosis(userId: string): Promise<DiagnosisItem[]> {
   if (!userId) throw new Error('userId é obrigatório');
   const res = await fetch(`/api/users/${encodeURIComponent(userId)}/diagnosis`, {
@@ -60,6 +75,17 @@ export async function fetchLastAnalysis(userId: string) {
   if (!r.ok) throw new Error('Falha ao buscar última análise');
   const j = await r.json();
   return j?.data ?? null;
+}
+
+export async function fetchLastInvoice(userId: string): Promise<LastInvoiceDTO | null> {
+  const r = await fetch(`/api/users/${userId}/last-invoice`);
+  if (!r.ok) {
+    console.warn('[fetchLastInvoice] status', r.status);
+    return null;
+  }
+  const data = await r.json();
+  console.log('[fetchLastInvoice] payload', data);
+  return data;
 }
 
 export async function fetchHistory(userId: string) {

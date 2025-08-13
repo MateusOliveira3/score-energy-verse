@@ -1,6 +1,6 @@
 // server/lib/invoice-parser.ts
 import { InvoiceParsed, asNumberOrZero } from './types.js';
-import { toNumberBR, normalizeTariffKWh, asSheetNumber } from './num';
+import { toNumberBR, normalizeTariffUnit } from './num.js';
 
 /**
  * Parser desacoplado para transformar texto "flat" da fatura
@@ -116,7 +116,7 @@ export function parseInvoiceText(rawText: string): InvoiceParsed {
     const sceeeKWh      = toNumberBR(sceeeKWhRaw);
     const gdiKWh        = toNumberBR(gdiKWhRaw);
 
-    const consumption_kwh = asSheetNumber(eletricityKWh + sceeeKWh, 3);
+    const consumption_kwh = toNumberBR(eletricityKWh + sceeeKWh);
 
     // 3) Valor total (R$)
     // Buscar após labels comuns: "Total a pagar", "Total da fatura", "Valor total"
@@ -129,7 +129,7 @@ export function parseInvoiceText(rawText: string): InvoiceParsed {
     
     // Usar as funções utilitárias para parsing robusto
     // asSheetNumber() garante formato seguro para Google Sheets
-    const total_value_brl = asSheetNumber(total_value_brl_raw, 2);
+    const total_value_brl = toNumberBR(total_value_brl_raw);
 
     // 4) Reativo excedente (has_reactive)
     const has_reactive = hasAny(cleaned, [
@@ -152,7 +152,7 @@ export function parseInvoiceText(rawText: string): InvoiceParsed {
     // 7) Valor por kWh (R$/kWh)
     // asSheetNumber() com 4 decimais para precisão em tarifas
     const value_per_kwh = consumption_kwh > 0
-      ? asSheetNumber(total_value_brl / consumption_kwh, 4)
+      ? toNumberBR(total_value_brl / consumption_kwh)
       : 0;
 
     // 8) Contribuição de iluminação pública (opcional)
@@ -164,7 +164,7 @@ export function parseInvoiceText(rawText: string): InvoiceParsed {
     }
     
     // Usar as funções utilitárias para parsing robusto
-    const publicLightingContribution = asSheetNumber(publicLightingContributionRaw, 2);
+    const publicLightingContribution = toNumberBR(publicLightingContributionRaw);
 
     const invoice: InvoiceParsed = {
       month,
