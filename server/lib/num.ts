@@ -43,13 +43,42 @@ export function fromBRStringSmart(x: any): number {
 
 // Dinheiro sempre em BRL, aceita "285,20"/"285.20"
 export function fromMoney(x: any): number {
+  if (x === null || x === undefined) return 0;
+  if (isFiniteNumber(x)) return x;
+
+  const s = String(x).trim();
+  if (!s) return 0;
+
+  // CORRIGIDO: Para dinheiro, tratar ponto como decimal (formato americano)
+  // "285.20" -> 285.20, "285,20" -> 285.20
+  if (s.includes('.') && !s.includes(',')) {
+    // Se tem ponto mas não vírgula, é formato americano (decimal)
+    const n = parseFloat(s);
+    if (Number.isFinite(n)) return n;
+  }
+
+  // Caso contrário, usar a função genérica (formato brasileiro)
   return fromBRStringSmart(x);
 }
 
 // kWh vindo do parser/Sheets (345.000, 41.700, 345,000 etc.)
 export function fromKwh(x: any): number {
+  if (x === null || x === undefined) return 0;
+  if (isFiniteNumber(x)) return x;
+
+  const s = String(x).trim();
+  if (!s) return 0;
+
+  // CORRIGIDO: Para kWh, tratar ponto como separador de milhar (formato brasileiro)
+  // "345.000" -> 345000, "41.700" -> 41700
+  if (s.includes('.') && !s.includes(',')) {
+    // Se tem ponto mas não vírgula, é formato brasileiro (milhar)
+    const n = parseFloat(s.replace(/\./g, ''));
+    if (Number.isFinite(n) && n > 0 && n <= 200000) return n;
+  }
+
+  // Caso contrário, usar a função genérica
   const n = fromBRStringSmart(x);
-  // proteção contra milhões por erro de milhar
   if (!Number.isFinite(n)) return 0;
   if (n > 200000) return 0; // muito improvável para fatura mensal
   return n;

@@ -73,33 +73,56 @@ async function parsePdf(filePath: string): Promise<any> {
     };
     const normTariff = (n: number) => (n >= 5 ? n / 1000 : n); // R$/MWh → R$/kWh
 
-    // extração de tarifas e preços específicos - usando padrões mais específicos
-    const teComImpRaw   = grab(cleanedText, "tarifa te com impostos|te c/ impostos|te\\s*\\(com impostos\\)");
-    const teSemImpRaw   = grab(cleanedText, "tarifa te sem impostos|te s/ impostos|te\\s*\\(sem impostos\\)");
-    const tusdComRaw    = grab(cleanedText, "tusd.*com impostos|tusd c/ impostos|tusd\\s*\\(com impostos\\)");
-    const tusdSemRaw    = grab(cleanedText, "tusd.*sem impostos|tusd s/ impostos|tusd\\s*\\(sem impostos\\)");
-    const bandRaw       = grab(cleanedText, "bandeira.*(tarifária|amarela|vermelha|verde|escassez)");
-    const precoEEraw    = grab(cleanedText, "preço energia elétrica|preco energia eletrica"); // se existir
-
-    // Se não encontrou com os padrões genéricos, tentar padrões específicos do PDF
-    let teComImp = normTariff(toBR(teComImpRaw));
-    let teSemImp = normTariff(toBR(teSemImpRaw));
-    let tusdCom = normTariff(toBR(tusdComRaw));
-    let tusdSem = normTariff(toBR(tusdSemRaw));
+    // CORRIGIDO: Extração direta das tarifas baseada no formato específico do PDF
+    // Formato: (0D) Consumo TE KWH 150,000 0,362600 ... 0,302240
+    let teComImp = 0;
+    let teSemImp = 0;
+    let tusdCom = 0;
+    let tusdSem = 0;
     
-    // Tentar extrair das linhas de consumo específicas
-    if (teComImp === 0) {
-      const teMatch = cleanedText.match(/Consumo\s+TE\s+KWH\s+\d+,\d+\s+(\d+,\d+)/i);
-      if (teMatch) teComImp = normTariff(toBR(teMatch[1]));
+    // Extrair tarifa TE com impostos (primeira tarifa após consumo TE)
+    const teMatch = cleanedText.match(/Consumo\s+TE\s+KWH\s+\d+,\d+\s+(\d+,\d+)/i);
+    if (teMatch) {
+      teComImp = normTariff(toBR(teMatch[1]));
+      console.log('[PARSER] Tarifa TE com impostos extraída:', teMatch[1], '->', teComImp);
     }
     
-    if (tusdCom === 0) {
-      const tusdMatch = cleanedText.match(/Consumo\s+TUSD\s+KWH\s+\d+,\d+\s+(\d+,\d+)/i);
-      if (tusdMatch) tusdCom = normTariff(toBR(tusdMatch[1]));
+    // Extrair tarifa TE sem impostos (segunda tarifa na linha TE)
+    const teSemMatch = cleanedText.match(/Consumo\s+TE\s+KWH\s+\d+,\d+\s+\d+,\d+\s+[^\d]*\d+,\d+\s+[^\d]*\d+,\d+\s+[^\d]*\d+,\d+\s+[^\d]*\d+,\d+\s+[^\d]*(\d+,\d+)/i);
+    if (teSemMatch) {
+      teSemImp = normTariff(toBR(teSemMatch[1]));
+      console.log('[PARSER] Tarifa TE sem impostos extraída:', teSemMatch[1], '->', teSemImp);
     }
     
-    const precoEE = normTariff(toBR(precoEEraw)); // muitas vezes é só um "médio"
-    const bandeira = bandRaw || "Não encontrado";
+    // Extrair tarifa TUSD com impostos (primeira tarifa após consumo TUSD)
+    const tusdMatch = cleanedText.match(/Consumo\s+TUSD\s+KWH\s+\d+,\d+\s+(\d+,\d+)/i);
+    if (tusdMatch) {
+      tusdCom = normTariff(toBR(tusdMatch[1]));
+      console.log('[PARSER] Tarifa TUSD com impostos extraída:', tusdMatch[1], '->', tusdCom);
+    }
+    
+    // Extrair tarifa TUSD sem impostos (segunda tarifa na linha TUSD)
+    const tusdSemMatch = cleanedText.match(/Consumo\s+TUSD\s+KWH\s+\d+,\d+\s+\d+,\d+\s+[^\d]*\d+,\d+\s+[^\d]*\d+,\d+\s+[^\d]*\d+,\d+\s+[^\d]*\d+,\d+\s+[^\d]*(\d+,\d+)/i);
+    if (tusdSemMatch) {
+      tusdSem = normTariff(toBR(tusdSemMatch[1]));
+      console.log('[PARSER] Tarifa TUSD sem impostos extraída:', tusdSemMatch[1], '->', tusdSem);
+    }
+    
+    // Extrair bandeira tarifária
+    const bandeiraMatch = cleanedText.match(/Bandeira\s+(Verde|Amarela|Vermelha)/i);
+    const bandeira = bandeiraMatch ? bandeiraMatch[1] : 'Verde';
+    
+    // Preço médio da energia (usar primeira tarifa TE como referência)
+    const precoEE = teComImp;
+    
+    console.log('[PARSER] Tarifas extraídas:', {
+      teComImp,
+      teSemImp,
+      tusdCom,
+      tusdSem,
+      bandeira,
+      precoEE
+    });
 
     // Função para buscar o primeiro número com vírgula após a keyword
     function findFirstCommaNumberAfterKeyword(text: string, keyword: string | RegExp): string {
@@ -346,13 +369,13 @@ async function parsePdf(filePath: string): Promise<any> {
       totalConsumptionKwh: totalConsumptionKwh || '0.00',
       totalValueBrl: totalValueBrlFixed || '0.00',
       dueDate: dueDate || '01/01/2025',
-      // Novos campos de tarifas e preços extraídos pelos helpers
-      tarifa_te_com_impostos: teComImp || 0,
-      tarifa_te_sem_impostos: teSemImp || 0,
-      tarifa_tusd_com_impostos: tusdCom || 0,
-      tarifa_tusd_sem_impostos: tusdSem || 0,
+      // CORRIGIDO: Usar os valores das variáveis locais que foram extraídos corretamente
+      tarifa_te_com_impostos: teComImp,
+      tarifa_te_sem_impostos: teSemImp,
+      tarifa_tusd_com_impostos: tusdCom,
+      tarifa_tusd_sem_impostos: tusdSem,
       bandeira_tarifaria: bandeira,
-      preco_energia_eletrica: precoEE || 0,
+      preco_energia_eletrica: precoEE,
     };
 
   } catch (error) {
@@ -937,7 +960,12 @@ app.post('/api/invoices/analyze-pdf', upload.single('invoice'), async (req, res)
     // Usando as novas funções mais robustas
     const teKwh  = fromKwh(extractedData?.eletricityKWhTE || extractedData?.eletricityKWh);
     const sceeeKwh = fromKwh(extractedData?.sceeeKWh);
-    const totalKwh = preferNumber(extractedData?.totalConsumptionKwh, teKwh + sceeeKwh);
+    
+    // CORRIGIDO: Garantir que o consumo total seja extraído corretamente
+    let totalKwh = fromKwh(extractedData?.totalConsumptionKwh);
+    if (totalKwh === 0) {
+      totalKwh = teKwh + sceeeKwh;
+    }
     
     // Debug: logar os valores extraídos
     console.log('[DEBUG] Valores extraídos:', {
@@ -946,7 +974,8 @@ app.post('/api/invoices/analyze-pdf', upload.single('invoice'), async (req, res)
       totalConsumptionKwh: extractedData?.totalConsumptionKwh,
       teKwh,
       sceeeKwh,
-      totalKwh
+      totalKwh,
+      rawTotalConsumption: extractedData?.totalConsumptionKwh
     });
 
     const totalValueBrl = fromMoney(extractedData?.totalValueBrl);
