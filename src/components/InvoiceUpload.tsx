@@ -25,7 +25,7 @@ export function InvoiceUpload() {
     // Novo estado para armazenar dados que não são do formulário mas precisam ser passados adiante
     const [invoiceMetaData, setInvoiceMetaData] = useState<any>(null);
 
-    const { uploadFile } = useInvoices();
+    const { extractInvoiceData } = useInvoices();
     const { toast } = useToast();
 
     const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -35,37 +35,36 @@ export function InvoiceUpload() {
         setIsLoading(true);
 
         try {
-            // 1. Fazer upload do arquivo para o Drive e extrair dados via API
-            const uploadResult = await uploadFile(file);
-            console.log("Resultado do upload:", uploadResult);
+            // 1. Extrair dados do arquivo via API
+            const extractResult = await extractInvoiceData(file);
+            console.log("Resultado da extração:", extractResult);
 
             // 2. Prepara os dados para o formulário de confirmação
             setFormData({
-                totalConsumptionKwh: uploadResult.extractedData.totalConsumptionKwh,
-                totalValueBrl: uploadResult.extractedData.totalValueBrl,
-                dueDate: uploadResult.extractedData.dueDate,
+                totalConsumptionKwh: extractResult.extractedData.totalConsumptionKwh,
+                totalValueBrl: extractResult.extractedData.totalValueBrl,
+                dueDate: extractResult.extractedData.dueDate,
             });
 
             // 3. Guarda os metadados restantes para o envio final
             setInvoiceMetaData({
-                tax_percentage: uploadResult.extractedData.taxValueBrl,
-                peak_hours: uploadResult.extractedData.peakConsumptionKwh,
+                tax_percentage: extractResult.extractedData.taxValueBrl,
+                peak_hours: extractResult.extractedData.peakConsumptionKwh,
                 month: new Date().toLocaleString('default', { month: 'long' }),
-                file_url: uploadResult.fileUrl,
-                file_name: uploadResult.fileName,
-                reactive_energy_kvarh: uploadResult.extractedData.reactiveEnergyKvarh,
-                has_fine: uploadResult.extractedData.hasFine,
+                file_name: extractResult.fileName,
+                reactive_energy_kvarh: extractResult.extractedData.reactiveEnergyKvarh,
+                has_fine: extractResult.extractedData.hasFine,
             });
             
             // 4. Mostra o modal de confirmação em vez de salvar diretamente
             setShowConfirmation(true);
 
         } catch (error) {
-            console.error("Erro no processo de upload de fatura:", error);
+            console.error("Erro no processo de extração de dados:", error);
             const errorMessage = error instanceof Error ? error.message : "Tente novamente.";
             toast({
-                title: "Erro no Upload",
-                description: `Não foi possível enviar sua fatura. ${errorMessage}`,
+                title: "Erro na Extração",
+                description: `Não foi possível extrair os dados da fatura. ${errorMessage}`,
                 variant: "destructive",
             });
         } finally {
@@ -90,8 +89,8 @@ export function InvoiceUpload() {
             // Apenas confirmamos que o usuário está satisfeito com os dados extraídos
             
             toast({
-                title: "Fatura Registrada! 🚀",
-                description: "Sua fatura foi processada e salva com sucesso.",
+                title: "Dados Processados! 🚀",
+                description: "Seus dados foram extraídos e salvos na planilha com sucesso.",
                 variant: "default",
             });
 
@@ -117,7 +116,7 @@ export function InvoiceUpload() {
                 <CardHeader>
                     <CardTitle>Upload de Fatura</CardTitle>
                     <CardDescription>
-                        Envie sua fatura de energia (PDF ou imagem) para análise.
+                        Envie sua fatura de energia (PDF) para extração e análise dos dados.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -130,11 +129,11 @@ export function InvoiceUpload() {
                             accept=".pdf,.png,.jpg,.jpeg"
                         />
                     </div>
-                    {isLoading && (
-                        <div className="mt-4 flex items-center justify-center">
-                            <p>Enviando e processando...</p>
-                        </div>
-                    )}
+                                         {isLoading && (
+                         <div className="mt-4 flex items-center justify-center">
+                             <p>Extraindo dados e salvando...</p>
+                         </div>
+                     )}
                 </CardContent>
             </Card>
 
@@ -142,10 +141,10 @@ export function InvoiceUpload() {
             <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
                 <DialogContent className="sm:max-w-[425px] bg-white">
                     <DialogHeader>
-                        <DialogTitle>Confirme os Dados da Fatura</DialogTitle>
-                        <DialogDescription>
-                            Verifique os dados extraídos do seu PDF. Edite se for necessário.
-                        </DialogDescription>
+                                                 <DialogTitle>Confirme os Dados Extraídos</DialogTitle>
+                         <DialogDescription>
+                             Verifique os dados extraídos do seu PDF. Os dados já foram salvos na planilha.
+                         </DialogDescription>
                     </DialogHeader>
                     {formData && (
                         <div className="space-y-6 py-4">
@@ -211,14 +210,14 @@ export function InvoiceUpload() {
                                 Cancelar
                             </Button>
                         </DialogClose>
-                        <Button
-                          type="button"
-                          onClick={handleConfirmationSubmit}
-                          disabled={isLoading}
-                          className="bg-emerald-600 hover:bg-emerald-700"
-                        >
-                          {isLoading ? "Salvando..." : "Confirmar e Salvar"}
-                        </Button>
+                                                 <Button
+                           type="button"
+                           onClick={handleConfirmationSubmit}
+                           disabled={isLoading}
+                           className="bg-emerald-600 hover:bg-emerald-700"
+                         >
+                           {isLoading ? "Confirmando..." : "Confirmar Dados"}
+                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

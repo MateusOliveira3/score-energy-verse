@@ -55,8 +55,8 @@ export const addInvoice = async (invoiceData: Omit<Invoice, 'id' | 'created_at' 
     }
 };
 
-export const uploadFile = async (file: File, userId: string) => {
-    console.log(`[Data Service] Enviando arquivo ${file.name} para o usuário ${userId}`);
+export const extractInvoiceData = async (file: File, userId: string) => {
+    console.log(`[Data Service] Extraindo dados do arquivo ${file.name} para o usuário ${userId}`);
     const formData = new FormData();
     formData.append('invoice', file);
     formData.append('userId', userId);
@@ -69,14 +69,14 @@ export const uploadFile = async (file: File, userId: string) => {
 
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.message || 'Erro no upload do arquivo');
+            throw new Error(errorData.message || 'Erro na extração dos dados');
         }
 
         const result = await response.json();
-        console.log('[Data Service] Arquivo enviado com sucesso:', result);
+        console.log('[Data Service] Dados extraídos com sucesso:', result);
         return result;
     } catch (error) {
-        console.error("Erro ao enviar arquivo via API:", error);
+        console.error("Erro ao extrair dados via API:", error);
         throw error;
     }
 };

@@ -1,0 +1,104 @@
+{
+  "id": "invoice_1754687647414",
+  "userId": "user_1750536675273",
+  "fileName": "393000180804.pdf",
+  "unidade_consumidora": "0021062553",
+  "mes": "05",
+  "ano": "2025",
+  "consumo_te_kwh": "345.000",
+  "consumo_total_kwh": "345.000",
+  "tarifa_te_com_impostos": "0.362600",
+  "tarifa_te_sem_impostos": "0.302240",
+  "tarifa_tusd_com_impostos": "0.378667",
+  "tarifa_tusd_sem_impostos": "0.315670",
+  "tarifa_bandeira_com_impostos": "Amarela",
+  "tarifa_bandeira_sem_impostos": "0.008267",
+  "bandeira_tarifaria": "Amarela",
+  "preco_energia_eletrica": "0.362600",
+  "energia_scee_kwh": "0,000",
+  "preco_energia_scee": "0,00",
+  "energia_compensada_gdi_kwh": "0,000",
+  "preco_energia_compensada_gdi": "0,00",
+  "contribuicao_iluminacao_publica": "0.00",
+  "consumo_total_kwh_calculado": "345.00",
+  "valor_total_brl": "285.20",
+  "data_vencimento": "28/05/2025",
+  "historico_consumo": [
+    {
+      "mes": "ABR/25",
+      "consumo": 338,
+      "dias": 25
+    },
+    {
+      "mes": "MAR/25",
+      "consumo": 494,
+      "dias": 25
+    },
+    {
+      "mes": "FEV/25",
+      "consumo": 605,
+      "dias": 25
+    },
+    {
+      "mes": "JAN/25",
+      "consumo": 478,
+      "dias": 25
+    },
+    {
+      "mes": "DEZ/24",
+      "consumo": 417,
+      "dias": 24
+    },
+    {
+      "mes": "NOV/24",
+      "consumo": 379,
+      "dias": 24
+    },
+    {
+      "mes": "OUT/24",
+      "consumo": 317,
+      "dias": 24
+    },
+    {
+      "mes": "SET/24",
+      "consumo": 329,
+      "dias": 24
+    },
+    {
+      "mes": "AGO/24",
+      "consumo": 338,
+      "dias": 24
+    },
+    {
+      "mes": "JUL/24",
+      "consumo": 347,
+      "dias": 24
+    },
+    {
+      "mes": "JUN/24",
+      "consumo": 311,
+      "dias": 24
+    },
+    {
+      "mes": "MAI/24",
+      "consumo": 412,
+      "dias": 24
+    },
+    {
+      "mes": "ABR/24",
+      "consumo": 874,
+      "dias": 28
+    }
+  ],
+  "economia_calculada": null,
+  "pontos_ganhos": 104,
+  "diagnostico_energetico": [
+    {
+      "tipo": "sugestao",
+      "mensagem": "Sem GD detectada. Avalie energia solar."
+    }
+  ],
+  "status": "PROCESSED",
+  "data_criacao": "2025-08-08T21:14:07.414Z",
+  "data_atualizacao": "2025-08-08T21:14:07.414Z"
+}

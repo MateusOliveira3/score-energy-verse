@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import bcrypt from 'bcrypt';
 import { Readable } from 'stream';
 import fs from 'fs';
-import { uploadInvoiceToSupabase } from './lib/supabase-upload.js';
+
 
 dotenv.config();
 
@@ -46,6 +46,9 @@ export async function initializeGoogleApis() {
         drive = google.drive({ version: 'v3', auth });
 
         console.log('✅ Google Sheets & Drive Services Conectados.');
+        
+        // Garantir que a aba de diagnóstico esteja pronta
+        await ensureDiagnosisSheetReady();
     } catch (error) {
         console.error('❌ Erro ao inicializar Google Services:', error);
         throw new Error('Falha na conexão com APIs do Google');
@@ -81,7 +84,10 @@ async function readSheet(sheetName: string) {
 async function appendToSheet(sheetName: string, rows: any[][]) {
     const sheetsApi = await getSheetsApi();
     try {
-        await sheetsApi.spreadsheets.values.append({
+        console.log(`[Google Service] Tentando adicionar ${rows.length} linha(s) na aba ${sheetName}`);
+        console.log(`[Google Service] Dados a serem inseridos:`, rows);
+        
+        const response = await sheetsApi.spreadsheets.values.append({
             spreadsheetId: SPREADSHEET_ID,
             range: sheetName,
             valueInputOption: 'USER_ENTERED',
@@ -90,9 +96,14 @@ async function appendToSheet(sheetName: string, rows: any[][]) {
                 values: rows,
             },
         });
+        
+        console.log(`[Google Service] Dados adicionados com sucesso na aba ${sheetName}`);
+        console.log(`[Google Service] Resposta da API:`, response.data);
+        
     } catch (error) {
-        console.error(`Erro ao adicionar dados na aba ${sheetName}:`, error);
-        throw new Error(`Falha ao escrever na aba ${sheetName}`);
+        console.error(`[Google Service] Erro ao adicionar dados na aba ${sheetName}:`, error);
+        console.error(`[Google Service] Detalhes do erro:`, error.response?.data || error.message);
+        throw new Error(`Falha ao escrever na aba ${sheetName}: ${error.message}`);
     }
 }
 
@@ -102,6 +113,82 @@ function rowToObject(row: any[], headers: string[]) {
         obj[header] = row[index];
     });
     return obj;
+}
+
+// --- Novas Utilidades para Sheets ---
+
+async function sheetExists(sheetName: string): Promise<boolean> {
+    try {
+        const sheetsApi = await getSheetsApi();
+        await sheetsApi.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${sheetName}!A1:Z1`,
+        });
+        console.log(`[SHEETS] A aba '${sheetName}' existe e tem cabeçalho.`);
+        return true;
+    } catch (error) {
+        console.log(`[SHEETS] A aba '${sheetName}' não existe ou não tem cabeçalho.`);
+        return false;
+    }
+}
+
+async function ensureSheetHeaders(sheetName: string, headers: string[]): Promise<void> {
+    try {
+        const exists = await sheetExists(sheetName);
+        
+        if (!exists) {
+            console.log(`[SHEETS] Criando nova aba '${sheetName}' com cabeçalhos...`);
+            const sheetsApi = await getSheetsApi();
+            
+            // Criar nova aba
+            await sheetsApi.spreadsheets.batchUpdate({
+                spreadsheetId: SPREADSHEET_ID,
+                requestBody: {
+                    requests: [{
+                        addSheet: {
+                            properties: {
+                                title: sheetName
+                            }
+                        }
+                    }]
+                }
+            });
+            
+            console.log(`[SHEETS] Aba '${sheetName}' criada com sucesso.`);
+        }
+        
+        // Garantir que a linha 1 tenha exatamente os headers
+        const sheetsApi = await getSheetsApi();
+        const range = `${sheetName}!A1:${columnNumberToA1(headers.length)}1`;
+        
+        await sheetsApi.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: range,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+                values: [headers]
+            }
+        });
+        
+        console.log(`[SHEETS] Cabeçalhos da aba '${sheetName}' configurados com sucesso.`);
+    } catch (error) {
+        console.error(`[SHEETS] Erro ao configurar aba '${sheetName}':`, error);
+        throw new Error(`Falha ao configurar aba ${sheetName}: ${error.message}`);
+    }
+}
+
+export async function ensureDiagnosisSheetReady(): Promise<void> {
+    console.log('[SHEETS] Verificando se a aba invoices_diagnosis está pronta...');
+    
+    // Padronizando cabeçalhos em português para consistência com aba invoices
+    const headers = [
+        'id', 'user_id', 'mes', 'ano', 'consumo_kwh', 'valor_total_brl',
+        'tem_reativo', 'tem_gd', 'tarifa', 'valor_por_kwh', 'score_total',
+        'score_detalhado_json', 'recomendacoes_json', 'data_criacao'
+    ];
+    
+    await ensureSheetHeaders('invoices_diagnosis', headers);
+    console.log('[SHEETS] Aba invoices_diagnosis está pronta para uso.');
 }
 
 
@@ -239,71 +326,119 @@ async function getOrCreateUserFolder(driveApi: any, userEmail: string, parentFol
     return folder.data.id;
 }
 
-export async function uploadInvoice(userId: string, filePath: string, originalName: string) {
-    try {
-        console.log('[Upload Service] Usando Supabase Storage para upload...');
-        
-        // Usar Supabase Storage para upload
-        const result = await uploadInvoiceToSupabase(userId, filePath, originalName);
-        
-        console.log(`[Upload Service] Upload para Supabase concluído: ${result.id}`);
-        
-        return result;
-        
-    } catch (error) {
-        console.error('[Upload Service] Erro no upload para Supabase:', error);
-        throw new Error('Falha ao fazer upload do arquivo.');
-    }
-}
+
 
 export async function saveInvoiceData(userId: string, data: any) {
     const now = new Date().toISOString();
     const invoiceId = `invoice_${Date.now()}`;
 
     const {
-        fileId,
         fileName,
+        customerNumber,
         month,
         year,
-        eletricityKWh,
+        eletricityKWhTE,
+        eletricityKWhTotal,
+        teUnitWithTax,
+        teUnitNoTax,
+        tusdUnitWithTax,
+        tusdUnitNoTax,
+        bandeiraUnitWithTax,
+        bandeiraUnitNoTax,
+        bandeiraTarifaria,
         eletricityPrice,
         sceeeKWh,
         sceeePrice,
         gdiKWh,
         gdiPrice,
         publicLightingContribution,
-        totalValue,
+        totalConsumptionKwh,
+        totalValueBrl,
+        dueDate,
+        historicoConsumo,
         economy,
         points,
         diagnostico
     } = data;
 
+    // Definir cabeçalhos padronizados em português para consistência com extração PDF
+    const expectedHeaders = [
+        'id',
+        'user_id',
+        'file_name',
+        'unidade_consumidora',
+        'mes',
+        'ano',
+        'consumo_te_kwh',
+        'consumo_total_kwh',
+        'tarifa_te_com_impostos',
+        'tarifa_te_sem_impostos',
+        'tarifa_tusd_com_impostos',
+        'tarifa_tusd_sem_impostos',
+        'tarifa_bandeira_com_impostos',
+        'tarifa_bandeira_sem_impostos',
+        'bandeira_tarifaria',
+        'preco_energia_eletrica',
+        'energia_scee_kwh',
+        'preco_energia_scee',
+        'energia_compensada_gdi_kwh',
+        'preco_energia_compensada_gdi',
+        'contribuicao_iluminacao_publica',
+        'consumo_total_kwh_calculado',
+        'valor_total_brl',
+        'data_vencimento',
+        'historico_consumo',
+        'economia_calculada',
+        'pontos_ganhos',
+        'diagnostico_energetico',
+        'status',
+        'data_criacao',
+        'data_atualizacao'
+    ];
+
+    // Preparar dados da linha com todos os campos extraídos (cabeçalhos padronizados em português)
     const row = [
         invoiceId,
         userId,
-        fileId,
         fileName,
-        month,
-        year,
-        eletricityKWh,
-        eletricityPrice,
-        sceeeKWh,
-        sceeePrice,
-        gdiKWh,
-        gdiPrice,
-        publicLightingContribution,
-        totalValue,
-        economy,
-        points || 0,
-        JSON.stringify(diagnostico || []),
-        'PENDING', // Status inicial
-        now,
-        now
+        customerNumber, // unidade_consumidora
+        month, // mes
+        year, // ano
+        eletricityKWhTE, // consumo_te_kwh
+        eletricityKWhTotal, // consumo_total_kwh
+        teUnitWithTax, // tarifa_te_com_impostos
+        teUnitNoTax, // tarifa_te_sem_impostos
+        tusdUnitWithTax, // tarifa_tusd_com_impostos
+        tusdUnitNoTax, // tarifa_tusd_sem_impostos
+        bandeiraUnitWithTax, // tarifa_bandeira_com_impostos
+        bandeiraUnitNoTax, // tarifa_bandeira_sem_impostos
+        bandeiraTarifaria, // bandeira_tarifaria
+        eletricityPrice, // preco_energia_eletrica
+        sceeeKWh, // energia_scee_kwh
+        sceeePrice, // preco_energia_scee
+        gdiKWh, // energia_compensada_gdi_kwh
+        gdiPrice, // preco_energia_compensada_gdi
+        publicLightingContribution, // contribuicao_iluminacao_publica
+        totalConsumptionKwh, // consumo_total_kwh_calculado
+        totalValueBrl, // valor_total_brl
+        dueDate, // data_vencimento
+        JSON.stringify(historicoConsumo || []), // historico_consumo
+        economy, // economia_calculada
+        points || 0, // pontos_ganhos
+        JSON.stringify(diagnostico || []), // diagnostico_energetico
+        'PROCESSED', // status
+        now, // data_criacao
+        now // data_atualizacao
     ];
 
     try {
+        // 1. Verificar se a aba invoices existe e tem os cabeçalhos corretos
+        await ensureInvoicesSheetStructure(expectedHeaders);
+        
+        // 2. Salvar os dados
         await appendToSheet(SHEETS.INVOICES, [row]);
         console.log(`[Google Service] Dados da fatura para ${userId} salvos na planilha.`);
+        
     } catch (error) {
         console.error('[Google Service] Erro ao salvar dados da fatura no Google Sheets:', error);
         
@@ -323,28 +458,39 @@ export async function saveInvoiceData(userId: string, data: any) {
                 fs.mkdirSync(userDataDir, { recursive: true });
             }
             
-            // Salvar dados da fatura em arquivo JSON local
+            // Salvar dados da fatura em arquivo JSON local (mantendo compatibilidade)
             const invoiceData = {
                 id: invoiceId,
                 userId,
-                fileId,
                 fileName,
-                month,
-                year,
-                eletricityKWh,
-                eletricityPrice,
-                sceeeKWh,
-                sceeePrice,
-                gdiKWh,
-                gdiPrice,
-                publicLightingContribution,
-                totalValue,
-                economy,
-                points: points || 0,
-                diagnostico: diagnostico || [],
-                status: 'PENDING',
-                created_at: now,
-                updated_at: now
+                unidade_consumidora: customerNumber,
+                mes: month,
+                ano: year,
+                consumo_te_kwh: eletricityKWhTE,
+                consumo_total_kwh: eletricityKWhTotal,
+                tarifa_te_com_impostos: teUnitWithTax,
+                tarifa_te_sem_impostos: teUnitNoTax,
+                tarifa_tusd_com_impostos: tusdUnitWithTax,
+                tarifa_tusd_sem_impostos: tusdUnitNoTax,
+                tarifa_bandeira_com_impostos: bandeiraUnitWithTax,
+                tarifa_bandeira_sem_impostos: bandeiraUnitNoTax,
+                bandeira_tarifaria: bandeiraTarifaria,
+                preco_energia_eletrica: eletricityPrice,
+                energia_scee_kwh: sceeeKWh,
+                preco_energia_scee: sceeePrice,
+                energia_compensada_gdi_kwh: gdiKWh,
+                preco_energia_compensada_gdi: gdiPrice,
+                contribuicao_iluminacao_publica: publicLightingContribution,
+                consumo_total_kwh_calculado: totalConsumptionKwh,
+                valor_total_brl: totalValueBrl,
+                data_vencimento: dueDate,
+                historico_consumo: historicoConsumo,
+                economia_calculada: economy,
+                pontos_ganhos: points || 0,
+                diagnostico_energetico: diagnostico || [],
+                status: 'PROCESSED',
+                data_criacao: now,
+                data_atualizacao: now
             };
             
             const invoiceFilePath = `${userDataDir}/invoice_${Date.now()}.json`;
@@ -356,6 +502,87 @@ export async function saveInvoiceData(userId: string, data: any) {
             console.error('[Google Service] Erro no fallback local:', fallbackError);
             throw new Error('Falha ao salvar dados da fatura (Google Sheets e local)');
         }
+    }
+}
+
+// Função para garantir que a aba invoices existe e tem a estrutura correta
+async function ensureInvoicesSheetStructure(expectedHeaders: string[]) {
+    try {
+        const sheetsApi = await getSheetsApi();
+        
+        // 1. Verificar se a planilha existe
+        const spreadsheet = await sheetsApi.spreadsheets.get({
+            spreadsheetId: SPREADSHEET_ID,
+        });
+        
+        // 2. Verificar se a aba 'invoices' existe
+        const invoicesSheet = spreadsheet.data.sheets.find(s => s.properties.title === SHEETS.INVOICES);
+        
+        if (!invoicesSheet) {
+            console.log(`[Google Service] Aba "${SHEETS.INVOICES}" não encontrada. Criando...`);
+            
+            // Criar a aba invoices
+            await sheetsApi.spreadsheets.batchUpdate({
+                spreadsheetId: SPREADSHEET_ID,
+                requestBody: {
+                    requests: [
+                        {
+                            addSheet: {
+                                properties: {
+                                    title: SHEETS.INVOICES,
+                                    gridProperties: {
+                                        rowCount: 1000,
+                                        columnCount: expectedHeaders.length
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            });
+            
+            console.log(`[Google Service] Aba "${SHEETS.INVOICES}" criada com sucesso!`);
+        }
+        
+        // 3. Verificar cabeçalhos da aba invoices
+        let currentHeaders: string[] = [];
+        try {
+            const headersData = await sheetsApi.spreadsheets.values.get({
+                spreadsheetId: SPREADSHEET_ID,
+                range: `${SHEETS.INVOICES}!A1:Z1`,
+            });
+            currentHeaders = (headersData.data.values?.[0] || []) as string[];
+        } catch (error) {
+            console.log(`[Google Service] Erro ao ler cabeçalhos existentes, criando novos...`);
+            currentHeaders = [];
+        }
+        
+        console.log(`[Google Service] Cabeçalhos atuais da aba ${SHEETS.INVOICES}:`, currentHeaders);
+        
+        // 4. Se não há cabeçalhos ou estão diferentes, criar/atualizar
+        if (currentHeaders.length === 0 || currentHeaders.join(',') !== expectedHeaders.join(',')) {
+            console.log(`[Google Service] Atualizando cabeçalhos da aba ${SHEETS.INVOICES}...`);
+            
+            // Calcular a última coluna baseada no número de cabeçalhos (suporta além de Z)
+            const lastColumn = columnNumberToA1(expectedHeaders.length);
+            
+            await sheetsApi.spreadsheets.values.update({
+                spreadsheetId: SPREADSHEET_ID,
+                range: `${SHEETS.INVOICES}!A1:${lastColumn}1`,
+                valueInputOption: 'RAW',
+                requestBody: {
+                    values: [expectedHeaders]
+                }
+            });
+            
+            console.log(`[Google Service] Cabeçalhos da aba ${SHEETS.INVOICES} atualizados com sucesso!`);
+        } else {
+            console.log(`[Google Service] Cabeçalhos da aba ${SHEETS.INVOICES} já estão corretos`);
+        }
+        
+    } catch (error) {
+        console.error(`[Google Service] Erro ao verificar/criar estrutura da aba ${SHEETS.INVOICES}:`, error);
+        throw error;
     }
 }
 
@@ -542,4 +769,155 @@ export async function getLeaderboard() {
     }
 }
 
-// Adicione outras funções aqui (getInvoices, updateUser, etc.) conforme necessário 
+// ------------------------------------------------------------------
+// Persistência da análise consultiva em `invoices_diagnosis`
+// ------------------------------------------------------------------
+import type { InvoiceParsed, ConsultativeScore } from './lib/types.js';
+
+export async function saveTechnicalAnalysis(
+  userId: string,
+  invoice: InvoiceParsed,
+  score: ConsultativeScore,
+  tips: string[]
+): Promise<void> {
+  // Garante headers e aba prontos
+  try {
+    await ensureDiagnosisSheetReady();
+  } catch (e: any) {
+    console.error('[SHEETS] Falha ao garantir aba invoices_diagnosis:', e?.message || e);
+    throw e;
+  }
+
+  // Monta a linha conforme cabeçalhos padronizados em português
+  const row = [
+    `analysis_${Date.now()}`,            // id
+    userId,                              // user_id
+    invoice.month || '',                 // mes
+    invoice.year || '',                  // ano
+    Number(invoice.consumption_kwh || 0),// consumo_kwh
+    Number(invoice.total_value_brl || 0),// valor_total_brl
+    Boolean(invoice.has_reactive),       // tem_reativo
+    Boolean(invoice.has_gd),             // tem_gd
+    String(invoice.tariff || ''),        // tarifa
+    Number(invoice.value_per_kwh || 0),  // valor_por_kwh
+    Number(score?.total || 0),           // score_total
+    JSON.stringify(score?.breakdown || {}), // score_detalhado_json
+    JSON.stringify(tips || []),          // recomendacoes_json
+    new Date().toISOString()             // data_criacao
+  ];
+
+  try {
+    await appendToSheet('invoices_diagnosis', [row]);
+    console.log('[SHEETS] Análise técnica salva em invoices_diagnosis.');
+  } catch (e: any) {
+    console.error('[SHEETS] Falha ao salvar análise técnica:', e?.message || e);
+    throw e;
+  }
+}
+
+import type { DiagnosisItem, DiagnosisListOptions, DiagnosisListResponse } from './lib/types.js';
+
+// Aceita PT/EN nos cabeçalhos e normaliza a saída em inglês.
+// Suporta paginação opcional via options { limit, cursor }.
+// Compatível: sem options → retorna array simples.
+export async function getDiagnosisByUser(
+  userId: string,
+  options?: DiagnosisListOptions
+): Promise<DiagnosisItem[] | DiagnosisListResponse> {
+  try {
+    const rows = await readSheet('invoices_diagnosis');
+    if (!rows || rows.length < 2) {
+      return options ? { items: [], nextCursor: null } : [];
+    }
+
+    const headers = rows[0].map(String);
+
+    const col = (...names: string[]) => {
+      for (const n of names) {
+        const i = headers.indexOf(n);
+        if (i !== -1) return i;
+      }
+      return -1;
+    };
+
+    const idx = {
+      id:             col('id', 'ID'),
+      user_id:        col('user_id', 'usuario_id', 'userId'),
+      month:          col('month', 'mes', 'mês'),
+      year:           col('year', 'ano'),
+      consumption:    col('consumption_kwh', 'consumo_kwh', 'consumo_total_kwh', 'consumo_te_kwh'),
+      total_value:    col('total_value_brl', 'valor_total_brl', 'valor_total'),
+      score_total:    col('score_total', 'pontuacao_total'),
+      score_json:     col('score_breakdown_json', 'score_detalhado_json'),
+      tips_json:      col('recommendations_json', 'recomendacoes_json'),
+      created_at:     col('created_at', 'criado_em'),
+    };
+
+    const safeNum = (v: unknown) => {
+      if (typeof v === 'number') return v;
+      if (typeof v !== 'string') return 0;
+      const s = v.replace(/\./g, '').replace(',', '.');
+      const n = Number(s);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    const safeJson = <T,>(raw: unknown, fallback: T): T => {
+      try {
+        if (!raw || typeof raw !== 'string') return fallback;
+        return JSON.parse(raw) as T;
+      } catch { return fallback; }
+    };
+
+    let all = rows
+      .slice(1)
+      .filter((r) => String(r[idx.user_id] ?? '') === userId)
+      .map((r): DiagnosisItem => ({
+        id: String(r[idx.id] ?? ''),
+        user_id: String(r[idx.user_id] ?? ''),
+        month: String(r[idx.month] ?? ''),
+        year: String(r[idx.year] ?? ''),
+        consumption_kwh: safeNum(r[idx.consumption]),
+        total_value_brl: safeNum(r[idx.total_value]),
+        score_total: safeNum(r[idx.score_total]),
+        breakdown: safeJson(r[idx.score_json], {} as Record<string, number>),
+        tips: safeJson(r[idx.tips_json], [] as string[]),
+        created_at: String(r[idx.created_at] ?? ''),
+      }))
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    if (!options || (!options.limit && !options.cursor)) {
+      return all;
+    }
+
+    const limit = Math.max(1, Math.min(100, Number(options.limit || 20)));
+    const cursor = options.cursor ? new Date(options.cursor) : null;
+
+    if (cursor && !isNaN(cursor.getTime())) {
+      all = all.filter((it) => new Date(it.created_at).getTime() < cursor.getTime());
+    }
+
+    const page = all.slice(0, limit);
+    const next = page.length === limit ? page[page.length - 1].created_at : null;
+
+    const resp: DiagnosisListResponse = {
+      items: page,
+      nextCursor: next,
+    };
+    return resp;
+  } catch (err) {
+    console.error('[SHEETS] getDiagnosisByUser: erro ao ler/normalizar:', err);
+    return options ? { items: [], nextCursor: null } : [];
+  }
+}
+
+// Converte número da coluna (1-based) para notação A1 (A, Z, AA, AB, ...)
+function columnNumberToA1(columnNumber: number): string {
+    let result = '';
+    let n = columnNumber;
+    while (n > 0) {
+        const rem = (n - 1) % 26;
+        result = String.fromCharCode(65 + rem) + result;
+        n = Math.floor((n - 1) / 26);
+    }
+    return result;
+} 

@@ -34,13 +34,13 @@ export const useInvoices = () => {
 
 
 
-  const uploadFile = async (file: File) => {
+  const extractInvoiceData = async (file: File) => {
     if (!user) throw new Error("Usuário não autenticado");
-    // Retorna o resultado da API: { message, fileUrl, fileName, fileId }
-    return await dataService.uploadFile(file, user.id);
+    // Retorna o resultado da API: { message, extractedData, fileName, economy, points, diagnostico }
+    return await dataService.extractInvoiceData(file, user.id);
   };
 
   const latestInvoice = invoices.length > 0 ? invoices[0] : null;
 
-  return { invoices, isLoading, uploadFile, refreshInvoices: fetchInvoices, latestInvoice };
+  return { invoices, isLoading, extractInvoiceData, refreshInvoices: fetchInvoices, latestInvoice };
 }; 

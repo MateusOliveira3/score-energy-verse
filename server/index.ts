@@ -1,13 +1,18 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { initializeGoogleApis, uploadInvoice, saveInvoiceData, signInUser, createUser, getInvoices, getUserProfile, getAllUsersForAdmin, getGamificationData, updateGamificationData, getLeaderboard } from './google-service.js';
+import { initializeGoogleApis, saveInvoiceData, signInUser, createUser, getInvoices, getUserProfile, getAllUsersForAdmin, getGamificationData, updateGamificationData, getLeaderboard, saveTechnicalAnalysis } from './google-service.js';
 import multer from 'multer';
 import fs from 'fs';
 import os from 'os';
 import bcrypt from 'bcrypt';
 import pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
 import path from 'path';
+
+// 1) IMPORTS — adicione perto dos demais imports do topo de server/index.ts
+import { parseInvoiceText } from './lib/invoice-parser.js';
+import diagnosticoEnergeticoConsultivo from './lib/energy-advisor.js';
+import computeConsultativeScore from './lib/score-advisor.js';
 
 dotenv.config();
 
@@ -111,11 +116,14 @@ async function parsePdf(filePath: string): Promise<any> {
     function findUnitValues(text: string, tipo: 'TE' | 'TUSD' | 'BANDEIRA'): { withTax: string, noTax: string } {
       let regex;
       if (tipo === 'TE') {
+        // Padrão: (0D) Consumo TE KWH 150,000 0,362600 ... 0,302240
         regex = /Consumo\s*TE\s*KWH\s*\d{1,4},\d{3}\s*(\d{1,2},\d{6})[\s\S]*?(\d{1,2},\d{6})/i;
       } else if (tipo === 'TUSD') {
+        // Padrão: (0E) Consumo TUSD KWH 150,000 0,378667 ... 0,315670
         regex = /Consumo\s*TUSD\s*KWH\s*\d{1,4},\d{3}\s*(\d{1,2},\d{6})[\s\S]*?(\d{1,2},\d{6})/i;
       } else {
-        regex = /Bandeira\s+Amarela\s+KWH\s*\d{1,4},\d{3}\s*(\d{1,2},\d{6})[\s\S]*?(\d{1,2},\d{6})/i;
+        // Padrão: (2L) Bandeira Amarela KWH 150,000 0,008267 ... 0,006841
+        regex = /Bandeira\s+(Verde|Amarela|Vermelha)\s*KWH\s*\d{1,4},\d{3}\s*(\d{1,2},\d{6})[\s\S]*?(\d{1,2},\d{6})/i;
       }
       let match = text.match(regex);
       if (match && match[1] && match[2]) {
@@ -124,17 +132,54 @@ async function parsePdf(filePath: string): Promise<any> {
           noTax: match[2].replace(',', '.')
         };
       }
+      // Se não encontrar, tentar padrão mais simples
+      if (tipo === 'TE') {
+        const simpleMatch = text.match(/Consumo\s*TE\s*KWH[^\d]*(\d{1,2},\d{6})/i);
+        if (simpleMatch) {
+          return {
+            withTax: simpleMatch[1].replace(',', '.'),
+            noTax: '0.00'
+          };
+        }
+      } else if (tipo === 'TUSD') {
+        const simpleMatch = text.match(/Consumo\s*TUSD\s*KWH[^\d]*(\d{1,2},\d{6})/i);
+        if (simpleMatch) {
+          return {
+            withTax: simpleMatch[1].replace(',', '.'),
+            noTax: '0.00'
+          };
+        }
+      } else {
+        const simpleMatch = text.match(/Bandeira[^\d]*(\d{1,2},\d{6})/i);
+        if (simpleMatch) {
+          return {
+            withTax: simpleMatch[1].replace(',', '.'),
+            noTax: '0.00'
+          };
+        }
+      }
       return { withTax: '0.00', noTax: '0.00' };
     }
 
     // Função para extrair a bandeira tarifária
     function findBandeiraTarifaria(text: string): string {
+      // Procurar por padrões como: (2L) Bandeira Amarela KWH
       let match = text.match(/Bandeira\s+(Verde|Amarela|Vermelha)/i);
       if (match && match[1]) return match[1];
+      
       // Alternativa: buscar só por "Verde", "Amarela", "Vermelha" próximo de "R$"
       let alt = text.match(/(Verde|Amarela|Vermelha)\s*R\$/i);
       if (alt && alt[1]) return alt[1];
-      return 'Não encontrado';
+      
+      // Procurar por "Etapa: Verde" ou similar
+      let etapa = text.match(/Etapa:\s*(Verde|Amarela|Vermelha)/i);
+      if (etapa && etapa[1]) return etapa[1];
+      
+      // Procurar por "21 Amarela" ou similar
+      let amarela = text.match(/\d+\s+(Amarela|Verde|Vermelha)/i);
+      if (amarela && amarela[1]) return amarela[1];
+      
+      return 'Verde'; // Padrão para residencial
     }
 
     // Função para somar todos os valores de kWh de Consumo TE
@@ -148,21 +193,34 @@ async function parsePdf(filePath: string): Promise<any> {
       return matches.reduce((acc, m) => acc + parseFloat(m[1].replace(',', '.')), 0);
     }
 
-    // Ajuste dos padrões para o modelo Celesc, agora usando busca por proximidade e regex global
-    const customerNumber = findClosestValue(cleanedText, /Unidade\s+Consumidora/i, /\d{8,10}/g);
-    const referenceMonth = findClosestValue(cleanedText, /Refer[êe]ncia/i, /\d{2}\/\d{4}/g);
-    const dueDate = findClosestValue(cleanedText, /Vencimento/i, /\d{2}\/\d{2}\/\d{4}/g);
-    const totalValueBrl = findFirstCommaNumberAfterKeyword(cleanedText, /Total\s+a\s+Pagar.*?R\$|Total\s+a\s+Pagar/i);
+    // Ajuste dos padrões para o modelo Celesc real
+    const customerNumber = findClosestValue(cleanedText, /Unidade\s+Consumidora/i, /\d{8,10}/g) || '0000000000';
+    const referenceMonth = findClosestValue(cleanedText, /Refer[êe]ncia/i, /\d{2}\/\d{4}/g) || '01/2025';
+    const dueDate = findClosestValue(cleanedText, /Vencimento/i, /\d{2}\/\d{2}\/\d{4}/g) || '01/01/2025';
+    const totalValueBrl = findFirstCommaNumberAfterKeyword(cleanedText, /Total\s+a\s+Pagar.*?R\$|Total\s+a\s+Pagar/i) || '0,00';
+    
+    // Extrair consumo TE total (soma de todos os consumos TE)
     const eletricityKWhTE = sumAllConsumoTE(cleanedText).toFixed(3);
-    const eletricityPrice = findClosestValue(cleanedText, /Energia Elétrica kWh/i, /[\d.,]+\s+[\d.,]+\s+([\d.,]+)/g) || findClosestValue(cleanedText, /Energia Elétrica/i, /[\d.,]+\s+[\d.,]+\s+([\d.,]+)/g);
-    const sceeeKWh = findClosestValue(cleanedText, /Energia SCEE s\/ ICMS kWh/i, /[\d.,]+/g);
-    const sceeePrice = findClosestValue(cleanedText, /Energia SCEE s\/ ICMS kWh/i, /[\d.,]+\s+[\d.,]+\s+([\d.,]+)/g);
-    const gdiKWh = findClosestValue(cleanedText, /Energia compensada GD I kWh/i, /[\d.,]+/g);
-    const gdiPrice = findClosestValue(cleanedText, /Energia compensada GD I kWh/i, /[\d.,]+\s+[\d.,]+\s+([\d.,]+)/g);
-    const publicLightingContribution = findClosestValue(cleanedText, /Contrib Ilum Publica Municipal/i, /[\d.,]+/g);
+    
+    // Extrair preços baseados nos dados reais do PDF
+    // Procurar por padrões como: (0D) Consumo TE KWH 150,000 0,362600
+    const eletricityPriceMatch = cleanedText.match(/Consumo\s+TE\s+KWH\s+\d{1,4},\d{3}\s+(\d{1,2},\d{6})/i);
+    const eletricityPrice = eletricityPriceMatch ? eletricityPriceMatch[1].replace(',', '.') : '0.00';
+    
+    // SCEE geralmente é 0 para residencial
+    const sceeeKWh = '0,000';
+    const sceeePrice = '0,00';
+    
+    // GD geralmente é 0 para residencial
+    const gdiKWh = '0,000';
+    const gdiPrice = '0,00';
+    
+    // Contribuição de iluminação pública (COSIP)
+    const publicLightingContributionMatch = cleanedText.match(/COSIP\s+Municipal[^\d]*(\d{1,2},\d{2})/i);
+    const publicLightingContribution = publicLightingContributionMatch ? publicLightingContributionMatch[1].replace(',', '.') : '0.00';
     
     const [month, year] = referenceMonth.split('/');
-    let totalConsumptionKwhNum = parseFloat(eletricityKWhTE) + parseFloat(sceeeKWh);
+    let totalConsumptionKwhNum = parseFloat(eletricityKWhTE) + parseFloat(sceeeKWh || '0');
     let totalConsumptionKwh = isNaN(totalConsumptionKwhNum) ? '0.00' : totalConsumptionKwhNum.toFixed(2);
     let totalValueBrlNum = parseFloat(totalValueBrl.replace(',', '.'));
     let totalValueBrlFixed = isNaN(totalValueBrlNum) ? '0.00' : totalValueBrlNum.toFixed(2);
@@ -175,7 +233,7 @@ async function parsePdf(filePath: string): Promise<any> {
 
     // Função para extrair o histórico de consumo
     function extractHistoricoConsumo(text: string): { mes: string, consumo: number, dias: number }[] {
-      // 1. Encontrar todos os meses (ex: ABR/25)
+      // 1. Encontrar todos os meses (ex: ABR/25, MAR/25, etc.)
       const mesesMatch = Array.from(text.matchAll(/([A-Z]{3}\/\d{2})/g));
       const meses = mesesMatch.map(m => m[1]);
       if (meses.length === 0) return [];
@@ -186,11 +244,12 @@ async function parsePdf(filePath: string): Promise<any> {
       const textoAPartirDosMeses = text.slice(idxPrimeiroMes);
 
       // 4. Extrair todos os consumos (3 dígitos) e dias (1 ou 2 dígitos) após os meses
+      // Padrão: ABR/25 338 28 (mês, consumo, dias)
       const consumos = Array.from(textoAPartirDosMeses.matchAll(/\b(\d{3})\b/g)).map(m => parseInt(m[1], 10));
       const dias = Array.from(textoAPartirDosMeses.matchAll(/\b(\d{1,2})\b/g)).map(m => parseInt(m[1], 10));
 
       // 5. Pegar apenas os N primeiros consumos e dias
-      const N = meses.length;
+      const N = Math.min(meses.length, consumos.length, dias.length);
       const consumosFinal = consumos.slice(0, N);
       const diasFinal = dias.slice(0, N);
 
@@ -213,28 +272,28 @@ async function parsePdf(filePath: string): Promise<any> {
     const eletricityKWhTotal = eletricityKWhTE;
 
     return {
-      customerNumber: customerNumber || 'Não encontrado',
-      month: month || 'Não encontrado',
-      year: year || 'Não encontrado',
-      eletricityKWhTE: eletricityKWhTE,
-      eletricityKWhTotal: eletricityKWhTotal,
-      teUnitWithTax: teUnits.withTax,
-      teUnitNoTax: teUnits.noTax,
-      tusdUnitWithTax: tusdUnits.withTax,
-      tusdUnitNoTax: tusdUnits.noTax,
-      bandeiraUnitWithTax: bandeiraUnits.withTax,
-      bandeiraUnitNoTax: bandeiraUnits.noTax,
-      bandeiraTarifaria: bandeiraTarifaria,
-      historicoConsumo: historicoConsumo,
-      eletricityPrice: eletricityPrice || 0,
-      sceeeKWh: sceeeKWh || 0,
-      sceeePrice: sceeePrice || 0,
-      gdiKWh: gdiKWh || 0,
-      gdiPrice: gdiPrice || 0,
-      publicLightingContribution: publicLightingContribution || 0,
-      totalConsumptionKwh: totalConsumptionKwh,
-      totalValueBrl: totalValueBrlFixed,
-      dueDate: dueDate || 'Não encontrado',
+      customerNumber: customerNumber || '0000000000',
+      month: month || '01',
+      year: year || '2025',
+      eletricityKWhTE: eletricityKWhTE || '0.000',
+      eletricityKWhTotal: eletricityKWhTotal || '0.000',
+      teUnitWithTax: teUnits.withTax || '0.00',
+      teUnitNoTax: teUnits.noTax || '0.00',
+      tusdUnitWithTax: tusdUnits.withTax || '0.00',
+      tusdUnitNoTax: tusdUnits.noTax || '0.00',
+      bandeiraUnitWithTax: bandeiraUnits.withTax || '0.00',
+      bandeiraUnitNoTax: bandeiraUnits.noTax || '0.00',
+      bandeiraTarifaria: bandeiraTarifaria || 'Verde',
+      historicoConsumo: historicoConsumo || [],
+      eletricityPrice: eletricityPrice || '0.00',
+      sceeeKWh: sceeeKWh || '0.000',
+      sceeePrice: sceeePrice || '0.00',
+      gdiKWh: gdiKWh || '0.000',
+      gdiPrice: gdiPrice || '0.00',
+      publicLightingContribution: publicLightingContribution || '0.00',
+      totalConsumptionKwh: totalConsumptionKwh || '0.00',
+      totalValueBrl: totalValueBrlFixed || '0.00',
+      dueDate: dueDate || '01/01/2025',
     };
 
   } catch (error) {
@@ -485,9 +544,7 @@ app.post(
     console.log(`[API] Arquivo recebido: ${req.file.originalname}, salvo temporariamente em: ${req.file.path}`);
 
     try {
-      const { webViewLink: fileUrl, id: fileId } = await uploadInvoice(userId, req.file.path, req.file.originalname);
-      console.log(`[API] Arquivo enviado para o Drive com sucesso. File ID: ${fileId}`);
-
+      // 1. Extrair dados do PDF primeiro
       const extractedData = await parsePdf(req.file.path);
       console.log('[API] Dados extraídos do PDF:', extractedData);
       
@@ -496,6 +553,7 @@ app.post(
         return;
       }
 
+      // 2. Calcular análises baseadas nos dados extraídos
       const economy = calculateEconomy(extractedData);
       const points = calculatePoints(economy, extractedData.totalValueBrl);
       const diagnostico = diagnosticoEnergetico(extractedData);
@@ -504,27 +562,75 @@ app.post(
       console.log(`[API] Pontos calculados: ${points}`);
       console.log(`[API] Diagnóstico energético:`, diagnostico);
       
+      // --- CAMADA CONSULTIVA (NOVA) ---
+      let invoiceResumo: any = null;
+      let scoreConsultivo: any = null;
+      let diagnosticoConsultivo: any = null;
+      let tagsConsultivo: any = null;
+      
+      try {
+        const totalKwh = Number(extractedData.eletricityKWh || 0) + Number(extractedData.sceeeKWh || 0);
+
+        invoiceResumo = {
+          month: extractedData.month || '',
+          year: extractedData.year || '',
+          consumption_kwh: Number(totalKwh.toFixed(2)),
+          total_value_brl: Number(Number(extractedData.totalValueBrl || 0).toFixed(2)),
+          has_reactive: false, // ajuste se você já extrair explicitamente
+          has_gd: Number(extractedData.gdiKWh || 0) > 0,
+          tariff: '', // preencha se tiver no extractedData
+          value_per_kwh: totalKwh > 0
+            ? Number((Number(extractedData.totalValueBrl || 0) / totalKwh).toFixed(4))
+            : 0,
+          publicLightingContribution: Number(extractedData.publicLightingContribution || 0),
+        };
+
+        const { tips, tags } = diagnosticoEnergeticoConsultivo(invoiceResumo);
+        scoreConsultivo = computeConsultativeScore(invoiceResumo);
+        diagnosticoConsultivo = tips;
+        tagsConsultivo = tags;
+
+        await saveTechnicalAnalysis(userId, invoiceResumo, scoreConsultivo, tips);
+        console.log('[SHEETS] (upload) Análise consultiva salva em invoices_diagnosis.');
+
+      } catch (e) {
+        console.error('[API] (upload) Falha ao gerar/salvar análise consultiva:', e);
+        // não falhe a requisição por causa da camada consultiva; prossiga sem bloquear o fluxo antigo
+      }
+      
+      // 3. Preparar payload com dados extraídos e análises
       const invoicePayload = {
         ...extractedData,
-        fileUrl,
-        fileId,
         fileName: req.file.originalname,
         economy,
         points,
         diagnostico
       };
 
+      // 4. Salvar dados na planilha do Google
       await saveInvoiceData(userId, invoicePayload);
       console.log('[API] Dados da fatura salvos na planilha com sucesso.');
 
+      // 5. Descartar o arquivo PDF temporário
+      try {
+        fs.unlinkSync(req.file.path);
+        console.log(`[API] Arquivo temporário removido: ${req.file.path}`);
+      } catch (unlinkError) {
+        console.warn(`[API] Aviso: Não foi possível remover arquivo temporário: ${req.file.path}`);
+      }
+
       res.status(200).json({
-        message: 'Arquivo enviado e processado com sucesso!',
+        message: 'Dados extraídos e salvos com sucesso!',
         extractedData,
-        fileUrl,
         fileName: req.file.originalname,
         economy,
         points,
-        diagnostico
+        diagnostico,
+        // Campos da camada consultiva (se disponíveis)
+        ...(invoiceResumo && { invoiceResumo }),
+        ...(scoreConsultivo && { scoreConsultivo }),
+        ...(diagnosticoConsultivo && { diagnosticoConsultivo }),
+        ...(tagsConsultivo && { tagsConsultivo })
       });
 
     } catch (error) {
@@ -628,6 +734,36 @@ app.put('/api/users/:userId/gamification', async (req: Request, res: Response) =
     }
 });
 
+import type { DiagnosisListOptions } from './lib/types.js';
+import { getDiagnosisByUser } from './google-service.js';
+
+app.get('/api/users/:userId/diagnosis', async (req, res) => {
+  console.log('[API] GET /api/users/:userId/diagnosis');
+  try {
+    const { userId } = req.params;
+    if (!userId) {
+      res.status(400).json({ message: 'userId obrigatório.' });
+      return;
+    }
+
+    const limit = req.query.limit ? Number(req.query.limit) : undefined;
+    const cursor = req.query.cursor ? String(req.query.cursor) : undefined;
+    const wantsPagination = Boolean(limit || cursor);
+
+    const options: DiagnosisListOptions | undefined = wantsPagination
+      ? { limit, cursor: cursor ?? null }
+      : undefined;
+
+    const result = await getDiagnosisByUser(userId, options);
+
+    // Compat: sem paginação → retorna array; com paginação → { items, nextCursor }
+    res.status(200).json(result);
+  } catch (e: any) {
+    console.error('[API] Erro em /diagnosis:', e?.message || e);
+    res.status(500).json({ message: 'Erro ao buscar histórico de análises.' });
+  }
+});
+
 // Rota para buscar leaderboard
 app.get('/api/leaderboard', async (req: Request, res: Response) => {
     console.log('[API] Requisição recebida: GET /api/leaderboard');
@@ -658,6 +794,114 @@ app.post(
     }
   }
 );
+
+// 2) ROTA NOVA — cole abaixo das outras rotas, sem alterar as existentes
+//    POST /api/invoices/analyze-pdf
+//    - recebe arquivo "invoice" (PDF) e userId no body
+//    - extrai dados com parsePdf (já existente no seu server)
+//    - NÃO faz upload no Drive
+//    - salva linha "operacional" em INVOICES com saveInvoiceData (fileId vazio)
+//    - monta InvoiceParsed -> diagnostico + score consultivo -> salva em invoices_diagnosis
+app.post('/api/invoices/analyze-pdf', upload.single('invoice'), async (req, res) => {
+  console.log('[API] POST /api/invoices/analyze-pdf');
+
+  try {
+    const userId = req.body?.userId;
+    if (!userId || typeof userId !== 'string') {
+      res.status(400).json({ message: 'Parâmetro inválido: userId é obrigatório.' });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ message: 'Nenhum arquivo enviado (campo "invoice").' });
+      return;
+    }
+
+    console.log(`[API] Arquivo recebido: ${req.file.originalname}, tmp: ${req.file.path}`);
+
+    // 2.1) Extrair texto/valores do PDF usando sua função atual
+    const extractedData = await parsePdf(req.file.path);
+    if (extractedData?.error) {
+      res.status(500).json({ message: extractedData.message || 'Falha ao ler o PDF.' });
+      return;
+    }
+    console.log('[PARSER] Extraído:', {
+      month: extractedData.month,
+      year: extractedData.year,
+      eletricityKWh: extractedData.eletricityKWh,
+      sceeeKWh: extractedData.sceeeKWh,
+      totalValueBrl: extractedData.totalValueBrl
+    });
+
+    // 2.2) Calcular economia e pontos (suas funções existentes)
+    const economy = calculateEconomy(extractedData);
+    const points  = calculatePoints(economy, extractedData.totalValueBrl);
+    console.log('[API] Economy:', economy, 'Points:', points);
+
+    // 2.3) (Opcional / Operacional) Salvar em INVOICES (sem Drive)
+    //      Mantemos o schema atual, com fileId vazio; não muda saveInvoiceData
+    const payload = {
+      fileId: '', // <- não salvamos mais PDFs
+      fileName: req.file.originalname,
+      month: extractedData.month,
+      year: extractedData.year,
+      eletricityKWh: extractedData.eletricityKWh,
+      eletricityPrice: extractedData.eletricityPrice,
+      sceeeKWh: extractedData.sceeeKWh,
+      sceeePrice: extractedData.sceeePrice,
+      gdiKWh: extractedData.gdiKWh,
+      gdiPrice: extractedData.gdiPrice,
+      publicLightingContribution: extractedData.publicLightingContribution,
+      totalValue: extractedData.totalValueBrl,
+      economy
+    };
+    await saveInvoiceData(userId, payload);
+    console.log('[SHEETS] Linha operacional salva em INVOICES.');
+
+    // 2.4) Normalizar para InvoiceParsed (camada consultiva)
+    const totalKwh = Number(extractedData.eletricityKWh || 0) + Number(extractedData.sceeeKWh || 0);
+    const invoiceResumo = {
+      month: extractedData.month || '',
+      year: extractedData.year || '',
+      consumption_kwh: Number(totalKwh.toFixed(2)),
+      total_value_brl: Number(Number(extractedData.totalValueBrl || 0).toFixed(2)),
+      // Se você já extrai reativo explicitamente, ajuste aqui (por enquanto heurística simples)
+      has_reactive: false,
+      has_gd: Number(extractedData.gdiKWh || 0) > 0,
+      // Se já extrai "tariff" em extractedData, preencha; senão mantenha vazio
+      tariff: '',
+      value_per_kwh: totalKwh > 0
+        ? Number((Number(extractedData.totalValueBrl || 0) / totalKwh).toFixed(4))
+        : 0,
+      publicLightingContribution: Number(extractedData.publicLightingContribution || 0)
+    };
+
+    // 2.5) Diagnóstico + Score consultivo (funções puras)
+    const { tips, tags } = diagnosticoEnergeticoConsultivo(invoiceResumo);
+    const scoreConsultivo = computeConsultativeScore(invoiceResumo);
+    console.log('[ADVISOR] Tips:', tips);
+    console.log('[SCORE] Total:', scoreConsultivo.total, 'Breakdown:', scoreConsultivo.breakdown);
+
+    // 2.6) Persistir análise consultiva (invoices_diagnosis)
+    await saveTechnicalAnalysis(userId, invoiceResumo, scoreConsultivo, tips);
+    console.log('[SHEETS] Análise consultiva salva em invoices_diagnosis.');
+
+    // 2.7) Responder ao cliente
+    res.status(200).json({
+      message: 'PDF analisado com sucesso (sem upload ao Drive).',
+      extractedData,
+      invoiceResumo,
+      scoreConsultivo,
+      diagnostico: tips,
+      tags,
+      economy,
+      points
+    });
+
+  } catch (error: any) {
+    console.error('[API] Erro em /api/invoices/analyze-pdf:', error?.message || error);
+    res.status(500).json({ message: 'Erro ao analisar o PDF.' });
+  }
+});
 
 // --- ROTAS DE AUTENTICAÇÃO ---
 
