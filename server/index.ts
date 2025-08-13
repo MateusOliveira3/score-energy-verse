@@ -13,7 +13,7 @@ import path from 'path';
 import { parseInvoiceText } from './lib/invoice-parser.js';
 import diagnosticoEnergeticoConsultivo from './lib/energy-advisor.js';
 import computeConsultativeScore from './lib/score-advisor.js';
-import { toNumberBR, normalizeTariffUnit, safeDiv, asSheetNumber } from './lib/num.js';
+import { fromKwh, fromMoney, preferNumber, safeDiv, normalizeTariffUnit, fromBRStringSmart, asSheetNumber } from './lib/num.js';
 import { saveTechnicalAnalysis, getLastDiagnosisRow } from './google-service.js';
 
 dotenv.config();
@@ -906,85 +906,68 @@ app.post('/api/invoices/analyze-pdf', upload.single('invoice'), async (req, res)
       totalValueBrl: extractedData.totalValueBrl
     });
 
-    const eletricityKWh = asSheetNumber(extractedData.eletricityKWh, 3);
-    const sceeeKWh      = asSheetNumber(extractedData.sceeeKWh, 3);
-    const gdiKWh        = asSheetNumber(extractedData.gdiKWh, 3);
-    const totalBRL      = asSheetNumber(extractedData.totalValueBrl, 2);
+    // Usando as novas funções mais robustas
+    const teKwh  = fromKwh(extractedData?.eletricityKWh);
+    const sceeeKwh = fromKwh(extractedData?.sceeeKWh);
+    const totalKwh = preferNumber(extractedData?.totalConsumptionKwh, teKwh + sceeeKwh);
 
-    // total de kWh: somar TE + SCEE se não vier pronto
-    const totalKwh = asSheetNumber(
-      extractedData.totalConsumptionKwh ?? (eletricityKWh + sceeeKWh),
-      3
-    );
+    const totalValueBrl = fromMoney(extractedData?.totalValueBrl);
+    const valuePerKwh   = safeDiv(totalValueBrl, totalKwh);
 
-    // valuePerKwh robusto (evita NaN/Infinity)
-    const valuePerKwh = asSheetNumber(safeDiv(totalBRL, totalKwh), 3);
+    // mantém seus cálculos existentes
+    const economy = calculateEconomy({
+      ...extractedData,
+      eletricityKWh: teKwh,
+      sceeeKWh: sceeeKwh,
+      totalConsumptionKwh: totalKwh,
+      totalValueBrl: totalValueBrl,
+    });
+    const points  = calculatePoints(economy, totalValueBrl);
 
-    // normaliza tarifas para R$/kWh
-    const te_com    = asSheetNumber(normalizeTariffUnit(extractedData.tarifa_te_com_impostos), 3);
-    const te_sem    = asSheetNumber(normalizeTariffUnit(extractedData.tarifa_te_sem_impostos), 3);
-    const tusd_com  = asSheetNumber(normalizeTariffUnit(extractedData.tarifa_tusd_com_impostos), 3);
-    const tusd_sem  = asSheetNumber(normalizeTariffUnit(extractedData.tarifa_tusd_sem_impostos), 3);
-    const band_com  = asSheetNumber(normalizeTariffUnit(extractedData.tarifa_bandeira_com_impostos), 3);
-    const band_sem  = asSheetNumber(normalizeTariffUnit(extractedData.tarifa_bandeira_sem_impostos), 3);
-
-    // payload coerente para diagnóstico/score
-    const invParsed = {
-      month: String(asSheetNumber(extractedData.month, 0)),
-      year: String(asSheetNumber(extractedData.year, 0)),
-      consumption_kwh: totalKwh,
-      total_value_brl: totalBRL,
-      value_per_kwh: valuePerKwh,
-      has_reactive: Boolean(extractedData.hasReactive),
-      has_gd: toNumberBR(extractedData.gdiKWh) > 0,
-      tariff: extractedData.tariff || 'B1 Convencional',
+    // payload operacional (planilha invoices) – mantenha os demais campos que você já passa
+    const invoicePayload = {
+      ...extractedData,
+      eletricityKWh: teKwh,
+      sceeeKWh: sceeeKwh,
+      totalConsumptionKwh: totalKwh,
+      totalValueBrl: totalValueBrl,
+      economy,
+      points,
     };
 
-    // reuso das funções já existentes no seu arquivo:
-    const economy = calculateEconomy({ ...extractedData, totalValueBrl: totalBRL, eletricityKWh, sceeeKWh });
-    const points  = calculatePoints(economy, totalBRL);
+    // salva como você já faz
+    await saveInvoiceData(userId, invoicePayload);
 
-    // Salvar a linha operacional (mantenha sua chamada existente, só garanta que estes campos estão indo):
-    await saveInvoiceData(userId, {
-      ...extractedData,
-      fileId: '',
-      fileName: req.file.originalname,
-      eletricityKWh,
-      sceeeKWh,
-      gdiKWh,
-      totalConsumptionKwh: totalKwh,
-      totalValueBrl: totalBRL,
-      valuePerKwh
-    });
-
-    // ---- camada consultiva (usa seu módulo energy-advisor já criado) ----
-    const diagnosis = diagnosticoEnergeticoConsultivo({
-      month: invParsed.month,
-      year: invParsed.year,
-      consumption_kwh: invParsed.consumption_kwh,
-      total_value_brl: invParsed.total_value_brl,
-      value_per_kwh: invParsed.value_per_kwh,
-      has_reactive: invParsed.has_reactive,
-      has_gd: invParsed.has_gd,
-      tariff: invParsed.tariff,
-    });
-
-    // computeConsultativeScore já existente:
-    const score = computeConsultativeScore(invParsed);
-
-    // Persistir diagnóstico na aba invoices_diagnosis (AGORA passando value_per_kwh explicitamente)
-    await saveTechnicalAnalysis(userId, {
-      month: asSheetNumber(extractedData.month, 0),
-      year: asSheetNumber(extractedData.year, 0),
+    // payload consultivo (planilha invoices_diagnosis)
+    const consultParsed = {
+      month: fromBRStringSmart(extractedData?.month) || extractedData?.month || '',
+      year:  fromBRStringSmart(extractedData?.year)  || extractedData?.year  || '',
       consumption_kwh: totalKwh,
-      total_value_brl: totalBRL,
+      total_value_brl: totalValueBrl,
+      has_reactive: Boolean(extractedData?.hasReactive),
+      has_gd: Boolean(extractedData?.gdiKWh) && fromKwh(extractedData?.gdiKWh) > 0,
+      tariff: extractedData?.tariff || 'N/D',
       value_per_kwh: valuePerKwh,
-      has_reactive: Boolean(extractedData.hasReactive),
-      has_gd: gdiKWh > 0,
-      tariff: extractedData.tariff || 'B1 Convencional',
+    };
+
+    // usa seu advisor e score existentes
+    const diag = diagnosticoEnergeticoConsultivo({
+      month: String(consultParsed.month),
+      year: String(consultParsed.year),
+      consumption_kwh: consultParsed.consumption_kwh,
+      total_value_brl: consultParsed.total_value_brl,
+      value_per_kwh: consultParsed.value_per_kwh,
+      has_reactive: consultParsed.has_reactive,
+      has_gd: consultParsed.has_gd,
+      tariff: consultParsed.tariff,
+    });
+    const score = computeConsultativeScore(consultParsed);
+
+    await saveTechnicalAnalysis(userId, {
+      ...consultParsed,
       score_total: score.total,
-      score_breakdown_json: JSON.stringify(score.breakdown || {}),
-      recommendations_json: diagnosis.tips || [],
+      score_breakdown_json: JSON.stringify(score.breakdown),
+      recommendations_json: diag.tips ?? [],
       created_at: new Date().toISOString(),
     });
 
@@ -992,16 +975,21 @@ app.post('/api/invoices/analyze-pdf', upload.single('invoice'), async (req, res)
     const lastRow = await getLastDiagnosisRow(userId);
     console.log('[DEBUG last diagnosis row]', lastRow);
 
+    console.log('[DEBUG] saved diagnosis row', {
+      consumption_kwh: consultParsed.consumption_kwh,
+      total_value_brl: consultParsed.total_value_brl,
+      value_per_kwh: consultParsed.value_per_kwh,
+    });
+
     // resposta final (mantenha sua resposta, mas inclua os números já normalizados):
     res.status(200).json({
       message: 'Arquivo enviado e analisado com sucesso!',
       extractedData: {
         ...extractedData,
-        eletricityKWh,
-        sceeeKWh,
-        gdiKWh,
+        eletricityKWh: teKwh,
+        sceeeKWh: sceeeKwh,
         totalConsumptionKwh: totalKwh,
-        totalValueBrl: totalBRL,
+        totalValueBrl: totalValueBrl,
         valuePerKwh
       },
       economy,
