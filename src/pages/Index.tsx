@@ -12,6 +12,8 @@ import MascotCustomization from '../components/MascotCustomization';
 import EnergyNews from '../components/EnergyNews';
 import GamificationDashboard from '../components/gamification/GamificationDashboard';
 import { useInvoices } from '@/hooks/useInvoices';
+import { useDiagnosis } from '@/hooks/useDiagnosis';
+import { useAuth } from '@/contexts/AuthContext';
 import InvoiceAlerts from '@/components/InvoiceAlerts';
 
 interface InvoiceData {
@@ -42,6 +44,11 @@ const Index = () => {
   const [currentScore, setCurrentScore] = useState(1247);
   const [currentLevel, setCurrentLevel] = useState(7);
   const { latestInvoice } = useInvoices();
+  const { user } = useAuth();
+  
+  // Hook para diagnosis com SWR
+  const { mutate: mutateDiagnosis } = useDiagnosis(user?.id, { limit: 1 });
+  
   const [userProfile, setUserProfile] = useState<UserProfileData>({
     consumerType: 'Residencial',
     location: '',
@@ -55,6 +62,18 @@ const Index = () => {
     colorPalette: 'emerald',
     borderEffect: 'none'
   });
+
+  // Função para revalidar o diagnosis quando uma nova fatura for processada
+  const handleDiagnosisUpdate = async () => {
+    if (mutateDiagnosis) {
+      try {
+        await mutateDiagnosis();
+        console.log('[Index] Diagnosis revalidado com sucesso');
+      } catch (error) {
+        console.warn('[Index] Erro ao revalidar diagnosis:', error);
+      }
+    }
+  };
 
   const handleInvoiceProcessed = (data: InvoiceData) => {
     setInvoiceData(data);
@@ -95,7 +114,7 @@ const Index = () => {
       <main className="container mx-auto px-4 py-8 space-y-8">
         <div className="max-w-4xl mx-auto space-y-4">
           <InvoiceAlerts latestInvoice={latestInvoice} />
-          <InvoiceUpload />
+          <InvoiceUpload onDiagnosisUpdate={handleDiagnosisUpdate} />
           {latestInvoice && (
             <p className="text-xs text-center text-gray-500">
               Último envio em: {new Date(latestInvoice.created_at).toLocaleString('pt-BR')}
@@ -139,7 +158,7 @@ const Index = () => {
 
         {/* Análise da Última Fatura */}
         <div className="max-w-6xl mx-auto">
-          <AnalysisPanel userId={userProfile?.id} />
+          <AnalysisPanel userId={user?.id} />
         </div>
 
         {/* Central de Gamificação */}

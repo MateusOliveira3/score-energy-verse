@@ -1,125 +1,134 @@
 // server/lib/num.ts
-// Conversões robustas BR/US para kWh/R$ + helpers
-
-export function isFiniteNumber(n: any): n is number {
-  return typeof n === 'number' && Number.isFinite(n);
-}
-
-// Tenta interpretar strings como número considerando padrões brasileiros
-export function fromBRStringSmart(x: any): number {
-  if (x === null || x === undefined) return 0;
-  if (isFiniteNumber(x)) return x;
-
+export function toNumberBR(x: any): number {
+  if (x == null || x === '') return 0;
+  if (typeof x === 'number' && Number.isFinite(x)) return x;
   const s = String(x).trim();
   if (!s) return 0;
-
-  // limpeza leve
-  const onlyDigits = s.replace(/[^\d.,-]/g, '');
-
-  // caso "285,20" (clássico BR)
-  if (onlyDigits.includes(',') && !onlyDigits.includes('.')) {
-    const n = parseFloat(onlyDigits.replace(/\./g, '').replace(',', '.'));
-    return Number.isFinite(n) ? n : 0;
-  }
-
-  // caso só ponto: decidir se é decimal ou milhar
-  if (onlyDigits.includes('.') && !onlyDigits.includes(',')) {
-    const parts = onlyDigits.split('.');
-    const last = parts[parts.length - 1];
-    // heurística: se a parte final tem 1-3 dígitos, tratamos PONTO como DECIMAL
-    if (/^\d{1,3}$/.test(last)) {
-      const n = parseFloat(onlyDigits);
-      return Number.isFinite(n) ? n : 0;
-    }
-    // senão, tratamos como milhar e removemos pontos
-    const n = parseFloat(onlyDigits.replace(/\./g, ''));
-    return Number.isFinite(n) ? n : 0;
-  }
-
-  // misto ou sem separadores
-  const n = parseFloat(onlyDigits.replace(/\./g, '').replace(',', '.'));
+  const n = parseFloat(s.replace(/\./g, '').replace(',', '.'));
   return Number.isFinite(n) ? n : 0;
 }
 
-// Dinheiro sempre em BRL, aceita "285,20"/"285.20"
-export function fromMoney(x: any): number {
-  if (x === null || x === undefined) return 0;
-  if (isFiniteNumber(x)) return x;
-
-  const s = String(x).trim();
-  if (!s) return 0;
-
-  // CORRIGIDO: Para dinheiro, tratar ponto como decimal (formato americano)
-  // "285.20" -> 285.20, "285,20" -> 285.20
-  if (s.includes('.') && !s.includes(',')) {
-    // Se tem ponto mas não vírgula, é formato americano (decimal)
-    const n = parseFloat(s);
-    if (Number.isFinite(n)) return n;
-  }
-
-  // Caso contrário, usar a função genérica (formato brasileiro)
-  return fromBRStringSmart(x);
+function isoDate(x: any): number {
+  try { return new Date(String(x)).getTime(); } catch { return 0; }
 }
 
-// kWh vindo do parser/Sheets (345.000, 41.700, 345,000 etc.)
-export function fromKwh(x: any): number {
-  if (x === null || x === undefined) return 0;
-  if (isFiniteNumber(x)) return x;
-
-  const s = String(x).trim();
-  if (!s) return 0;
-
-  // CORRIGIDO: Para kWh, tratar ponto como separador de milhar (formato brasileiro)
-  // "345.000" -> 345000, "41.700" -> 41700
-  if (s.includes('.') && !s.includes(',')) {
-    // Se tem ponto mas não vírgula, é formato brasileiro (milhar)
-    const n = parseFloat(s.replace(/\./g, ''));
-    if (Number.isFinite(n) && n > 0 && n <= 200000) return n;
-  }
-
-  // Caso contrário, usar a função genérica
-  const n = fromBRStringSmart(x);
-  if (!Number.isFinite(n)) return 0;
-  if (n > 200000) return 0; // muito improvável para fatura mensal
-  return n;
+export function toUSString(n: number, decimals = 3): string {
+  if (!Number.isFinite(n)) return '0';
+  return n.toFixed(decimals).replace(',', '.');
 }
 
-// Seleciona o primeiro número finito e > 0
-export function preferNumber(...candidates: any[]): number {
-  for (const c of candidates) {
-    const n = isFiniteNumber(c) ? c : fromBRStringSmart(c);
-    if (Number.isFinite(n) && n > 0) return n;
-  }
-  return 0;
+export function safeDiv(a: number, b: number): number {
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b === 0) return 0;
+  return a / b;
 }
 
-// Divide com segurança
-export function safeDiv(a: any, b: any): number {
-  const A = fromBRStringSmart(a);
-  const B = fromBRStringSmart(b);
-  if (!Number.isFinite(A) || !Number.isFinite(B) || B === 0) return 0;
-  return A / B;
-}
-
-// Normaliza tarifa: se vier em R$/MWh (>=5), converte para R$/kWh
+/** tarifário: se vier ≥ 5 assume MWh e converte pra kWh */
 export function normalizeTariffUnit(t: any): number {
-  const n = fromBRStringSmart(t);
-  if (!Number.isFinite(n)) return 0;
-  return n >= 5 ? n / 1000 : n;
+  const v = toNumberBR(t);
+  if (v >= 5) return v / 1000;
+  return v;
 }
 
-// Funções de compatibilidade (mantidas para não quebrar código existente)
-export function toNumberBR(x: any): number {
-  return fromBRStringSmart(x);
+import { monthToSeason, seasonPt, regionFromUF } from './season.js';
+
+// NOVA – recebe a última linha e devolve payload para o frontend
+export function buildLastAnalysisPayload(last: { type: 'diagnosis'|'invoice', data: any }, userProfile?: any) {
+  const d = last.data || {};
+
+  // tenta derivar mês/ano
+  const month = toNumberBR(d.month || d.mes);
+  const year  = toNumberBR(d.year  || d.ano);
+
+  // consumo/valor
+  const consumption = toNumberBR(d.consumption_kwh || d.consumo_kwh || d.consumo_total_kwh || d.consumo_total_kwh_calculado);
+  const totalValue  = toNumberBR(d.total_value_brl || d.valor_total_brl);
+
+  // valor por kWh robusto
+  const valuePerKwh = safeDiv(totalValue, consumption);
+
+  // impostos / pico se existirem
+  const impostosPerc = toNumberBR(d.impostos_perc || d.impostos || 0);
+  const picoSharePerc = toNumberBR(d.pico_perc || 0);
+
+  // UF do usuário (se tiver) -> região/estação
+  const uf = (userProfile?.uf || userProfile?.state || userProfile?.estado || '').toString().toUpperCase() || (d.uf || d.estado || '').toString().toUpperCase();
+  const region = regionFromUF(uf);
+  const season = seasonPt(monthToSeason(month || (new Date().getMonth()+1)));
+
+  // bandeira/tarifas
+  const bandeira = (d.bandeira_tarifaria || d.tarifa_bandeira_ || d.tarifa_bandeira_com_impostos || '').toString() || '—';
+  const te = normalizeTariffUnit(d.tarifa_te_com_impostos || d.tarifa_te_sem_impostos || 0);
+  const tusd = normalizeTariffUnit(d.tarifa_tusd_com_impostos || d.tarifa_tusd_sem_impostos || 0);
+
+  return {
+    month, year,
+    uf, region, season,
+    consumption_kwh: consumption,
+    total_value_brl: totalValue,
+    value_per_kwh: valuePerKwh,
+    impostos_perc: impostosPerc,
+    pico_perc: picoSharePerc,
+    bandeira,
+    te, tusd,
+    score_total: toNumberBR(d.score_total || 0),
+    tips_raw: d.recommendations_json || d.recomendacoes_json || '[]'
+  };
 }
 
-export function toUSString(n: any): string {
-  const v = isFiniteNumber(n) ? n : fromBRStringSmart(n);
-  return Number.isFinite(v) ? String(v) : '0';
+export function buildSmartTips(input: {
+  consumption_kwh: number;
+  value_per_kwh: number;
+  impostos_perc: number;
+  pico_perc: number;
+  bandeira: string;
+  region: string;
+  seasonPt: string;
+  hasReactive?: boolean;
+  tariff?: string;
+}) {
+  const tips: string[] = [];
+
+  // consumo x valor unitário
+  if (input.value_per_kwh > 1.0) {
+    tips.push('⚠️ Seu custo por kWh está alto. Avalie plano tarifário e combate a desperdícios.');
+  } else {
+    tips.push('🟢 Seu custo por kWh está dentro do esperado.');
+  }
+
+  // impostos
+  if (input.impostos_perc > 20) {
+    tips.push('⚠️ Impostos representam parcela relevante. Reveja enquadramento tributário/ICMS e possíveis isenções.');
+  }
+
+  // pico
+  if (input.pico_perc > 40) {
+    tips.push('⚠️ Alta participação do horário de pico. Realoque cargas e avalie tarifa com ponta diferenciada.');
+  }
+
+  // bandeira
+  if ((input.bandeira || '').toLowerCase().includes('amarela')) {
+    tips.push('🟡 Bandeira Amarela vigente: custo extra temporário. Reforce ações de eficiência.');
+  }
+
+  // reativo
+  if (input.hasReactive) {
+    tips.push('🔴 Multa por reativo identificada. Considere banco de capacitores / correção de FP.');
+  }
+
+  // sazonalidade simples
+  if (input.seasonPt === 'Inverno' && input.region === 'Sul') {
+    tips.push('❄️ Inverno no Sul pode elevar uso de aquecimento. Programe horários e isole ambientes.');
+  }
+  if (input.seasonPt === 'Season' && ['Norte','Nordeste','Sudeste','Centro-Oeste'].includes(input.region)) {
+    tips.push('☀️ Verão: atenção ao ar-condicionado. Verifique selos de eficiência e manutenção de filtros.');
+  }
+
+  return tips;
 }
 
-export function asSheetNumber(x: any, decimals?: number): number {
-  const n = fromBRStringSmart(x);
-  if (!Number.isFinite(n)) return 0;
-  return typeof decimals === 'number' ? Number(n.toFixed(decimals)) : n;
+export async function fetchLastAnalysis(userId: string) {
+  const r = await fetch(`/api/users/${userId}/last-analysis`);
+  if (!r.ok) throw new Error('Falha ao buscar última análise');
+  const j = await r.json();
+  return j?.data ?? null;
 }

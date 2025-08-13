@@ -17,13 +17,13 @@ import SeasonalInsightCard from '@/components/SeasonalInsightCard';
 const InvoiceHistory = () => {
   const { invoices, isLoading } = useInvoices();
   const { user } = useAuth();
-  const { data: diagnosis, loading: diagLoading } = useDiagnosis(user?.id);
+  const { items: diagnosisItems, isLoading: diagLoading } = useDiagnosis(user?.id);
   const { analytics } = useDiagnosisAnalytics(user?.id);
 
   // Merge memoizado (acima do return):
   const merged = React.useMemo(() => {
-    return mergeInvoicesWithDiagnosis(invoices as InvoiceLike[] || [], diagnosis || []);
-  }, [invoices, diagnosis]);
+    return mergeInvoicesWithDiagnosis(invoices as InvoiceLike[] || [], diagnosisItems || []);
+  }, [invoices, diagnosisItems]);
 
   // Temporário: apenas log até desenharmos os cards/indicadores
   React.useEffect(() => {
@@ -107,7 +107,7 @@ const InvoiceHistory = () => {
         </CardHeader>
         <CardContent>
           <DiagnosisSummary userId={user?.id} />
-          <SeasonalInsightCard userId={user?.id} userState={user?.state} />
+          <SeasonalInsightCard userId={user?.id} userState={undefined} />
           {merged.length === 0 ? (
             <div className="text-center py-8">
               <Zap className="h-12 w-12 text-gray-400 mx-auto mb-4" />

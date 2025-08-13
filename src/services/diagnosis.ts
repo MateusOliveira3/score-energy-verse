@@ -28,3 +28,10 @@ export function pickLatestForMonthYear(items: DiagnosisItem[], month: string, ye
   if (filtered.length <= 1) return filtered[0] || null;
   return filtered.sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
 }
+
+export async function fetchLastAnalysis(userId: string) {
+  const r = await fetch(`/api/users/${userId}/last-analysis`);
+  if (!r.ok) throw new Error('Falha ao buscar última análise');
+  const j = await r.json();
+  return j?.data ?? null;
+}

@@ -1,44 +1,24 @@
-import { useEffect, useMemo, useState } from 'react';
-import { fetchDiagnosis, type DiagnosisItem } from '@/services/diagnosis';
+import useSWR from 'swr';
 
-export function useDiagnosis(userId?: string) {
-  const [data, setData] = useState<DiagnosisItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string|null>(null);
+type Options = { limit?: number };
+export function useDiagnosis(userId?: string, options: Options = {}) {
+  const { limit = 50 } = options;
+  const shouldFetch = Boolean(userId);
+  const key = shouldFetch ? [`/api/users/${userId}/diagnosis`, limit] : null;
 
-  useEffect(() => {
-    let alive = true;
-    async function run() {
-      if (!userId) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const items = await fetchDiagnosis(userId);
-        if (alive) setData(items);
-      } catch (e: any) {
-        if (alive) setError(e?.message || 'Erro ao carregar análises');
-      } finally {
-        if (alive) setLoading(false);
-      }
-    }
-    run();
-    return () => { alive = false; };
-  }, [userId]);
+  const swr = useSWR(key, async ([url, lim]) => {
+    const u = lim ? `${url}?limit=${lim}` : url;
+    const res = await fetch(u);
+    if (!res.ok) throw new Error('Falha ao buscar diagnosis');
+    return await res.json();
+  });
 
-  // índices úteis para acesso rápido por (month,year)
-  const byMonthYear = useMemo(() => {
-    const map = new Map<string, DiagnosisItem[]>();
-    for (const d of data) {
-      const key = `${d.year}-${d.month}`;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(d);
-    }
-    for (const [key, arr] of map) {
-      arr.sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      map.set(key, arr);
-    }
-    return map;
-  }, [data]);
+  // normaliza: pode ser {items:[]} ou []
+  const list = Array.isArray(swr.data)
+    ? swr.data
+    : Array.isArray(swr.data?.items)
+      ? swr.data.items
+      : [];
 
-  return { data, byMonthYear, loading, error };
+  return { ...swr, items: list, mutate: swr.mutate };
 }

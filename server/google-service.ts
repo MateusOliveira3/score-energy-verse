@@ -3,7 +3,14 @@ import dotenv from 'dotenv';
 import bcrypt from 'bcrypt';
 import { Readable } from 'stream';
 import fs from 'fs';
-import { asSheetNumber, toNumberBR, normalizeTariffUnit } from './lib/num';
+import { toNumberBR, normalizeTariffUnit } from './lib/num';
+
+// Helper para formatar números para planilha (substitui asSheetNumber)
+function formatForSheet(value: any, decimals: number = 0): number {
+  const num = toNumberBR(value);
+  if (!Number.isFinite(num)) return 0;
+  return Number(num.toFixed(decimals));
+}
 
 
 dotenv.config();
@@ -68,7 +75,7 @@ async function getDriveApi() {
 }
 
 // Helpers
-async function readSheet(sheetName: string) {
+export async function readSheet(sheetName: string) {
     const sheetsApi = await getSheetsApi();
     try {
         const response = await sheetsApi.spreadsheets.values.get({
@@ -80,6 +87,44 @@ async function readSheet(sheetName: string) {
         console.error(`Erro ao ler a aba ${sheetName}:`, error);
         return [];
     }
+}
+
+// NOVA – retorna a última linha de diagnosis OU invoice (a mais "recente" lançada)
+export async function getLastAnalysisOrInvoice(userId: string) {
+  const diagnosisRows = await readSheet('invoices_diagnosis');
+  const invoicesRows = await readSheet('invoices');
+
+  const pick = (rows: string[][], userIdxName: string) => {
+    if (!rows?.length) return [];
+    const headers = rows[0];
+    const mapIdx = (k: string) => headers.indexOf(k);
+
+    const ui = mapIdx(userIdxName);
+    const cai = mapIdx('created_at');
+    const uai = mapIdx('updated_at');
+
+    return rows.slice(1)
+      .filter(r => ui >= 0 ? r[ui] === userId : false)
+      .map(r => ({ row: r, headers, created: isoDate(r[cai]), updated: isoDate(r[uai]) }))
+      .sort((a,b) => (b.updated || b.created) - (a.updated || b.created));
+  };
+
+  const diag = pick(diagnosisRows, 'user_id');
+  const inv  = pick(invoicesRows, 'user_id');
+
+  const best = [diag[0], inv[0]].filter(Boolean).sort((a,b) => (b.updated||b.created)-(a.updated||b.created))[0];
+  if (!best) return null;
+
+  // constrói um objeto plano {header: value}
+  const obj: Record<string, any> = {};
+  best.headers.forEach((h, i) => (obj[h] = best.row[i]));
+
+  return { type: best.headers.includes('score_total') ? 'diagnosis' as const : 'invoice' as const, data: obj };
+}
+
+// Helper para converter data para timestamp
+function isoDate(x: any): number {
+  try { return new Date(String(x)).getTime(); } catch { return 0; }
 }
 
 async function appendToSheet(sheetName: string, rows: any[][]) {
@@ -333,28 +378,28 @@ export async function saveInvoiceData(userId, data) {
   const now = new Date().toISOString();
   const invoiceId = `invoice_${Date.now()}`;
 
-  const kwh_te    = asSheetNumber(data.eletricityKWh, 3);
-  const kwh_sceee = asSheetNumber(data.sceeeKWh, 3);
-  const kwh_gdi   = asSheetNumber(data.gdiKWh, 3);
-  const totalKwh  = asSheetNumber(data.totalConsumptionKwh ?? (kwh_te + kwh_sceee), 3);
-  const totalBRL  = asSheetNumber(data.totalValueBrl, 2);
+  const kwh_te    = formatForSheet(data.eletricityKWh, 3);
+  const kwh_sceee = formatForSheet(data.sceeeKWh, 3);
+  const kwh_gdi   = formatForSheet(data.gdiKWh, 3);
+  const totalKwh  = formatForSheet(data.totalConsumptionKwh ?? (kwh_te + kwh_sceee), 3);
+  const totalBRL  = formatForSheet(data.totalValueBrl, 2);
 
-  const te_com    = asSheetNumber(normalizeTariffUnit(data.tarifa_te_com_impostos), 3);
-  const te_sem    = asSheetNumber(normalizeTariffUnit(data.tarifa_te_sem_impostos), 3);
-  const tusd_com  = asSheetNumber(normalizeTariffUnit(data.tarifa_tusd_com_impostos), 3);
-  const tusd_sem  = asSheetNumber(normalizeTariffUnit(data.tarifa_tusd_sem_impostos), 3);
-  const band_com  = asSheetNumber(normalizeTariffUnit(data.tarifa_bandeira_com_impostos), 3);
-  const band_sem  = asSheetNumber(normalizeTariffUnit(data.tarifa_bandeira_sem_impostos), 3);
+  const te_com    = formatForSheet(normalizeTariffUnit(data.tarifa_te_com_impostos), 3);
+  const te_sem    = formatForSheet(normalizeTariffUnit(data.tarifa_te_sem_impostos), 3);
+  const tusd_com  = formatForSheet(normalizeTariffUnit(data.tarifa_tusd_com_impostos), 3);
+  const tusd_sem  = formatForSheet(normalizeTariffUnit(data.tarifa_tusd_sem_impostos), 3);
+  const band_com  = formatForSheet(normalizeTariffUnit(data.tarifa_bandeira_com_impostos), 3);
+  const band_sem  = formatForSheet(normalizeTariffUnit(data.tarifa_bandeira_sem_impostos), 3);
 
   const row = [
     invoiceId,
     userId,
     data.fileName ?? '',
     data.customerNumber ?? '',
-    asSheetNumber(data.month, 0),
-    asSheetNumber(data.year, 0),
+    formatForSheet(data.month, 0),
+    formatForSheet(data.year, 0),
     kwh_te,
-    asSheetNumber(totalKwh, 3), // consumo_total_kwh
+    formatForSheet(totalKwh, 3), // consumo_total_kwh
     te_com,
     te_sem,
     tusd_com,
@@ -362,18 +407,18 @@ export async function saveInvoiceData(userId, data) {
     band_com,
     band_sem,
     data.bandeira_tarifaria || '',
-    asSheetNumber(data.preco_energia_eletrica, 3),
+    formatForSheet(data.preco_energia_eletrica, 3),
     kwh_sceee,
-    asSheetNumber(data.sceeePrice, 3),
+    formatForSheet(data.sceeePrice, 3),
     kwh_gdi,
-    asSheetNumber(data.gdiPrice, 3),
-    asSheetNumber(data.publicLightingContribution, 2),
-    asSheetNumber(totalKwh, 3), // consumo_total_kwh_calculado (se existir)
-    asSheetNumber(totalBRL, 2),
+    formatForSheet(data.gdiPrice, 3),
+    formatForSheet(data.publicLightingContribution, 2),
+    formatForSheet(totalKwh, 3), // consumo_total_kwh_calculado (se existir)
+    formatForSheet(totalBRL, 2),
     data.dueDate || '',
     JSON.stringify(data.historico_consumo ?? data.consumoHistorico ?? []),
-    asSheetNumber(data.economy, 2),
-    asSheetNumber(data.points, 0),
+    formatForSheet(data.economy, 2),
+    formatForSheet(data.points, 0),
     JSON.stringify(data.diagnostico_energetico ?? []),
     'PROCESSED',
     now,

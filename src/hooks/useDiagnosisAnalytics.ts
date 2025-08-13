@@ -3,21 +3,21 @@ import { computeDiagnosisAnalytics, type DiagnosisAnalytics } from '@/utils/diag
 import { useMemo } from 'react';
 
 export function useDiagnosisAnalytics(userId?: string, userState?: string) {
-  const { data, loading, error } = useDiagnosis(userId);
+  const { items, isLoading, error } = useDiagnosis(userId);
   
   const analytics = useMemo(() => {
-    if (!data || data.length === 0) return null;
+    if (!items || items.length === 0) return null;
     try {
-      return computeDiagnosisAnalytics(data as any, userState);
+      return computeDiagnosisAnalytics(items as any, userState);
     } catch {
       return null;
     }
-  }, [data, userState]);
+  }, [items, userState]);
 
   return {
-    data,
+    data: items,
     analytics,
-    loading,
+    loading: isLoading,
     error
   };
 }

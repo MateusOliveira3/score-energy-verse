@@ -16,7 +16,12 @@ type FormData = {
     // Adicione outros campos que você deseja que sejam editáveis
 };
 
-export function InvoiceUpload() {
+// Props para receber a função mutate do useDiagnosis
+type InvoiceUploadProps = {
+    onDiagnosisUpdate?: () => Promise<void>;
+};
+
+export function InvoiceUpload({ onDiagnosisUpdate }: InvoiceUploadProps) {
     const [isLoading, setIsLoading] = useState(false);
     // Novo estado para controlar o modal de confirmação
     const [showConfirmation, setShowConfirmation] = useState(false);
@@ -39,14 +44,24 @@ export function InvoiceUpload() {
             const extractResult = await extractInvoiceData(file);
             console.log("Resultado da extração:", extractResult);
 
-            // 2. Prepara os dados para o formulário de confirmação
+            // 2. Se recebeu diagnosis na resposta, revalida o SWR
+            if (extractResult?.diagnosis && onDiagnosisUpdate) {
+                try {
+                    await onDiagnosisUpdate();
+                    console.log('[InvoiceUpload] Diagnosis revalidado com sucesso');
+                } catch (error) {
+                    console.warn('[InvoiceUpload] Erro ao revalidar diagnosis:', error);
+                }
+            }
+
+            // 3. Prepara os dados para o formulário de confirmação
             setFormData({
                 totalConsumptionKwh: extractResult.extractedData.totalConsumptionKwh,
                 totalValueBrl: extractResult.extractedData.totalValueBrl,
                 dueDate: extractResult.extractedData.dueDate,
             });
 
-            // 3. Guarda os metadados restantes para o envio final
+            // 4. Guarda os metadados restantes para o envio final
             setInvoiceMetaData({
                 tax_percentage: extractResult.extractedData.taxValueBrl,
                 peak_hours: extractResult.extractedData.peakConsumptionKwh,
@@ -56,7 +71,7 @@ export function InvoiceUpload() {
                 has_fine: extractResult.extractedData.hasFine,
             });
             
-            // 4. Mostra o modal de confirmação em vez de salvar diretamente
+            // 5. Mostra o modal de confirmação em vez de salvar diretamente
             setShowConfirmation(true);
 
         } catch (error) {

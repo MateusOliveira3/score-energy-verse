@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, RequestHandler } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { initializeGoogleApis, saveInvoiceData, signInUser, createUser, getInvoices, getUserProfile, getAllUsersForAdmin, getGamificationData, updateGamificationData, getLeaderboard, detectAndFixTariffsOnce } from './google-service.js';
@@ -13,8 +13,8 @@ import path from 'path';
 import { parseInvoiceText } from './lib/invoice-parser.js';
 import diagnosticoEnergeticoConsultivo from './lib/energy-advisor.js';
 import computeConsultativeScore from './lib/score-advisor.js';
-import { fromKwh, fromMoney, preferNumber, safeDiv, normalizeTariffUnit, fromBRStringSmart, asSheetNumber } from './lib/num.js';
-import { saveTechnicalAnalysis, getLastDiagnosisRow } from './google-service.js';
+import { toNumberBR, safeDiv, normalizeTariffUnit, buildLastAnalysisPayload } from './lib/num.js';
+import { saveTechnicalAnalysis, getLastDiagnosisRow, getLastAnalysisOrInvoice } from './google-service.js';
 
 dotenv.config();
 
@@ -889,6 +889,39 @@ app.get('/api/users/:userId/diagnosis', async (req, res) => {
   }
 });
 
+// Tipos da rota
+type LastAnalysisParams = { userId: string };
+type LastAnalysisRes = { ok: boolean; data: any | null; error?: string };
+
+// Handler com tipagem EXPRESS
+const getLastAnalysisHandler: RequestHandler<LastAnalysisParams, LastAnalysisRes> = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const last = await getLastAnalysisOrInvoice(userId);
+
+    if (!last) {
+      res.status(200).json({ ok: true, data: null });
+      return;
+    }
+
+    // perfil é opcional; trate erro silenciosamente
+    let profile: any = null;
+    try { profile = await getUserProfile(userId); } catch {}
+
+    const payload = buildLastAnalysisPayload(last, profile);
+    res.status(200).json({ ok: true, data: payload });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ ok: false, data: null, error: msg });
+  }
+};
+
+// Registra a rota usando os generics de params/response body
+app.get<LastAnalysisParams, LastAnalysisRes>(
+  '/api/users/:userId/last-analysis',
+  getLastAnalysisHandler
+);
+
 // Rota para buscar leaderboard
 app.get('/api/leaderboard', async (req: Request, res: Response) => {
     console.log('[API] Requisição recebida: GET /api/leaderboard');
@@ -958,11 +991,11 @@ app.post('/api/invoices/analyze-pdf', upload.single('invoice'), async (req, res)
     });
 
     // Usando as novas funções mais robustas
-    const teKwh  = fromKwh(extractedData?.eletricityKWhTE || extractedData?.eletricityKWh);
-    const sceeeKwh = fromKwh(extractedData?.sceeeKWh);
+    const teKwh  = toNumberBR(extractedData?.eletricityKWhTE || extractedData?.eletricityKWh);
+    const sceeeKwh = toNumberBR(extractedData?.sceeeKWh);
     
     // CORRIGIDO: Garantir que o consumo total seja extraído corretamente
-    let totalKwh = fromKwh(extractedData?.totalConsumptionKwh);
+    let totalKwh = toNumberBR(extractedData?.totalConsumptionKWh);
     if (totalKwh === 0) {
       totalKwh = teKwh + sceeeKwh;
     }
@@ -978,7 +1011,7 @@ app.post('/api/invoices/analyze-pdf', upload.single('invoice'), async (req, res)
       rawTotalConsumption: extractedData?.totalConsumptionKwh
     });
 
-    const totalValueBrl = fromMoney(extractedData?.totalValueBrl);
+    const totalValueBrl = toNumberBR(extractedData?.totalValueBrl);
     const valuePerKwh   = safeDiv(totalValueBrl, totalKwh);
 
     // mantém seus cálculos existentes
@@ -1007,12 +1040,12 @@ app.post('/api/invoices/analyze-pdf', upload.single('invoice'), async (req, res)
 
     // payload consultivo (planilha invoices_diagnosis)
     const consultParsed = {
-      month: fromBRStringSmart(extractedData?.month) || extractedData?.month || '',
-      year:  fromBRStringSmart(extractedData?.year)  || extractedData?.year  || '',
+      month: toNumberBR(extractedData?.month) || extractedData?.month || '',
+      year:  toNumberBR(extractedData?.year)  || extractedData?.year  || '',
       consumption_kwh: totalKwh,
       total_value_brl: totalValueBrl,
       has_reactive: Boolean(extractedData?.hasReactive),
-      has_gd: Boolean(extractedData?.gdiKWh) && fromKwh(extractedData?.gdiKWh) > 0,
+      has_gd: Boolean(extractedData?.gdiKWh) && toNumberBR(extractedData?.gdiKWh) > 0,
       tariff: extractedData?.tariff || 'N/D',
       value_per_kwh: valuePerKwh,
     };
@@ -1048,9 +1081,23 @@ app.post('/api/invoices/analyze-pdf', upload.single('invoice'), async (req, res)
       value_per_kwh: consultParsed.value_per_kwh,
     });
 
+    // Objeto com o diagnóstico salvo para retornar na resposta
+    const diagnosisSaved = {
+      user_id: userId,
+      month: consultParsed.month,
+      year: consultParsed.year,
+      consumption_kwh: consultParsed.consumption_kwh,
+      total_value_brl: consultParsed.total_value_brl,
+      value_per_kwh: consultParsed.value_per_kwh,
+      score_total: score.total,
+      score_breakdown: score.breakdown,
+      recommendations: diag.tips ?? [],
+      created_at: new Date().toISOString(),
+    };
+
     // resposta final (mantenha sua resposta, mas inclua os números já normalizados):
     res.status(200).json({
-      message: 'Arquivo enviado e analisado com sucesso!',
+      message: 'Arquivo enviado e processado com sucesso!',
       extractedData: {
         ...extractedData,
         eletricityKWh: teKwh,
@@ -1060,7 +1107,8 @@ app.post('/api/invoices/analyze-pdf', upload.single('invoice'), async (req, res)
         valuePerKwh
       },
       economy,
-      points
+      points,
+      diagnosis: diagnosisSaved,   // <<< devolve o diagnóstico salvo
     });
 
   } catch (error: any) {

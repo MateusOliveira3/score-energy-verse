@@ -10,12 +10,12 @@ export default function InvoiceAnalysisExample({ userId, month, year }: {
   month: string; 
   year: string; 
 }) {
-  const { data: diagnosis, loading, error } = useDiagnosis(userId);
+  const { items: diagnosis, isLoading, error } = useDiagnosis(userId);
   
   // Busca a análise mais recente para o mês/ano específico
   const latestAnalysis = pickLatestForMonthYear(diagnosis, month, year);
   
-  if (loading) {
+  if (isLoading) {
     return <div className="text-sm text-gray-500">Carregando análise...</div>;
   }
   
