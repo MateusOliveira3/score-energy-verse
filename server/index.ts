@@ -14,7 +14,7 @@ import { parseInvoiceText } from './lib/invoice-parser.js';
 import diagnosticoEnergeticoConsultivo from './lib/energy-advisor.js';
 import computeConsultativeScore from './lib/score-advisor.js';
 import { toNumberBR, normalizeTariffUnit, safeDiv, asSheetNumber } from './lib/num.js';
-import { saveTechnicalAnalysis } from './google-service.js';
+import { saveTechnicalAnalysis, getLastDiagnosisRow } from './google-service.js';
 
 dotenv.config();
 
@@ -910,7 +910,15 @@ app.post('/api/invoices/analyze-pdf', upload.single('invoice'), async (req, res)
     const sceeeKWh      = asSheetNumber(extractedData.sceeeKWh, 3);
     const gdiKWh        = asSheetNumber(extractedData.gdiKWh, 3);
     const totalBRL      = asSheetNumber(extractedData.totalValueBrl, 2);
-    const totalKwh      = asSheetNumber(extractedData.totalConsumptionKwh ?? (eletricityKWh + sceeeKWh), 3);
+
+    // total de kWh: somar TE + SCEE se não vier pronto
+    const totalKwh = asSheetNumber(
+      extractedData.totalConsumptionKwh ?? (eletricityKWh + sceeeKWh),
+      3
+    );
+
+    // valuePerKwh robusto (evita NaN/Infinity)
+    const valuePerKwh = asSheetNumber(safeDiv(totalBRL, totalKwh), 3);
 
     // normaliza tarifas para R$/kWh
     const te_com    = asSheetNumber(normalizeTariffUnit(extractedData.tarifa_te_com_impostos), 3);
@@ -919,8 +927,6 @@ app.post('/api/invoices/analyze-pdf', upload.single('invoice'), async (req, res)
     const tusd_sem  = asSheetNumber(normalizeTariffUnit(extractedData.tarifa_tusd_sem_impostos), 3);
     const band_com  = asSheetNumber(normalizeTariffUnit(extractedData.tarifa_bandeira_com_impostos), 3);
     const band_sem  = asSheetNumber(normalizeTariffUnit(extractedData.tarifa_bandeira_sem_impostos), 3);
-
-    const valuePerKwh = asSheetNumber(safeDiv(totalBRL, totalKwh), 3);
 
     // payload coerente para diagnóstico/score
     const invParsed = {
@@ -938,25 +944,17 @@ app.post('/api/invoices/analyze-pdf', upload.single('invoice'), async (req, res)
     const economy = calculateEconomy({ ...extractedData, totalValueBrl: totalBRL, eletricityKWh, sceeeKWh });
     const points  = calculatePoints(economy, totalBRL);
 
-    // Salva a linha operacional na planilha "invoices"
+    // Salvar a linha operacional (mantenha sua chamada existente, só garanta que estes campos estão indo):
     await saveInvoiceData(userId, {
       ...extractedData,
-      fileId: '', // sem upload no Drive
+      fileId: '',
       fileName: req.file.originalname,
       eletricityKWh,
       sceeeKWh,
       gdiKWh,
       totalConsumptionKwh: totalKwh,
       totalValueBrl: totalBRL,
-      tarifa_te_com_impostos: te_com,
-      tarifa_te_sem_impostos: te_sem,
-      tarifa_tusd_com_impostos: tusd_com,
-      tarifa_tusd_sem_impostos: tusd_sem,
-      tarifa_bandeira_com_impostos: band_com,
-      tarifa_bandeira_sem_impostos: band_sem,
-      valuePerKwh,
-      economy,
-      points,
+      valuePerKwh
     });
 
     // ---- camada consultiva (usa seu módulo energy-advisor já criado) ----
@@ -974,23 +972,27 @@ app.post('/api/invoices/analyze-pdf', upload.single('invoice'), async (req, res)
     // computeConsultativeScore já existente:
     const score = computeConsultativeScore(invParsed);
 
-    // Persistir diagnóstico na aba "invoices_diagnosis"
+    // Persistir diagnóstico na aba invoices_diagnosis (AGORA passando value_per_kwh explicitamente)
     await saveTechnicalAnalysis(userId, {
-      month: Number(invParsed.month),
-      year: Number(invParsed.year),
-      consumption_kwh: invParsed.consumption_kwh,
-      total_value_brl: invParsed.total_value_brl,
-      value_per_kwh: invParsed.value_per_kwh,
-      has_reactive: invParsed.has_reactive,
-      has_gd: invParsed.has_gd,
-      tariff: invParsed.tariff,
+      month: asSheetNumber(extractedData.month, 0),
+      year: asSheetNumber(extractedData.year, 0),
+      consumption_kwh: totalKwh,
+      total_value_brl: totalBRL,
+      value_per_kwh: valuePerKwh,
+      has_reactive: Boolean(extractedData.hasReactive),
+      has_gd: gdiKWh > 0,
+      tariff: extractedData.tariff || 'B1 Convencional',
       score_total: score.total,
       score_breakdown_json: JSON.stringify(score.breakdown || {}),
       recommendations_json: diagnosis.tips || [],
       created_at: new Date().toISOString(),
     });
 
-    // resposta
+    // DEBUG: ler a última linha de diagnosis e logar
+    const lastRow = await getLastDiagnosisRow(userId);
+    console.log('[DEBUG last diagnosis row]', lastRow);
+
+    // resposta final (mantenha sua resposta, mas inclua os números já normalizados):
     res.status(200).json({
       message: 'Arquivo enviado e analisado com sucesso!',
       extractedData: {
@@ -1000,11 +1002,10 @@ app.post('/api/invoices/analyze-pdf', upload.single('invoice'), async (req, res)
         gdiKWh,
         totalConsumptionKwh: totalKwh,
         totalValueBrl: totalBRL,
-        valuePerKwh,
-        tarifas: { te_com, te_sem, tusd_com, tusd_sem, band_com, band_sem },
+        valuePerKwh
       },
       economy,
-      points,
+      points
     });
 
   } catch (error: any) {

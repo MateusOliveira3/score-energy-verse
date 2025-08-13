@@ -94,8 +94,22 @@ const AnalysisPanel: React.FC<AnalysisPanelProps> = ({ userId }) => {
     );
   }
 
-  const consumption = latestInvoice.consumption_kwh || latestInvoice.consumo_total_kwh || 0;
-  const totalValue = latestInvoice.total_value_brl || latestInvoice.valor_total_brl || 0;
+  const consumption =
+    latestInvoice?.extractedData?.totalConsumptionKwh ??
+    latestInvoice?.consumption_kwh ??
+    latestInvoice?.consumo_total_kwh ??
+    0;
+
+  const totalValue =
+    latestInvoice?.extractedData?.totalValueBrl ??
+    latestInvoice?.total_value_brl ??
+    latestInvoice?.valor_total_brl ??
+    0;
+
+  const valuePerKwh =
+    latestInvoice?.extractedData?.valuePerKwh ??
+    (consumption > 0 ? totalValue / consumption : 0);
+
   const month = latestInvoice.month || latestInvoice.mes || '';
   const year = latestInvoice.year || latestInvoice.ano || '';
 
@@ -131,7 +145,9 @@ const AnalysisPanel: React.FC<AnalysisPanelProps> = ({ userId }) => {
                 <span className="text-sm text-gray-600">Consumo</span>
               </div>
               <div className={`text-2xl font-bold ${getConsumptionColor(consumption)}`}>
-                {typeof consumption === 'number' ? consumption.toFixed(0) : consumption} kWh
+                {consumption > 0
+                  ? `${consumption.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 3 })} kWh`
+                  : '— kWh'}
               </div>
               <Badge variant={getConsumptionBadge(consumption).variant} className="mt-2">
                 {getConsumptionBadge(consumption).text}
@@ -145,10 +161,12 @@ const AnalysisPanel: React.FC<AnalysisPanelProps> = ({ userId }) => {
                 <span className="text-sm text-gray-600">Valor Total</span>
               </div>
               <div className="text-2xl font-bold text-gray-800">
-                {formatCurrency(totalValue)}
+                {totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
               </div>
               <div className="text-sm text-gray-500 mt-1">
-                {consumption > 0 ? formatCurrency(totalValue / consumption) : '—'} /kWh
+                {valuePerKwh > 0
+                  ? `${valuePerKwh.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} R$/kWh`
+                  : '— /kWh'}
               </div>
             </div>
 

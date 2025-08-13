@@ -653,11 +653,16 @@ export async function getLeaderboard() {
 // ------------------------------------------------------------------
 import type { InvoiceParsed, ConsultativeScore } from './lib/types.js';
 
-export async function saveTechnicalAnalysis(userId: string, payload: {
-  month: number; year: number; consumption_kwh: number; total_value_brl: number; value_per_kwh: number;
-  has_reactive: boolean; has_gd: boolean; tariff: string;
-  score_total: number; score_breakdown_json: string; recommendations_json: string[]; created_at: string;
-}) {
+export async function saveTechnicalAnalysis(
+  userId: string,
+  payload: {
+    month: number; year: number;
+    consumption_kwh: number; total_value_brl: number; value_per_kwh: number;
+    has_reactive: boolean; has_gd: boolean; tariff: string;
+    score_total: number; score_breakdown_json: string;
+    recommendations_json: string[]; created_at: string;
+  }
+) {
   const id = `analysis_${Date.now()}`;
   const row = [
     id,
@@ -841,4 +846,20 @@ export async function detectAndFixTariffsOnce(): Promise<FixResult> {
     }
   }
   return { updated, checked };
+}
+
+// ADICIONE ESTA FUNÇÃO utilitária (para a rota fazer debug):
+export async function getLastDiagnosisRow(userId: string) {
+  const rows = await readSheet('invoices_diagnosis');
+  if ((rows?.length || 0) < 2) return null;
+  const headers = rows[0];
+  const idxUser = headers.indexOf('user_id');
+  const idxCreated = headers.indexOf('created_at');
+  if (idxUser < 0 || idxCreated < 0) return null;
+
+  const items = rows.slice(1)
+    .filter(r => r[idxUser] === userId)
+    .sort((a, b) => String(b[idxCreated]).localeCompare(String(a[idxCreated])));
+
+  return items[0] || null;
 } 
