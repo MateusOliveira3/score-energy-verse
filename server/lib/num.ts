@@ -1,37 +1,96 @@
-export function toNumberBR(x: any): number {
+// server/lib/num.ts
+// Conversões robustas BR/US para kWh/R$ + helpers
+
+export function isFiniteNumber(n: any): n is number {
+  return typeof n === 'number' && Number.isFinite(n);
+}
+
+// Tenta interpretar strings como número considerando padrões brasileiros
+export function fromBRStringSmart(x: any): number {
   if (x === null || x === undefined) return 0;
-  if (typeof x === 'number' && Number.isFinite(x)) return x;
+  if (isFiniteNumber(x)) return x;
+
   const s = String(x).trim();
   if (!s) return 0;
-  // remove separador de milhar "." e troca decimal "," por "."
-  const n = parseFloat(s.replace(/\./g, '').replace(',', '.'));
+
+  // limpeza leve
+  const onlyDigits = s.replace(/[^\d.,-]/g, '');
+
+  // caso "285,20" (clássico BR)
+  if (onlyDigits.includes(',') && !onlyDigits.includes('.')) {
+    const n = parseFloat(onlyDigits.replace(/\./g, '').replace(',', '.'));
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  // caso só ponto: decidir se é decimal ou milhar
+  if (onlyDigits.includes('.') && !onlyDigits.includes(',')) {
+    const parts = onlyDigits.split('.');
+    const last = parts[parts.length - 1];
+    // heurística: se a parte final tem 1-3 dígitos, tratamos PONTO como DECIMAL
+    if (/^\d{1,3}$/.test(last)) {
+      const n = parseFloat(onlyDigits);
+      return Number.isFinite(n) ? n : 0;
+    }
+    // senão, tratamos como milhar e removemos pontos
+    const n = parseFloat(onlyDigits.replace(/\./g, ''));
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  // misto ou sem separadores
+  const n = parseFloat(onlyDigits.replace(/\./g, '').replace(',', '.'));
   return Number.isFinite(n) ? n : 0;
 }
 
-/** usado quando precisar string US, mas prefira sempre enviar Number ao Sheets */
+// Dinheiro sempre em BRL, aceita "285,20"/"285.20"
+export function fromMoney(x: any): number {
+  return fromBRStringSmart(x);
+}
+
+// kWh vindo do parser/Sheets (345.000, 41.700, 345,000 etc.)
+export function fromKwh(x: any): number {
+  const n = fromBRStringSmart(x);
+  // proteção contra milhões por erro de milhar
+  if (!Number.isFinite(n)) return 0;
+  if (n > 200000) return 0; // muito improvável para fatura mensal
+  return n;
+}
+
+// Seleciona o primeiro número finito e > 0
+export function preferNumber(...candidates: any[]): number {
+  for (const c of candidates) {
+    const n = isFiniteNumber(c) ? c : fromBRStringSmart(c);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 0;
+}
+
+// Divide com segurança
+export function safeDiv(a: any, b: any): number {
+  const A = fromBRStringSmart(a);
+  const B = fromBRStringSmart(b);
+  if (!Number.isFinite(A) || !Number.isFinite(B) || B === 0) return 0;
+  return A / B;
+}
+
+// Normaliza tarifa: se vier em R$/MWh (>=5), converte para R$/kWh
+export function normalizeTariffUnit(t: any): number {
+  const n = fromBRStringSmart(t);
+  if (!Number.isFinite(n)) return 0;
+  return n >= 5 ? n / 1000 : n;
+}
+
+// Funções de compatibilidade (mantidas para não quebrar código existente)
+export function toNumberBR(x: any): number {
+  return fromBRStringSmart(x);
+}
+
 export function toUSString(n: any): string {
-  const v = typeof n === 'number' ? n : toNumberBR(n);
+  const v = isFiniteNumber(n) ? n : fromBRStringSmart(n);
   return Number.isFinite(v) ? String(v) : '0';
 }
 
-/** tarifa pode vir em R$/MWh; se >= 5 assume MWh e divide por 1000 para virar R$/kWh */
-export function normalizeTariffUnit(t: any): number {
-  const v = toNumberBR(t);
-  if (!Number.isFinite(v) || v <= 0) return 0;
-  return v >= 5 ? v / 1000 : v;
-}
-
-/** divisão segura evitando NaN/Infinity */
-export function safeDiv(a: any, b: any): number {
-  const A = toNumberBR(a), B = toNumberBR(b);
-  if (B <= 0) return 0;
-  const r = A / B;
-  return Number.isFinite(r) ? r : 0;
-}
-
-/** converter para Number e opcionalmente fixar casas; ideal antes de gravar no Sheets */
 export function asSheetNumber(x: any, decimals?: number): number {
-  const n = toNumberBR(x);
+  const n = fromBRStringSmart(x);
   if (!Number.isFinite(n)) return 0;
   return typeof decimals === 'number' ? Number(n.toFixed(decimals)) : n;
 }
