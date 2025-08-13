@@ -62,7 +62,7 @@ const AnalysisPanel: React.FC<AnalysisPanelProps> = ({ userId }) => {
     return { text: 'Alto', variant: 'destructive' as const };
   };
 
-  if (isLoading || diagLoading) {
+  if (isLoading || loading) {
     return (
       <Card>
         <CardHeader>
@@ -78,7 +78,7 @@ const AnalysisPanel: React.FC<AnalysisPanelProps> = ({ userId }) => {
     );
   }
 
-  if (!latestInvoice) {
+  if (!last) {
     return (
       <Card>
         <CardHeader>
