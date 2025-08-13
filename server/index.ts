@@ -73,7 +73,7 @@ async function parsePdf(filePath: string): Promise<any> {
     };
     const normTariff = (n: number) => (n >= 5 ? n / 1000 : n); // R$/MWh → R$/kWh
 
-    // extração de tarifas e preços específicos
+    // extração de tarifas e preços específicos - usando padrões mais específicos
     const teComImpRaw   = grab(cleanedText, "tarifa te com impostos|te c/ impostos|te\\s*\\(com impostos\\)");
     const teSemImpRaw   = grab(cleanedText, "tarifa te sem impostos|te s/ impostos|te\\s*\\(sem impostos\\)");
     const tusdComRaw    = grab(cleanedText, "tusd.*com impostos|tusd c/ impostos|tusd\\s*\\(com impostos\\)");
@@ -81,12 +81,25 @@ async function parsePdf(filePath: string): Promise<any> {
     const bandRaw       = grab(cleanedText, "bandeira.*(tarifária|amarela|vermelha|verde|escassez)");
     const precoEEraw    = grab(cleanedText, "preço energia elétrica|preco energia eletrica"); // se existir
 
-    const teComImp      = normTariff(toBR(teComImpRaw));
-    const teSemImp      = normTariff(toBR(teSemImpRaw));
-    const tusdCom       = normTariff(toBR(tusdComRaw));
-    const tusdSem       = normTariff(toBR(tusdSemRaw));
-    const precoEE       = normTariff(toBR(precoEEraw)); // muitas vezes é só um "médio"
-    const bandeira      = bandRaw || "Não encontrado";
+    // Se não encontrou com os padrões genéricos, tentar padrões específicos do PDF
+    let teComImp = normTariff(toBR(teComImpRaw));
+    let teSemImp = normTariff(toBR(teSemImpRaw));
+    let tusdCom = normTariff(toBR(tusdComRaw));
+    let tusdSem = normTariff(toBR(tusdSemRaw));
+    
+    // Tentar extrair das linhas de consumo específicas
+    if (teComImp === 0) {
+      const teMatch = cleanedText.match(/Consumo\s+TE\s+KWH\s+\d+,\d+\s+(\d+,\d+)/i);
+      if (teMatch) teComImp = normTariff(toBR(teMatch[1]));
+    }
+    
+    if (tusdCom === 0) {
+      const tusdMatch = cleanedText.match(/Consumo\s+TUSD\s+KWH\s+\d+,\d+\s+(\d+,\d+)/i);
+      if (tusdMatch) tusdCom = normTariff(toBR(tusdMatch[1]));
+    }
+    
+    const precoEE = normTariff(toBR(precoEEraw)); // muitas vezes é só um "médio"
+    const bandeira = bandRaw || "Não encontrado";
 
     // Função para buscar o primeiro número com vírgula após a keyword
     function findFirstCommaNumberAfterKeyword(text: string, keyword: string | RegExp): string {
@@ -251,6 +264,14 @@ async function parsePdf(filePath: string): Promise<any> {
     const [month, year] = referenceMonth.split('/');
     let totalConsumptionKwhNum = parseFloat(eletricityKWhTE) + parseFloat(sceeeKWh || '0');
     let totalConsumptionKwh = isNaN(totalConsumptionKwhNum) ? '0.00' : totalConsumptionKwhNum.toFixed(2);
+    
+    // Debug: logar o cálculo do consumo total
+    console.log('[PARSER] Cálculo consumo total:', {
+      eletricityKWhTE,
+      sceeeKWh,
+      totalConsumptionKwhNum,
+      totalConsumptionKwh
+    });
     let totalValueBrlNum = parseFloat(totalValueBrl.replace(',', '.'));
     let totalValueBrlFixed = isNaN(totalValueBrlNum) ? '0.00' : totalValueBrlNum.toFixed(2);
 
@@ -299,6 +320,8 @@ async function parsePdf(filePath: string): Promise<any> {
 
     // eletricityKWhTotal deve ser igual à soma de todos os consumos TE
     const eletricityKWhTotal = eletricityKWhTE;
+    
+
 
     return {
       customerNumber: customerNumber || '0000000000',
@@ -346,30 +369,35 @@ async function parsePdf(filePath: string): Promise<any> {
 // Configuração do Multer para salvar arquivos temporariamente no diretório do sistema operacional
 const upload = multer({ dest: os.tmpdir() });
 
-// Função para calcular economia baseada nos dados da fatura
+    // Função para calcular economia baseada nos dados da fatura
 function calculateEconomy(extractedData: any): number {
-    const { eletricityPrice, gdiPrice, publicLightingContribution } = extractedData;
-    const totalValue = eletricityPrice + publicLightingContribution - gdiPrice;
+    // Usar os valores corretos das tarifas extraídas
+    const teComImp = parseFloat(extractedData.tarifa_te_com_impostos || '0');
+    const tusdComImp = parseFloat(extractedData.tarifa_tusd_com_impostos || '0');
+    const bandeiraComImp = parseFloat(extractedData.bandeira_tarifaria === 'Amarela' ? '0.014467' : '0');
     
-    // O consumo é a soma de todas as fontes de energia.
-    const totalConsumption = extractedData.eletricityKWhTE + extractedData.sceeeKWh;
+    // Calcular preço médio por kWh usando as tarifas reais
+    const totalTariff = teComImp + tusdComImp + bandeiraComImp;
+    
+    // O consumo total em kWh
+    const totalConsumption = parseFloat(extractedData.totalConsumptionKwh || '0');
+    const totalValue = parseFloat(extractedData.totalValueBrl || '0');
 
-    // Adicionado para evitar divisão por zero se o consumo for 0.
-    if (totalConsumption === 0) {
+    // Se não temos dados válidos, retornar 0
+    if (totalConsumption <= 0 || totalValue <= 0) {
       return 0;
     }
-    
-    const averagePricePerKWh = totalValue / totalConsumption;
     
     // Calcula economia baseada em diferentes cenários
     let economy = 0;
     
     // 1. Economia por redução de 10% no consumo (meta realista)
     const reducedConsumption = totalConsumption * 0.9;
-    const economyFromReduction = (totalConsumption - reducedConsumption) * averagePricePerKWh;
+    const economyFromReduction = (totalConsumption - reducedConsumption) * totalTariff;
     
     // 2. Economia por uso de energia solar (se não há GD)
-    const solarEconomy = extractedData.gdiKWh > 0 ? 0 : totalValue * 0.3; // 30% de economia com solar
+    const gdiKWh = parseFloat(extractedData.gdiKWh || '0');
+    const solarEconomy = gdiKWh > 0 ? 0 : totalValue * 0.3; // 30% de economia com solar
     
     // 3. Economia por eficiência energética
     const efficiencyEconomy = totalValue * 0.15; // 15% de economia com eficiência
@@ -907,9 +935,19 @@ app.post('/api/invoices/analyze-pdf', upload.single('invoice'), async (req, res)
     });
 
     // Usando as novas funções mais robustas
-    const teKwh  = fromKwh(extractedData?.eletricityKWh);
+    const teKwh  = fromKwh(extractedData?.eletricityKWhTE || extractedData?.eletricityKWh);
     const sceeeKwh = fromKwh(extractedData?.sceeeKWh);
     const totalKwh = preferNumber(extractedData?.totalConsumptionKwh, teKwh + sceeeKwh);
+    
+    // Debug: logar os valores extraídos
+    console.log('[DEBUG] Valores extraídos:', {
+      eletricityKWhTE: extractedData?.eletricityKWhTE,
+      eletricityKWh: extractedData?.eletricityKWh,
+      totalConsumptionKwh: extractedData?.totalConsumptionKwh,
+      teKwh,
+      sceeeKwh,
+      totalKwh
+    });
 
     const totalValueBrl = fromMoney(extractedData?.totalValueBrl);
     const valuePerKwh   = safeDiv(totalValueBrl, totalKwh);
