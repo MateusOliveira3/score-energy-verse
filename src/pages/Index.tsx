@@ -5,7 +5,7 @@ import ActionCards from '../components/ActionCards';
 import Leaderboard from '../components/Leaderboard';
 import LevelProgress from '../components/LevelProgress';
 import { InvoiceUpload } from '../components/InvoiceUpload';
-import InvoiceHistory from '../components/InvoiceHistory';
+import AnalysisPanel from '../components/AnalysisPanel';
 import SmartRecommendations from '../components/SmartRecommendations';
 import UserProfile from '../components/UserProfile';
 import MascotCustomization from '../components/MascotCustomization';
@@ -137,9 +137,9 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Histórico de Faturas */}
+        {/* Análise da Última Fatura */}
         <div className="max-w-6xl mx-auto">
-          <InvoiceHistory />
+          <AnalysisPanel userId={userProfile?.id} />
         </div>
 
         {/* Central de Gamificação */}

@@ -1,5 +1,6 @@
 // server/lib/invoice-parser.ts
 import { InvoiceParsed, asNumberOrZero } from './types.js';
+import { toNumberBR, normalizeTariffKWh, asSheetNumber } from './num';
 
 /**
  * Parser desacoplado para transformar texto "flat" da fatura
@@ -7,6 +8,20 @@ import { InvoiceParsed, asNumberOrZero } from './types.js';
  * quando não encontrar padrões.
  *
  * Use logs leves com prefixo [PARSER] para facilitar diagnóstico.
+ * 
+ * EXEMPLOS DE USO DAS FUNÇÕES UTILITÁRIAS:
+ * 
+ * // Para parsing de dados vindos do Google Sheets:
+ * const consumption_kwh = toNumberBR(row[idxConsumo]);
+ * const total_value_brl = toNumberBR(row[idxValorTotal]);
+ * const value_per_kwh  = toNumberBR(row[idxValorPorKwh]);
+ * const score_total    = toNumberBR(row[idxScore]);
+ * 
+ * // Para formatação segura para Google Sheets:
+ * const month = asSheetNumber(extractedData.month, 0);
+ * const year = asSheetNumber(extractedData.year, 0);
+ * const consumption = asSheetNumber(extractedData.consumption, 3);
+ * const totalValue = asSheetNumber(extractedData.totalValue, 2);
  */
 
 const MONTH_MAP: Record<string, string> = {
@@ -21,6 +36,11 @@ function parseBRNumber(input: string | null | undefined): number {
   const cleaned = input.replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '');
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : 0;
+}
+
+// Função auxiliar para formatação de números com decimais
+function asNumber(n: number, d = 3): number { 
+  return Number((n || 0).toFixed(d)); 
 }
 
 // Captura o primeiro número que siga imediatamente a uma label/palavra-chave
@@ -85,21 +105,31 @@ export function parseInvoiceText(rawText: string): InvoiceParsed {
     // Estratégia: somar itens que você já usa no backend:
     // "Energia Elétrica kWh" + "Energia SCEE s/ ICMS kWh"
     // + opcionalmente "Demais itens" que tragam kWh (se houver).
-    const eletricityKWh = extractKwhAfterLabel(cleaned, /Energia El[eé]trica\s*kWh?/i);
-    const sceeeKWh      = extractKwhAfterLabel(cleaned, /Energia\s*SCEE\s*s?\/\s*ICMS\s*kWh?/i);
+    const eletricityKWhRaw = extractKwhAfterLabel(cleaned, /Energia El[eé]trica\s*kWh?/i);
+    const sceeeKWhRaw      = extractKwhAfterLabel(cleaned, /Energia\s*SCEE\s*s?\/\s*ICMS\s*kWh?/i);
     // GD I (geração distribuída) em kWh
-    const gdiKWh        = extractKwhAfterLabel(cleaned, /Energia\s*compensada\s*GD\s*I\s*kWh?/i);
+    const gdiKWhRaw        = extractKwhAfterLabel(cleaned, /Energia\s*compensada\s*GD\s*I\s*kWh?/i);
 
-    const consumption_kwh = Number((eletricityKWh + sceeeKWh).toFixed(2));
+    // Usar as funções utilitárias para parsing robusto de números
+    // toNumberBR() é ideal para dados vindos de PDFs e textos
+    const eletricityKWh = toNumberBR(eletricityKWhRaw);
+    const sceeeKWh      = toNumberBR(sceeeKWhRaw);
+    const gdiKWh        = toNumberBR(gdiKWhRaw);
+
+    const consumption_kwh = asSheetNumber(eletricityKWh + sceeeKWh, 3);
 
     // 3) Valor total (R$)
     // Buscar após labels comuns: "Total a pagar", "Total da fatura", "Valor total"
-    let total_value_brl = extractNumberAfterKeyword(cleaned, /(Total\s*a\s*pagar|Total\s*da\s*fatura|Valor\s*total)/i);
-    if (total_value_brl === 0) {
+    let total_value_brl_raw = extractNumberAfterKeyword(cleaned, /(Total\s*a\s*pagar|Total\s*da\s*fatura|Valor\s*total)/i);
+    if (total_value_brl_raw === 0) {
       // fallback adicional: procurar "R$ xxx,xx" próximo a "Total"
       const m = cleaned.match(/Total[^\d]*(R\$\s*[\d.,]+)/i);
-      total_value_brl = m ? parseBRNumber(m[1]) : 0;
+      total_value_brl_raw = m ? parseBRNumber(m[1]) : 0;
     }
+    
+    // Usar as funções utilitárias para parsing robusto
+    // asSheetNumber() garante formato seguro para Google Sheets
+    const total_value_brl = asSheetNumber(total_value_brl_raw, 2);
 
     // 4) Reativo excedente (has_reactive)
     const has_reactive = hasAny(cleaned, [
@@ -109,7 +139,7 @@ export function parseInvoiceText(rawText: string): InvoiceParsed {
     ]);
 
     // 5) GD presente (has_gd)
-    const has_gd = gdiKWh > 0 || hasAny(cleaned, [
+    const has_gd = toNumberBR(gdiKWh) > 0 || hasAny(cleaned, [
       /compensad[ao]?\s*GD/i,
       /microger[aá]?[cç][aã]o/i,
       /ger[aá]?[cç][aã]o\s*distribu[ií]da/i
@@ -120,23 +150,27 @@ export function parseInvoiceText(rawText: string): InvoiceParsed {
     const tariff = tariffMatch ? tariffMatch[0].trim() : '';
 
     // 7) Valor por kWh (R$/kWh)
+    // asSheetNumber() com 4 decimais para precisão em tarifas
     const value_per_kwh = consumption_kwh > 0
-      ? Number((total_value_brl / consumption_kwh).toFixed(4))
+      ? asSheetNumber(total_value_brl / consumption_kwh, 4)
       : 0;
 
     // 8) Contribuição de iluminação pública (opcional)
     // "Contrib Ilum Publica Municipal", "CIP", etc.
-    let publicLightingContribution = extractNumberAfterKeyword(cleaned, /(Contrib(\.|ui[cç][aã]o)?\s*Ilum(\.|ina[cç][aã]o)?\s*P(ú|u)blica(\s*Municipal)?|CIP)/i);
-    if (publicLightingContribution === 0) {
+    let publicLightingContributionRaw = extractNumberAfterKeyword(cleaned, /(Contrib(\.|ui[cç][aã]o)?\s*Ilum(\.|ina[cç][aã]o)?\s*P(ú|u)blica(\s*Municipal)?|CIP)/i);
+    if (publicLightingContributionRaw === 0) {
       const cip = cleaned.match(/\bCIP\b[^\d]*([\d.,]+)/i);
-      publicLightingContribution = cip ? parseBRNumber(cip[1]) : 0;
+      publicLightingContributionRaw = cip ? parseBRNumber(cip[1]) : 0;
     }
+    
+    // Usar as funções utilitárias para parsing robusto
+    const publicLightingContribution = asSheetNumber(publicLightingContributionRaw, 2);
 
     const invoice: InvoiceParsed = {
       month,
       year,
       consumption_kwh,
-      total_value_brl: Number(total_value_brl.toFixed(2)),
+      total_value_brl,
       has_reactive,
       has_gd,
       tariff,

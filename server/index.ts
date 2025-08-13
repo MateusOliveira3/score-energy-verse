@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { initializeGoogleApis, saveInvoiceData, signInUser, createUser, getInvoices, getUserProfile, getAllUsersForAdmin, getGamificationData, updateGamificationData, getLeaderboard, saveTechnicalAnalysis } from './google-service.js';
+import { initializeGoogleApis, saveInvoiceData, signInUser, createUser, getInvoices, getUserProfile, getAllUsersForAdmin, getGamificationData, updateGamificationData, getLeaderboard, detectAndFixTariffsOnce } from './google-service.js';
 import multer from 'multer';
 import fs from 'fs';
 import os from 'os';
@@ -13,6 +13,8 @@ import path from 'path';
 import { parseInvoiceText } from './lib/invoice-parser.js';
 import diagnosticoEnergeticoConsultivo from './lib/energy-advisor.js';
 import computeConsultativeScore from './lib/score-advisor.js';
+import { toNumberBR, normalizeTariffUnit, safeDiv, asSheetNumber } from './lib/num.js';
+import { saveTechnicalAnalysis } from './google-service.js';
 
 dotenv.config();
 
@@ -58,6 +60,33 @@ async function parsePdf(filePath: string): Promise<any> {
     console.log(textContent);
 
     const cleanedText = textContent.replace(/\s+/g, ' ');
+
+    // helpers locais para extração de tarifas e preços
+    const grab = (text: string, label: string) => {
+      const r = new RegExp(label + "[^\\d]*([\\d\\.,]+)", "i");
+      const m = text.match(r);
+      return m ? m[1] : "";
+    };
+    const toBR = (s: string) => {
+      if (!s) return 0;
+      return parseFloat(s.replace(/\./g, "").replace(",", "."));
+    };
+    const normTariff = (n: number) => (n >= 5 ? n / 1000 : n); // R$/MWh → R$/kWh
+
+    // extração de tarifas e preços específicos
+    const teComImpRaw   = grab(cleanedText, "tarifa te com impostos|te c/ impostos|te\\s*\\(com impostos\\)");
+    const teSemImpRaw   = grab(cleanedText, "tarifa te sem impostos|te s/ impostos|te\\s*\\(sem impostos\\)");
+    const tusdComRaw    = grab(cleanedText, "tusd.*com impostos|tusd c/ impostos|tusd\\s*\\(com impostos\\)");
+    const tusdSemRaw    = grab(cleanedText, "tusd.*sem impostos|tusd s/ impostos|tusd\\s*\\(sem impostos\\)");
+    const bandRaw       = grab(cleanedText, "bandeira.*(tarifária|amarela|vermelha|verde|escassez)");
+    const precoEEraw    = grab(cleanedText, "preço energia elétrica|preco energia eletrica"); // se existir
+
+    const teComImp      = normTariff(toBR(teComImpRaw));
+    const teSemImp      = normTariff(toBR(teSemImpRaw));
+    const tusdCom       = normTariff(toBR(tusdComRaw));
+    const tusdSem       = normTariff(toBR(tusdSemRaw));
+    const precoEE       = normTariff(toBR(precoEEraw)); // muitas vezes é só um "médio"
+    const bandeira      = bandRaw || "Não encontrado";
 
     // Função para buscar o primeiro número com vírgula após a keyword
     function findFirstCommaNumberAfterKeyword(text: string, keyword: string | RegExp): string {
@@ -294,6 +323,13 @@ async function parsePdf(filePath: string): Promise<any> {
       totalConsumptionKwh: totalConsumptionKwh || '0.00',
       totalValueBrl: totalValueBrlFixed || '0.00',
       dueDate: dueDate || '01/01/2025',
+      // Novos campos de tarifas e preços extraídos pelos helpers
+      tarifa_te_com_impostos: teComImp || 0,
+      tarifa_te_sem_impostos: teSemImp || 0,
+      tarifa_tusd_com_impostos: tusdCom || 0,
+      tarifa_tusd_sem_impostos: tusdSem || 0,
+      bandeira_tarifaria: bandeira,
+      preco_energia_eletrica: precoEE || 0,
     };
 
   } catch (error) {
@@ -590,7 +626,20 @@ app.post(
         diagnosticoConsultivo = tips;
         tagsConsultivo = tags;
 
-        await saveTechnicalAnalysis(userId, invoiceResumo, scoreConsultivo, tips);
+        await saveTechnicalAnalysis(userId, {
+          month: Number(invoiceResumo.month || 0),
+          year: Number(invoiceResumo.year || 0),
+          consumption_kwh: Number(invoiceResumo.consumption_kwh || 0),
+          total_value_brl: Number(invoiceResumo.total_value_brl || 0),
+          value_per_kwh: Number(invoiceResumo.value_per_kwh || 0),
+          has_reactive: Boolean(invoiceResumo.has_reactive),
+          has_gd: Boolean(invoiceResumo.has_gd),
+          tariff: String(invoiceResumo.tariff || ''),
+          score_total: Number(scoreConsultivo?.total || 0),
+          score_breakdown_json: JSON.stringify(scoreConsultivo?.breakdown || {}),
+          recommendations_json: tips || [],
+          created_at: new Date().toISOString(),
+        });
         console.log('[SHEETS] (upload) Análise consultiva salva em invoices_diagnosis.');
 
       } catch (e) {
@@ -700,6 +749,29 @@ app.get('/api/admin/users', async (req: Request, res: Response) => {
     }
 });
 
+// Rota para corrigir tarifas no Google Sheets (executar apenas uma vez)
+app.post('/api/admin/fix-tariffs-once', async (req, res) => {
+  try {
+    // Auth básica: admin:admin
+    const authHeader = req.headers.authorization || '';
+    const expected = 'Basic ' + Buffer.from('admin:admin').toString('base64');
+    if (authHeader !== expected) {
+      res.status(401).json({ message: 'Autenticação necessária.' });
+      return;
+    }
+
+    const result = await detectAndFixTariffsOnce();
+    res.json({
+      ok: true,
+      ...result,
+      note: 'Valores >= 5 foram convertidos de R$/MWh para R$/kWh (÷1000).',
+    });
+  } catch (err) {
+    console.error('[ADMIN] fix-tariffs-once error:', err);
+    res.status(500).json({ ok: false, error: 'Falha ao corrigir tarifas.' });
+  }
+});
+
 // Rota para buscar dados de gamificação de um usuário
 app.get('/api/users/:userId/gamification', async (req: Request, res: Response) => {
     const { userId } = req.params;
@@ -736,6 +808,8 @@ app.put('/api/users/:userId/gamification', async (req: Request, res: Response) =
 
 import type { DiagnosisListOptions } from './lib/types.js';
 import { getDiagnosisByUser } from './google-service.js';
+
+type FixResult = { updated: number; checked: number };
 
 app.get('/api/users/:userId/diagnosis', async (req, res) => {
   console.log('[API] GET /api/users/:userId/diagnosis');
@@ -832,69 +906,105 @@ app.post('/api/invoices/analyze-pdf', upload.single('invoice'), async (req, res)
       totalValueBrl: extractedData.totalValueBrl
     });
 
-    // 2.2) Calcular economia e pontos (suas funções existentes)
-    const economy = calculateEconomy(extractedData);
-    const points  = calculatePoints(economy, extractedData.totalValueBrl);
-    console.log('[API] Economy:', economy, 'Points:', points);
+    const eletricityKWh = asSheetNumber(extractedData.eletricityKWh, 3);
+    const sceeeKWh      = asSheetNumber(extractedData.sceeeKWh, 3);
+    const gdiKWh        = asSheetNumber(extractedData.gdiKWh, 3);
+    const totalBRL      = asSheetNumber(extractedData.totalValueBrl, 2);
+    const totalKwh      = asSheetNumber(extractedData.totalConsumptionKwh ?? (eletricityKWh + sceeeKWh), 3);
 
-    // 2.3) (Opcional / Operacional) Salvar em INVOICES (sem Drive)
-    //      Mantemos o schema atual, com fileId vazio; não muda saveInvoiceData
-    const payload = {
-      fileId: '', // <- não salvamos mais PDFs
+    // normaliza tarifas para R$/kWh
+    const te_com    = asSheetNumber(normalizeTariffUnit(extractedData.tarifa_te_com_impostos), 3);
+    const te_sem    = asSheetNumber(normalizeTariffUnit(extractedData.tarifa_te_sem_impostos), 3);
+    const tusd_com  = asSheetNumber(normalizeTariffUnit(extractedData.tarifa_tusd_com_impostos), 3);
+    const tusd_sem  = asSheetNumber(normalizeTariffUnit(extractedData.tarifa_tusd_sem_impostos), 3);
+    const band_com  = asSheetNumber(normalizeTariffUnit(extractedData.tarifa_bandeira_com_impostos), 3);
+    const band_sem  = asSheetNumber(normalizeTariffUnit(extractedData.tarifa_bandeira_sem_impostos), 3);
+
+    const valuePerKwh = asSheetNumber(safeDiv(totalBRL, totalKwh), 3);
+
+    // payload coerente para diagnóstico/score
+    const invParsed = {
+      month: String(asSheetNumber(extractedData.month, 0)),
+      year: String(asSheetNumber(extractedData.year, 0)),
+      consumption_kwh: totalKwh,
+      total_value_brl: totalBRL,
+      value_per_kwh: valuePerKwh,
+      has_reactive: Boolean(extractedData.hasReactive),
+      has_gd: toNumberBR(extractedData.gdiKWh) > 0,
+      tariff: extractedData.tariff || 'B1 Convencional',
+    };
+
+    // reuso das funções já existentes no seu arquivo:
+    const economy = calculateEconomy({ ...extractedData, totalValueBrl: totalBRL, eletricityKWh, sceeeKWh });
+    const points  = calculatePoints(economy, totalBRL);
+
+    // Salva a linha operacional na planilha "invoices"
+    await saveInvoiceData(userId, {
+      ...extractedData,
+      fileId: '', // sem upload no Drive
       fileName: req.file.originalname,
-      month: extractedData.month,
-      year: extractedData.year,
-      eletricityKWh: extractedData.eletricityKWh,
-      eletricityPrice: extractedData.eletricityPrice,
-      sceeeKWh: extractedData.sceeeKWh,
-      sceeePrice: extractedData.sceeePrice,
-      gdiKWh: extractedData.gdiKWh,
-      gdiPrice: extractedData.gdiPrice,
-      publicLightingContribution: extractedData.publicLightingContribution,
-      totalValue: extractedData.totalValueBrl,
-      economy
-    };
-    await saveInvoiceData(userId, payload);
-    console.log('[SHEETS] Linha operacional salva em INVOICES.');
-
-    // 2.4) Normalizar para InvoiceParsed (camada consultiva)
-    const totalKwh = Number(extractedData.eletricityKWh || 0) + Number(extractedData.sceeeKWh || 0);
-    const invoiceResumo = {
-      month: extractedData.month || '',
-      year: extractedData.year || '',
-      consumption_kwh: Number(totalKwh.toFixed(2)),
-      total_value_brl: Number(Number(extractedData.totalValueBrl || 0).toFixed(2)),
-      // Se você já extrai reativo explicitamente, ajuste aqui (por enquanto heurística simples)
-      has_reactive: false,
-      has_gd: Number(extractedData.gdiKWh || 0) > 0,
-      // Se já extrai "tariff" em extractedData, preencha; senão mantenha vazio
-      tariff: '',
-      value_per_kwh: totalKwh > 0
-        ? Number((Number(extractedData.totalValueBrl || 0) / totalKwh).toFixed(4))
-        : 0,
-      publicLightingContribution: Number(extractedData.publicLightingContribution || 0)
-    };
-
-    // 2.5) Diagnóstico + Score consultivo (funções puras)
-    const { tips, tags } = diagnosticoEnergeticoConsultivo(invoiceResumo);
-    const scoreConsultivo = computeConsultativeScore(invoiceResumo);
-    console.log('[ADVISOR] Tips:', tips);
-    console.log('[SCORE] Total:', scoreConsultivo.total, 'Breakdown:', scoreConsultivo.breakdown);
-
-    // 2.6) Persistir análise consultiva (invoices_diagnosis)
-    await saveTechnicalAnalysis(userId, invoiceResumo, scoreConsultivo, tips);
-    console.log('[SHEETS] Análise consultiva salva em invoices_diagnosis.');
-
-    // 2.7) Responder ao cliente
-    res.status(200).json({
-      message: 'PDF analisado com sucesso (sem upload ao Drive).',
-      extractedData,
-      invoiceResumo,
-      scoreConsultivo,
-      diagnostico: tips,
-      tags,
+      eletricityKWh,
+      sceeeKWh,
+      gdiKWh,
+      totalConsumptionKwh: totalKwh,
+      totalValueBrl: totalBRL,
+      tarifa_te_com_impostos: te_com,
+      tarifa_te_sem_impostos: te_sem,
+      tarifa_tusd_com_impostos: tusd_com,
+      tarifa_tusd_sem_impostos: tusd_sem,
+      tarifa_bandeira_com_impostos: band_com,
+      tarifa_bandeira_sem_impostos: band_sem,
+      valuePerKwh,
       economy,
-      points
+      points,
+    });
+
+    // ---- camada consultiva (usa seu módulo energy-advisor já criado) ----
+    const diagnosis = diagnosticoEnergeticoConsultivo({
+      month: invParsed.month,
+      year: invParsed.year,
+      consumption_kwh: invParsed.consumption_kwh,
+      total_value_brl: invParsed.total_value_brl,
+      value_per_kwh: invParsed.value_per_kwh,
+      has_reactive: invParsed.has_reactive,
+      has_gd: invParsed.has_gd,
+      tariff: invParsed.tariff,
+    });
+
+    // computeConsultativeScore já existente:
+    const score = computeConsultativeScore(invParsed);
+
+    // Persistir diagnóstico na aba "invoices_diagnosis"
+    await saveTechnicalAnalysis(userId, {
+      month: Number(invParsed.month),
+      year: Number(invParsed.year),
+      consumption_kwh: invParsed.consumption_kwh,
+      total_value_brl: invParsed.total_value_brl,
+      value_per_kwh: invParsed.value_per_kwh,
+      has_reactive: invParsed.has_reactive,
+      has_gd: invParsed.has_gd,
+      tariff: invParsed.tariff,
+      score_total: score.total,
+      score_breakdown_json: JSON.stringify(score.breakdown || {}),
+      recommendations_json: diagnosis.tips || [],
+      created_at: new Date().toISOString(),
+    });
+
+    // resposta
+    res.status(200).json({
+      message: 'Arquivo enviado e analisado com sucesso!',
+      extractedData: {
+        ...extractedData,
+        eletricityKWh,
+        sceeeKWh,
+        gdiKWh,
+        totalConsumptionKwh: totalKwh,
+        totalValueBrl: totalBRL,
+        valuePerKwh,
+        tarifas: { te_com, te_sem, tusd_com, tusd_sem, band_com, band_sem },
+      },
+      economy,
+      points,
     });
 
   } catch (error: any) {

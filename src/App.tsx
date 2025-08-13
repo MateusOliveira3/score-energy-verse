@@ -16,6 +16,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import AdminPage from "./pages/AdminPage";
 import RankingPage from "./pages/RankingPage";
+import HistoricoPage from "./pages/HistoricoPage";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,14 @@ const AppRoutes = () => (
       }
     />
     <Route path="/ranking" element={<RankingPage />} />
+    <Route
+      path="/historico"
+      element={
+        <ProtectedRoute>
+          <HistoricoPage />
+        </ProtectedRoute>
+      }
+    />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );

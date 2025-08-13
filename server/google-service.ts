@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import bcrypt from 'bcrypt';
 import { Readable } from 'stream';
 import fs from 'fs';
+import { asSheetNumber, toNumberBR, normalizeTariffUnit } from './lib/num';
 
 
 dotenv.config();
@@ -328,181 +329,59 @@ async function getOrCreateUserFolder(driveApi: any, userEmail: string, parentFol
 
 
 
-export async function saveInvoiceData(userId: string, data: any) {
-    const now = new Date().toISOString();
-    const invoiceId = `invoice_${Date.now()}`;
+export async function saveInvoiceData(userId, data) {
+  const now = new Date().toISOString();
+  const invoiceId = `invoice_${Date.now()}`;
 
-    const {
-        fileName,
-        customerNumber,
-        month,
-        year,
-        eletricityKWhTE,
-        eletricityKWhTotal,
-        teUnitWithTax,
-        teUnitNoTax,
-        tusdUnitWithTax,
-        tusdUnitNoTax,
-        bandeiraUnitWithTax,
-        bandeiraUnitNoTax,
-        bandeiraTarifaria,
-        eletricityPrice,
-        sceeeKWh,
-        sceeePrice,
-        gdiKWh,
-        gdiPrice,
-        publicLightingContribution,
-        totalConsumptionKwh,
-        totalValueBrl,
-        dueDate,
-        historicoConsumo,
-        economy,
-        points,
-        diagnostico
-    } = data;
+  const kwh_te    = asSheetNumber(data.eletricityKWh, 3);
+  const kwh_sceee = asSheetNumber(data.sceeeKWh, 3);
+  const kwh_gdi   = asSheetNumber(data.gdiKWh, 3);
+  const totalKwh  = asSheetNumber(data.totalConsumptionKwh ?? (kwh_te + kwh_sceee), 3);
+  const totalBRL  = asSheetNumber(data.totalValueBrl, 2);
 
-    // Definir cabeçalhos padronizados em português para consistência com extração PDF
-    const expectedHeaders = [
-        'id',
-        'user_id',
-        'file_name',
-        'unidade_consumidora',
-        'mes',
-        'ano',
-        'consumo_te_kwh',
-        'consumo_total_kwh',
-        'tarifa_te_com_impostos',
-        'tarifa_te_sem_impostos',
-        'tarifa_tusd_com_impostos',
-        'tarifa_tusd_sem_impostos',
-        'tarifa_bandeira_com_impostos',
-        'tarifa_bandeira_sem_impostos',
-        'bandeira_tarifaria',
-        'preco_energia_eletrica',
-        'energia_scee_kwh',
-        'preco_energia_scee',
-        'energia_compensada_gdi_kwh',
-        'preco_energia_compensada_gdi',
-        'contribuicao_iluminacao_publica',
-        'consumo_total_kwh_calculado',
-        'valor_total_brl',
-        'data_vencimento',
-        'historico_consumo',
-        'economia_calculada',
-        'pontos_ganhos',
-        'diagnostico_energetico',
-        'status',
-        'data_criacao',
-        'data_atualizacao'
-    ];
+  const te_com    = asSheetNumber(normalizeTariffUnit(data.tarifa_te_com_impostos), 3);
+  const te_sem    = asSheetNumber(normalizeTariffUnit(data.tarifa_te_sem_impostos), 3);
+  const tusd_com  = asSheetNumber(normalizeTariffUnit(data.tarifa_tusd_com_impostos), 3);
+  const tusd_sem  = asSheetNumber(normalizeTariffUnit(data.tarifa_tusd_sem_impostos), 3);
+  const band_com  = asSheetNumber(normalizeTariffUnit(data.tarifa_bandeira_com_impostos), 3);
+  const band_sem  = asSheetNumber(normalizeTariffUnit(data.tarifa_bandeira_sem_impostos), 3);
 
-    // Preparar dados da linha com todos os campos extraídos (cabeçalhos padronizados em português)
-    const row = [
-        invoiceId,
-        userId,
-        fileName,
-        customerNumber, // unidade_consumidora
-        month, // mes
-        year, // ano
-        eletricityKWhTE, // consumo_te_kwh
-        eletricityKWhTotal, // consumo_total_kwh
-        teUnitWithTax, // tarifa_te_com_impostos
-        teUnitNoTax, // tarifa_te_sem_impostos
-        tusdUnitWithTax, // tarifa_tusd_com_impostos
-        tusdUnitNoTax, // tarifa_tusd_sem_impostos
-        bandeiraUnitWithTax, // tarifa_bandeira_com_impostos
-        bandeiraUnitNoTax, // tarifa_bandeira_sem_impostos
-        bandeiraTarifaria, // bandeira_tarifaria
-        eletricityPrice, // preco_energia_eletrica
-        sceeeKWh, // energia_scee_kwh
-        sceeePrice, // preco_energia_scee
-        gdiKWh, // energia_compensada_gdi_kwh
-        gdiPrice, // preco_energia_compensada_gdi
-        publicLightingContribution, // contribuicao_iluminacao_publica
-        totalConsumptionKwh, // consumo_total_kwh_calculado
-        totalValueBrl, // valor_total_brl
-        dueDate, // data_vencimento
-        JSON.stringify(historicoConsumo || []), // historico_consumo
-        economy, // economia_calculada
-        points || 0, // pontos_ganhos
-        JSON.stringify(diagnostico || []), // diagnostico_energetico
-        'PROCESSED', // status
-        now, // data_criacao
-        now // data_atualizacao
-    ];
+  const row = [
+    invoiceId,
+    userId,
+    data.fileName ?? '',
+    data.customerNumber ?? '',
+    asSheetNumber(data.month, 0),
+    asSheetNumber(data.year, 0),
+    kwh_te,
+    asSheetNumber(totalKwh, 3), // consumo_total_kwh
+    te_com,
+    te_sem,
+    tusd_com,
+    tusd_sem,
+    band_com,
+    band_sem,
+    data.bandeira_tarifaria || '',
+    asSheetNumber(data.preco_energia_eletrica, 3),
+    kwh_sceee,
+    asSheetNumber(data.sceeePrice, 3),
+    kwh_gdi,
+    asSheetNumber(data.gdiPrice, 3),
+    asSheetNumber(data.publicLightingContribution, 2),
+    asSheetNumber(totalKwh, 3), // consumo_total_kwh_calculado (se existir)
+    asSheetNumber(totalBRL, 2),
+    data.dueDate || '',
+    JSON.stringify(data.historico_consumo ?? data.consumoHistorico ?? []),
+    asSheetNumber(data.economy, 2),
+    asSheetNumber(data.points, 0),
+    JSON.stringify(data.diagnostico_energetico ?? []),
+    'PROCESSED',
+    now,
+    now,
+  ];
 
-    try {
-        // 1. Verificar se a aba invoices existe e tem os cabeçalhos corretos
-        await ensureInvoicesSheetStructure(expectedHeaders);
-        
-        // 2. Salvar os dados
-        await appendToSheet(SHEETS.INVOICES, [row]);
-        console.log(`[Google Service] Dados da fatura para ${userId} salvos na planilha.`);
-        
-    } catch (error) {
-        console.error('[Google Service] Erro ao salvar dados da fatura no Google Sheets:', error);
-        
-        // FALLBACK: Salvar localmente se o Google Sheets não estiver acessível
-        console.log('[Google Service] Usando fallback local para dados da fatura...');
-        
-        try {
-            // Criar pasta local para dados se não existir
-            const dataDir = './local_data';
-            if (!fs.existsSync(dataDir)) {
-                fs.mkdirSync(dataDir, { recursive: true });
-            }
-            
-            // Criar pasta do usuário se não existir
-            const userDataDir = `${dataDir}/${userId}`;
-            if (!fs.existsSync(userDataDir)) {
-                fs.mkdirSync(userDataDir, { recursive: true });
-            }
-            
-            // Salvar dados da fatura em arquivo JSON local (mantendo compatibilidade)
-            const invoiceData = {
-                id: invoiceId,
-                userId,
-                fileName,
-                unidade_consumidora: customerNumber,
-                mes: month,
-                ano: year,
-                consumo_te_kwh: eletricityKWhTE,
-                consumo_total_kwh: eletricityKWhTotal,
-                tarifa_te_com_impostos: teUnitWithTax,
-                tarifa_te_sem_impostos: teUnitNoTax,
-                tarifa_tusd_com_impostos: tusdUnitWithTax,
-                tarifa_tusd_sem_impostos: tusdUnitNoTax,
-                tarifa_bandeira_com_impostos: bandeiraUnitWithTax,
-                tarifa_bandeira_sem_impostos: bandeiraUnitNoTax,
-                bandeira_tarifaria: bandeiraTarifaria,
-                preco_energia_eletrica: eletricityPrice,
-                energia_scee_kwh: sceeeKWh,
-                preco_energia_scee: sceeePrice,
-                energia_compensada_gdi_kwh: gdiKWh,
-                preco_energia_compensada_gdi: gdiPrice,
-                contribuicao_iluminacao_publica: publicLightingContribution,
-                consumo_total_kwh_calculado: totalConsumptionKwh,
-                valor_total_brl: totalValueBrl,
-                data_vencimento: dueDate,
-                historico_consumo: historicoConsumo,
-                economia_calculada: economy,
-                pontos_ganhos: points || 0,
-                diagnostico_energetico: diagnostico || [],
-                status: 'PROCESSED',
-                data_criacao: now,
-                data_atualizacao: now
-            };
-            
-            const invoiceFilePath = `${userDataDir}/invoice_${Date.now()}.json`;
-            fs.writeFileSync(invoiceFilePath, JSON.stringify(invoiceData, null, 2));
-            
-            console.log(`[Google Service] Dados da fatura salvos localmente: ${invoiceFilePath}`);
-            
-        } catch (fallbackError) {
-            console.error('[Google Service] Erro no fallback local:', fallbackError);
-            throw new Error('Falha ao salvar dados da fatura (Google Sheets e local)');
-        }
-    }
+  await appendToSheet(SHEETS.INVOICES, [row]);
+  console.log(`[Google Service] Dados da fatura para ${userId} salvos na planilha (invoices).`);
 }
 
 // Função para garantir que a aba invoices existe e tem a estrutura correta
@@ -774,45 +653,30 @@ export async function getLeaderboard() {
 // ------------------------------------------------------------------
 import type { InvoiceParsed, ConsultativeScore } from './lib/types.js';
 
-export async function saveTechnicalAnalysis(
-  userId: string,
-  invoice: InvoiceParsed,
-  score: ConsultativeScore,
-  tips: string[]
-): Promise<void> {
-  // Garante headers e aba prontos
-  try {
-    await ensureDiagnosisSheetReady();
-  } catch (e: any) {
-    console.error('[SHEETS] Falha ao garantir aba invoices_diagnosis:', e?.message || e);
-    throw e;
-  }
-
-  // Monta a linha conforme cabeçalhos padronizados em português
+export async function saveTechnicalAnalysis(userId: string, payload: {
+  month: number; year: number; consumption_kwh: number; total_value_brl: number; value_per_kwh: number;
+  has_reactive: boolean; has_gd: boolean; tariff: string;
+  score_total: number; score_breakdown_json: string; recommendations_json: string[]; created_at: string;
+}) {
+  const id = `analysis_${Date.now()}`;
   const row = [
-    `analysis_${Date.now()}`,            // id
-    userId,                              // user_id
-    invoice.month || '',                 // mes
-    invoice.year || '',                  // ano
-    Number(invoice.consumption_kwh || 0),// consumo_kwh
-    Number(invoice.total_value_brl || 0),// valor_total_brl
-    Boolean(invoice.has_reactive),       // tem_reativo
-    Boolean(invoice.has_gd),             // tem_gd
-    String(invoice.tariff || ''),        // tarifa
-    Number(invoice.value_per_kwh || 0),  // valor_por_kwh
-    Number(score?.total || 0),           // score_total
-    JSON.stringify(score?.breakdown || {}), // score_detalhado_json
-    JSON.stringify(tips || []),          // recomendacoes_json
-    new Date().toISOString()             // data_criacao
+    id,
+    userId,
+    asSheetNumber(payload.month, 0),
+    asSheetNumber(payload.year, 0),
+    asSheetNumber(payload.consumption_kwh, 3),
+    asSheetNumber(payload.total_value_brl, 2),
+    String(payload.has_reactive).toUpperCase(),
+    String(payload.has_gd).toUpperCase(),
+    payload.tariff,
+    asSheetNumber(payload.value_per_kwh, 3),
+    asSheetNumber(payload.score_total, 0),
+    payload.score_breakdown_json,
+    JSON.stringify(payload.recommendations_json || []),
+    payload.created_at,
   ];
-
-  try {
-    await appendToSheet('invoices_diagnosis', [row]);
-    console.log('[SHEETS] Análise técnica salva em invoices_diagnosis.');
-  } catch (e: any) {
-    console.error('[SHEETS] Falha ao salvar análise técnica:', e?.message || e);
-    throw e;
-  }
+  await appendToSheet('invoices_diagnosis', [row]);
+  console.log(`[Google Service] Diagnóstico salvo (invoices_diagnosis) para ${userId}.`);
 }
 
 import type { DiagnosisItem, DiagnosisListOptions, DiagnosisListResponse } from './lib/types.js';
@@ -920,4 +784,61 @@ function columnNumberToA1(columnNumber: number): string {
         n = Math.floor((n - 1) / 26);
     }
     return result;
+}
+
+// ====== Tariff maintenance (one-shot) ======
+type FixResult = { updated: number; checked: number };
+
+export async function detectAndFixTariffsOnce(): Promise<FixResult> {
+  const sheetsApi = await getSheetsApi();
+
+  const resp = await sheetsApi.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID!,
+    range: SHEETS.INVOICES,
+  });
+  const rows = (resp.data.values || []) as string[][];
+  if (rows.length < 2) return { updated: 0, checked: 0 };
+
+  const headers = rows[0];
+  const col = (name: string) => headers.indexOf(name);
+  const cols = {
+    teCom: col('tarifa_te_com_impostos'),
+    teSem: col('tarifa_te_sem_impostos'),
+    tusdCom: col('tarifa_tusd_com_impostos'),
+    tusdSem: col('tarifa_tusd_sem_impostos'),
+    bandCom: col('tarifa_bandeira_com_impostos'),
+    bandSem: col('tarifa_bandeira_sem_impostos'),
+  };
+  const numericCols = Object.values(cols).filter((i) => i >= 0);
+
+  let updated = 0, checked = 0;
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row) continue;
+    checked++;
+
+    let changed = false;
+    for (const c of numericCols) {
+      const raw = row[c];
+      if (raw == null || raw === '') continue;
+      const n = toNumberBR(raw);
+      if (!Number.isFinite(n)) continue;
+      // >=5 => assume MWh
+      if (n >= 5) {
+        row[c] = (n / 1000).toFixed(3);
+        changed = true;
+      }
+    }
+    if (changed) {
+      const rowNumber = r + 1; // + cabeçalho
+      await sheetsApi.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID!,
+        range: `${SHEETS.INVOICES}!A${rowNumber}:ZZ${rowNumber}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: [row] },
+      });
+      updated++;
+    }
+  }
+  return { updated, checked };
 } 
