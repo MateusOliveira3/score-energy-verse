@@ -19,16 +19,17 @@ interface AnalysisPanelProps {
 const AnalysisPanel: React.FC<AnalysisPanelProps> = ({ userId }) => {
   const navigate = useNavigate();
   const { invoices, isLoading } = useInvoices();
-  const { data: diagnosis, loading: diagLoading } = useDiagnosis(userId);
+  // onde você carrega a análise
+  const { data, loading, error } = useDiagnosis(userId, { limit: 1 });
+
+  // pegue a última (itens já vêm ordenados por created_at desc)
+  const last = Array.isArray(data)
+    ? data[0]
+    : Array.isArray((data as any)?.items)
+      ? (data as any).items[0]
+      : null;
+
   const { analytics } = useDiagnosisAnalytics(userId);
-
-  // Merge memoizado das faturas com diagnóstico
-  const merged = React.useMemo(() => {
-    return mergeInvoicesWithDiagnosis(invoices as InvoiceLike[] || [], diagnosis || []);
-  }, [invoices, diagnosis]);
-
-  // Pega apenas a última fatura
-  const latestInvoice = merged[0];
 
   // Helpers
   const fmtDate = (d?: string | null) => {
@@ -94,24 +95,13 @@ const AnalysisPanel: React.FC<AnalysisPanelProps> = ({ userId }) => {
     );
   }
 
-  const consumption =
-    latestInvoice?.extractedData?.totalConsumptionKwh ??
-    latestInvoice?.consumption_kwh ??
-    latestInvoice?.consumo_total_kwh ??
-    0;
+  const consumption = last?.consumption_kwh ?? 0;
+  const totalValue  = last?.total_value_brl ?? 0;
+  const vpk         = last?.value_per_kwh ?? (consumption > 0 ? totalValue / consumption : 0);
+  const score       = last?.score_total ?? 0;
 
-  const totalValue =
-    latestInvoice?.extractedData?.totalValueBrl ??
-    latestInvoice?.total_value_brl ??
-    latestInvoice?.valor_total_brl ??
-    0;
-
-  const valuePerKwh =
-    latestInvoice?.extractedData?.valuePerKwh ??
-    (consumption > 0 ? totalValue / consumption : 0);
-
-  const month = latestInvoice.month || latestInvoice.mes || '';
-  const year = latestInvoice.year || latestInvoice.ano || '';
+  const month = last?.month || '';
+  const year = last?.year || '';
 
   return (
     <div className="space-y-6">
@@ -164,9 +154,9 @@ const AnalysisPanel: React.FC<AnalysisPanelProps> = ({ userId }) => {
                 {totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
               </div>
               <div className="text-sm text-gray-500 mt-1">
-                {valuePerKwh > 0
-                  ? `${valuePerKwh.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} R$/kWh`
-                  : '— /kWh'}
+                                 {vpk > 0
+                   ? `${vpk.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} R$/kWh`
+                   : '— /kWh'}
               </div>
             </div>
 
@@ -176,9 +166,9 @@ const AnalysisPanel: React.FC<AnalysisPanelProps> = ({ userId }) => {
                 <TrendingUp className="h-5 w-5 text-emerald-500" />
                 <span className="text-sm text-gray-600">Score</span>
               </div>
-              <div className="text-2xl font-bold text-emerald-600">
-                {latestInvoice.score_total || latestInvoice.pontos_ganhos || 0}
-              </div>
+                             <div className="text-2xl font-bold text-emerald-600">
+                 {score}
+               </div>
               <div className="text-sm text-gray-500 mt-1">
                 Pontos ganhos
               </div>
@@ -187,20 +177,20 @@ const AnalysisPanel: React.FC<AnalysisPanelProps> = ({ userId }) => {
         </CardContent>
       </Card>
 
-      {/* Análise e Recomendações */}
-      {latestInvoice.diagnostico_energetico && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Análise Energética</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <InvoiceTips tips={latestInvoice.diagnostico_energetico} />
-          </CardContent>
-        </Card>
-      )}
+             {/* Análise e Recomendações */}
+       {last?.recommendations_json && (
+         <Card>
+           <CardHeader>
+             <CardTitle>Análise Energética</CardTitle>
+           </CardHeader>
+           <CardContent>
+             <InvoiceTips tips={JSON.parse(last.recommendations_json)} />
+           </CardContent>
+         </Card>
+       )}
 
-      {/* Badge de Análise */}
-      <InvoiceAnalysisBadge invoice={latestInvoice} />
+       {/* Badge de Análise */}
+       <InvoiceAnalysisBadge invoice={last} />
 
       {/* Resumo de Desempenho */}
       <DiagnosisSummary userId={userId} />
