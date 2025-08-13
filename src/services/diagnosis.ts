@@ -11,6 +11,32 @@ export type DiagnosisItem = {
   created_at: string;
 };
 
+export type InvoiceLite = {
+  id: string;
+  user_id: string;
+  file_name: string;
+  unidade_consumidora: string;
+  month: number;
+  year: number;
+  consumption_kwh: number;
+  total_value_brl: number;
+  value_per_kwh: number;
+  status: string;
+  created_at: string | null;
+};
+
+export type DiagnosisLite = {
+  id: string;
+  user_id: string;
+  month: number;
+  year: number;
+  score_total: number;
+  score_breakdown: Record<string, number>;
+  recommendations: string[];
+  value_per_kwh: number;
+  created_at: string | null;
+};
+
 export async function fetchDiagnosis(userId: string): Promise<DiagnosisItem[]> {
   if (!userId) throw new Error('userId é obrigatório');
   const res = await fetch(`/api/users/${encodeURIComponent(userId)}/diagnosis`, {
@@ -34,4 +60,11 @@ export async function fetchLastAnalysis(userId: string) {
   if (!r.ok) throw new Error('Falha ao buscar última análise');
   const j = await r.json();
   return j?.data ?? null;
+}
+
+export async function fetchHistory(userId: string) {
+  const r = await fetch(`/api/users/${userId}/history`);
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || 'Erro ao carregar histórico');
+  return j.data as { invoices: InvoiceLite[]; diagnosis: DiagnosisLite[] };
 }

@@ -14,7 +14,7 @@ import { parseInvoiceText } from './lib/invoice-parser.js';
 import diagnosticoEnergeticoConsultivo from './lib/energy-advisor.js';
 import computeConsultativeScore from './lib/score-advisor.js';
 import { toNumberBR, safeDiv, normalizeTariffUnit, buildLastAnalysisPayload } from './lib/num.js';
-import { saveTechnicalAnalysis, getLastDiagnosisRow, getLastAnalysisOrInvoice } from './google-service.js';
+import { saveTechnicalAnalysis, getLastDiagnosisRow, getLastAnalysisOrInvoice, getUserHistory, getInvoicesRaw } from './google-service.js';
 
 dotenv.config();
 
@@ -889,38 +889,39 @@ app.get('/api/users/:userId/diagnosis', async (req, res) => {
   }
 });
 
-// Tipos da rota
-type LastAnalysisParams = { userId: string };
-type LastAnalysisRes = { ok: boolean; data: any | null; error?: string };
+// === [ADICIONAR] Rota: Histórico unificado ===
+type HistoryParams = { userId: string };
+type HistoryBody = { ok: true; data: { invoices: any[]; diagnosis: any[] } } | { ok: false; error: string };
 
-// Handler com tipagem EXPRESS
-const getLastAnalysisHandler: RequestHandler<LastAnalysisParams, LastAnalysisRes> = async (req, res) => {
+const historyHandler: RequestHandler<HistoryParams, HistoryBody> = async (req, res) => {
   try {
     const { userId } = req.params;
-    const last = await getLastAnalysisOrInvoice(userId);
-
-    if (!last) {
-      res.status(200).json({ ok: true, data: null });
-      return;
-    }
-
-    // perfil é opcional; trate erro silenciosamente
-    let profile: any = null;
-    try { profile = await getUserProfile(userId); } catch {}
-
-    const payload = buildLastAnalysisPayload(last, profile);
-    res.status(200).json({ ok: true, data: payload });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ ok: false, data: null, error: msg });
+    const data = await getUserHistory(userId);
+    res.status(200).json({ ok: true, data });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ ok: false, error: msg });
   }
 };
 
-// Registra a rota usando os generics de params/response body
-app.get<LastAnalysisParams, LastAnalysisRes>(
-  '/api/users/:userId/last-analysis',
-  getLastAnalysisHandler
-);
+app.get<HistoryParams, HistoryBody>('/api/users/:userId/history', historyHandler);
+
+// === [AJUSTE] rota que alimenta "Análise da Última Fatura" ===
+type LastRes = { ok: true; data: any | null } | { ok: false; error: string };
+
+const lastAnalysisHandler: RequestHandler<HistoryParams, LastRes> = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    // usa invoices ordenadas por created_at
+    const invoices = await getInvoicesRaw(userId);
+    const last = invoices[0] || null;
+    res.status(200).json({ ok: true, data: last });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e instanceof Error ? e.message : String(e) });
+  }
+};
+
+app.get<HistoryParams, LastRes>('/api/users/:userId/last-analysis', lastAnalysisHandler);
 
 // Rota para buscar leaderboard
 app.get('/api/leaderboard', async (req: Request, res: Response) => {

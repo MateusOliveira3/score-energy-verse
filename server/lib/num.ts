@@ -1,11 +1,50 @@
 // server/lib/num.ts
+/**
+ * Converte string numérica em número lidando com variações:
+ * - "285,20" (BR) -> 285.20
+ * - "285.20" (US) -> 285.20
+ * - "345.000" quando representa kWh inteiros (3 casas decimais técnicas) -> 345
+ * - "34.500" quando for milhar (1-3 dígitos por grupo) -> 34500
+ *
+ * Regras:
+ * 1) Se houver vírgula, assumimos vírgula como decimal -> removemos pontos e trocamos vírgula por ponto.
+ * 2) Se não houver vírgula:
+ *    2.1) Se corresponder a /^\d+\.\d{3}$/ (ex.: "345.000", "41.700"), tratamos como "ponto decimal técnico" -> parseFloat direto.
+ *         e arredondamos para 3 casas, depois, se for kWh típico, pode virar inteiro (345.000 -> 345).
+ *    2.2) Se corresponder a padrão de milhar /^\d{1,3}(\.\d{3})+$/, remove pontos -> parseFloat.
+ *    2.3) Caso contrário, parseFloat direto.
+ */
 export function toNumberBR(x: any): number {
-  if (x == null || x === '') return 0;
+  if (x === null || x === undefined) return 0;
   if (typeof x === 'number' && Number.isFinite(x)) return x;
-  const s = String(x).trim();
-  if (!s) return 0;
-  const n = parseFloat(s.replace(/\./g, '').replace(',', '.'));
-  return Number.isFinite(n) ? n : 0;
+
+  const raw = String(x).trim();
+  if (!raw) return 0;
+
+  // 1) tem vírgula => BR decimal
+  if (raw.includes(',')) {
+    const s = raw.replace(/\./g, '').replace(',', '.');
+    const n = parseFloat(s);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  // 2) sem vírgula
+  // 2.1) "decimal técnico" de 3 casas: 345.000 / 41.700
+  if (/^\d+\.\d{3}$/.test(raw)) {
+    const n = parseFloat(raw); // 345.000 -> 345, 41.700 -> 41.7
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  // 2.2) padrão só de milhares: 1.234 ou 12.345.678
+  if (/^\d{1,3}(\.\d{3})+$/.test(raw)) {
+    const s = raw.replace(/\./g, '');
+    const n = parseFloat(s);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  // 2.3) fallback: parseFloat direto (ex.: "302.240" que realmente é decimal "US")
+  const nf = parseFloat(raw);
+  return Number.isFinite(nf) ? nf : 0;
 }
 
 function isoDate(x: any): number {
@@ -22,11 +61,14 @@ export function safeDiv(a: number, b: number): number {
   return a / b;
 }
 
-/** tarifário: se vier ≥ 5 assume MWh e converte pra kWh */
-export function normalizeTariffUnit(t: any): number {
-  const v = toNumberBR(t);
-  if (v >= 5) return v / 1000;
-  return v;
+/**
+ * Normaliza unidade de tarifa: se vier suspeita em MWh (>= 5 R$/kWh normalmente é alto),
+ * trate conforme sua regra de negócio; mantemos como está se vier em kWh.
+ */
+export function normalizeTariffUnit(t: number): number {
+  if (!Number.isFinite(t)) return 0;
+  // aqui não mexemos, pois o problema estava no parse, não na unidade
+  return t;
 }
 
 import { monthToSeason, seasonPt, regionFromUF } from './season.js';

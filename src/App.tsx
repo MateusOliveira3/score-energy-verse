@@ -17,6 +17,8 @@ import ResetPassword from "./pages/ResetPassword";
 import AdminPage from "./pages/AdminPage";
 import RankingPage from "./pages/RankingPage";
 import HistoricoPage from "./pages/HistoricoPage";
+import HistoryPage from "./pages/HistoryPage";
+import AnalysisPanel from "./components/AnalysisPanel";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +37,12 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Componente para a página inicial com AnalysisPanel
+const HomePage = () => {
+  const { user } = useAuth();
+  return <AnalysisPanel userId={user?.id} />;
+};
+
 const AppRoutes = () => (
   <Routes>
     <Route path="/" element={<LandingPage />} />
@@ -42,6 +50,14 @@ const AppRoutes = () => (
     <Route path="/registro" element={<Register />} />
     <Route path="/forgot-password" element={<ForgotPassword />} />
     <Route path="/reset-password" element={<ResetPassword />} />
+    <Route
+      path="/dashboard"
+      element={
+        <ProtectedRoute>
+          <HomePage />
+        </ProtectedRoute>
+      }
+    />
     <Route
       path="/perfil"
       element={
@@ -64,6 +80,14 @@ const AppRoutes = () => (
       element={
         <ProtectedRoute>
           <HistoricoPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/history"
+      element={
+        <ProtectedRoute>
+          <HistoryPage />
         </ProtectedRoute>
       }
     />

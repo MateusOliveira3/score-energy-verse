@@ -3,7 +3,89 @@ import dotenv from 'dotenv';
 import bcrypt from 'bcrypt';
 import { Readable } from 'stream';
 import fs from 'fs';
-import { toNumberBR, normalizeTariffUnit } from './lib/num';
+import { normalizeTariffUnit } from './lib/num';
+
+// === [ADICIONAR / SUBSTITUIR] utilidades no topo do arquivo ===
+type AnyRow = Record<string, any>;
+
+function toNumberBR(x: any): number {
+  if (x === null || x === undefined) return 0;
+  if (typeof x === 'number' && Number.isFinite(x)) return x;
+  const s = String(x).trim();
+  if (!s) return 0;
+  const n = parseFloat(s.replace(/\./g, '').replace(',', '.'));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function safeDateISO(x: any): string | null {
+  if (!x) return null;
+  const d = new Date(x);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+function pick<T extends object>(row: AnyRow, keys: (keyof T)[], map: Record<string, string> = {}): T {
+  const out: AnyRow = {};
+  for (const k of keys as string[]) {
+    const cand = [k, map[k]].filter(Boolean) as string[];
+    let value: any = undefined;
+    for (const name of cand) {
+      if (name in row) { value = row[name]; break; }
+    }
+    out[k] = value;
+  }
+  return out as T;
+}
+
+function normalizeInvoiceRow(row: Record<string, any>) {
+  const month = row.mes ?? row.month;
+  const year  = row.ano ?? row.year;
+
+  const consumption_kwh =
+    toNumberBR(row.consumo_total_kwh) ||
+    toNumberBR(row.consumo_te_kwh) ||
+    toNumberBR(row.consumption_kwh);
+
+  const total_value_brl =
+    toNumberBR(row.valor_total_brl) ||
+    toNumberBR(row.total_value_brl);
+
+  const value_per_kwh =
+    consumption_kwh > 0 ? total_value_brl / consumption_kwh : 0;
+
+  const created_at =
+    (row.data_criacao && new Date(row.data_criacao).toISOString()) ||
+    (row.created_at && new Date(row.created_at).toISOString()) ||
+    null;
+
+  return {
+    id: row.id ?? row.invoice_id ?? `invoice_${Date.now()}`,
+    user_id: row.user_id,
+    file_name: row.file_name ?? '',
+    unidade_consumidora: row.unidade_consumidora ?? row.customerNumber ?? '',
+    month: toNumberBR(month),
+    year: toNumberBR(year),
+    consumption_kwh,
+    total_value_brl,
+    value_per_kwh,
+    status: row.status ?? 'PROCESSED',
+    created_at,
+  };
+}
+
+function sortByCreatedAtThenMY(a: any, b: any) {
+  // 1) prioriza created_at desc
+  if (a.created_at && b.created_at) {
+    if (a.created_at > b.created_at) return -1;
+    if (a.created_at < b.created_at) return 1;
+  } else if (a.created_at && !b.created_at) {
+    return -1;
+  } else if (!a.created_at && b.created_at) {
+    return 1;
+  }
+  // 2) fallback: ano/mes desc
+  if (a.year !== b.year) return (b.year ?? 0) - (a.year ?? 0);
+  return (b.month ?? 0) - (a.month ?? 0);
+}
 
 // Helper para formatar números para planilha (substitui asSheetNumber)
 function formatForSheet(value: any, decimals: number = 0): number {
@@ -125,6 +207,61 @@ export async function getLastAnalysisOrInvoice(userId: string) {
 // Helper para converter data para timestamp
 function isoDate(x: any): number {
   try { return new Date(String(x)).getTime(); } catch { return 0; }
+}
+
+// === [ADICIONAR] ===
+export async function getInvoicesRaw(userId: string) {
+  const rows = await readSheet('invoices'); // já existe readSheet
+  if (!rows.length) return [];
+  const headers = rows[0];
+  const payload = rows.slice(1).map(r => {
+    const obj: AnyRow = {};
+    headers.forEach((h: string, i: number) => { obj[h] = r[i]; });
+    return obj;
+  }).filter((r: AnyRow) => (r.user_id === userId));
+
+  const normalized = payload.map(normalizeInvoiceRow);
+  normalized.sort(sortByCreatedAtThenMY);
+  return normalized;
+}
+
+// === [ADICIONAR] ===
+export async function getUserHistory(userId: string) {
+  const invoices = await getInvoicesRaw(userId);
+
+  // diagnosis (já existente)
+  const diagRows = await readSheet('invoices_diagnosis');
+  let diagnosis: AnyRow[] = [];
+  if (diagRows.length) {
+    const hdr = diagRows[0];
+    diagnosis = diagRows.slice(1)
+      .map(r => {
+        const o: AnyRow = {};
+        hdr.forEach((h: string, i: number) => o[h] = r[i]);
+        return o;
+      })
+      .filter(o => o.user_id === userId)
+      .map(o => ({
+        id: o.id,
+        user_id: o.user_id,
+        month: toNumberBR(o.mes ?? o.month),
+        year:  toNumberBR(o.ano ?? o.year),
+        score_total: toNumberBR(o.score_total ?? 0),
+        score_breakdown: (() => {
+          try { return JSON.parse(o.score_detalhado_json ?? o.score_breakdown_json ?? '{}'); }
+          catch { return {}; }
+        })(),
+        recommendations: (() => {
+          try { return JSON.parse(o.recomendacoes_json ?? o.recommendations_json ?? '[]'); }
+          catch { return []; }
+        })(),
+        value_per_kwh: toNumberBR(o.valor_por_kwh ?? o.value_per_kwh ?? 0),
+        created_at: safeDateISO(o.created_at ?? o.data_criacao) || null,
+      }));
+    diagnosis.sort(sortByCreatedAtThenMY);
+  }
+
+  return { invoices, diagnosis };
 }
 
 async function appendToSheet(sheetName: string, rows: any[][]) {
@@ -712,15 +849,15 @@ export async function saveTechnicalAnalysis(
   const row = [
     id,
     userId,
-    asSheetNumber(payload.month, 0),
-    asSheetNumber(payload.year, 0),
-    asSheetNumber(payload.consumption_kwh, 3),
-    asSheetNumber(payload.total_value_brl, 2),
+    formatForSheet(payload.month, 0),
+    formatForSheet(payload.year, 0),
+    formatForSheet(payload.consumption_kwh, 3),
+    formatForSheet(payload.total_value_brl, 2),
     String(payload.has_reactive).toUpperCase(),
     String(payload.has_gd).toUpperCase(),
     payload.tariff,
-    asSheetNumber(payload.value_per_kwh, 3),
-    asSheetNumber(payload.score_total, 0),
+    formatForSheet(payload.value_per_kwh, 3),
+    formatForSheet(payload.score_total, 0),
     payload.score_breakdown_json,
     JSON.stringify(payload.recommendations_json || []),
     payload.created_at,
