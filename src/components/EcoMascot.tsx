@@ -23,7 +23,7 @@ const EcoMascot = ({ score, level, consumerType = 'Residencial', customization }
         'Comercial': 'EcoBiz',
         'Restaurante': 'EcoChef',
         'Escola': 'EcoAluno',
-        'Indústria': 'EcoTech'
+        'Industria': 'EcoTech'
       };
       return names[type as keyof typeof names] || 'EcoFriend';
     };
@@ -111,7 +111,6 @@ const EcoMascot = ({ score, level, consumerType = 'Residencial', customization }
   };
 
   const mascot = getMascotData(level, consumerType, customization);
-  const nextLevelScore = level * 200;
   const progressToNext = Math.min(((score % 200) / 200) * 100, 100);
 
   return (

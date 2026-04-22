@@ -3,122 +3,81 @@ import { Upload, FileText, Zap, Eye, CheckCircle, Database } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useInvoices } from '@/hooks/useInvoices';
-import { useAuth } from '@/contexts/AuthContext';
-
-interface InvoiceData {
-  consumption: number;
-  totalValue: number;
-  taxPercentage: number;
-  peakHours: string;
-  month: string;
-}
+import { interpretInvoiceFile } from '@/lib/mvpCoreFlow';
+import { UserProfileData } from '@/types/mvp';
 
 interface InvoiceUploadProps {
-  onInvoiceProcessed: (data: InvoiceData) => void;
+  profile: UserProfileData;
+  onUploadStarted: () => void;
+  onInvoiceProcessed: (file: File) => void;
 }
 
-const InvoiceUpload = ({ onInvoiceProcessed }: InvoiceUploadProps) => {
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const InvoiceUpload = ({ profile, onUploadStarted, onInvoiceProcessed }: InvoiceUploadProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [savedInJourney, setSavedInJourney] = useState(false);
   const { toast } = useToast();
-  const { addInvoice, uploadFile } = useInvoices();
-  const { user } = useAuth();
 
-  // Simulação de OCR - em produção seria uma chamada real para API de OCR
-  const simulateOCR = useCallback(async (file: File): Promise<InvoiceData> => {
-    await new Promise(resolve => setTimeout(resolve, 3000)); // Simula processamento
-    
-    // Dados simulados extraídos do OCR
-    return {
-      consumption: Math.floor(Math.random() * 300) + 150,
-      totalValue: Math.floor(Math.random() * 200) + 180,
-      taxPercentage: Math.floor(Math.random() * 30) + 25,
-      peakHours: '18:00-22:00',
-      month: new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
-    };
-  }, []);
+  const handleFileUpload = useCallback(
+    async (file: File) => {
+      const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
 
-  const handleFileUpload = useCallback(async (file: File) => {
-    const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
-    
-    if (!validTypes.includes(file.type)) {
-      toast({
-        title: "Formato inválido",
-        description: "Por favor, envie apenas arquivos PDF, JPG ou PNG.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!user) {
-      toast({
-        title: "Usuário não autenticado",
-        description: "Faça login para enviar faturas.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsUploading(true);
-    setUploadedFile(file);
-
-    try {
-      // Processar OCR
-      const ocrData = await simulateOCR(file);
-      
-      // Upload do arquivo para storage (opcional)
-      let fileUrl = null;
-      try {
-        fileUrl = await uploadFile(file);
-      } catch (error) {
-        console.warn('Erro no upload do arquivo, continuando sem salvar o arquivo:', error);
-      }
-
-      // Salvar dados no Supabase
-      const savedInvoice = await addInvoice({
-        consumption: ocrData.consumption,
-        total_value: ocrData.totalValue,
-        tax_percentage: ocrData.taxPercentage,
-        peak_hours: ocrData.peakHours,
-        month: ocrData.month,
-        file_url: fileUrl,
-        file_name: file.name
-      });
-
-      if (savedInvoice) {
-        onInvoiceProcessed(ocrData);
-        
+      if (!validTypes.includes(file.type)) {
         toast({
-          title: "Fatura processada e salva! ⚡",
-          description: `Consumo de ${ocrData.consumption} kWh detectado. Dados salvos no banco!`,
+          title: 'Formato invalido',
+          description: 'Por favor, envie apenas arquivos PDF, JPG ou PNG.',
+          variant: 'destructive',
         });
+        return;
       }
-    } catch (error) {
-      console.error('Erro no processamento:', error);
-      toast({
-        title: "Erro no processamento",
-        description: "Não foi possível processar a fatura. Tente novamente.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsUploading(false);
-    }
-  }, [simulateOCR, onInvoiceProcessed, toast, user, addInvoice, uploadFile]);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragActive(false);
-    
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) {
-      handleFileUpload(files[0]);
-    }
-  }, [handleFileUpload]);
+      setIsUploading(true);
+      setUploadedFile(file);
+      setSavedInJourney(false);
+      onUploadStarted();
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
+      try {
+        await wait(1200);
+        const extractedInvoice = interpretInvoiceFile(file, profile);
+        onInvoiceProcessed(file);
+        setSavedInJourney(true);
+
+        toast({
+          title: 'Fatura processada!',
+          description: `Resumo gerado para ${extractedInvoice.month} com ${extractedInvoice.consumption} kWh estimados.`,
+        });
+      } catch (error) {
+        console.error('Erro no processamento:', error);
+        toast({
+          title: 'Erro no processamento',
+          description: 'Nao foi possivel processar a fatura. Tente novamente.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    [onInvoiceProcessed, onUploadStarted, profile, toast]
+  );
+
+  const handleDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+      setIsDragActive(false);
+
+      const files = Array.from(event.dataTransfer.files);
+      if (files.length > 0) {
+        handleFileUpload(files[0]);
+      }
+    },
+    [handleFileUpload]
+  );
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
     if (files && files.length > 0) {
       handleFileUpload(files[0]);
     }
@@ -135,15 +94,15 @@ const InvoiceUpload = ({ onInvoiceProcessed }: InvoiceUploadProps) => {
       <CardContent>
         <div
           className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 ${
-            isDragActive 
-              ? 'border-emerald-500 bg-emerald-50' 
-              : uploadedFile 
+            isDragActive
+              ? 'border-emerald-500 bg-emerald-50'
+              : uploadedFile
                 ? 'border-emerald-300 bg-emerald-25'
                 : 'border-gray-300 hover:border-emerald-400 hover:bg-emerald-25'
           }`}
           onDrop={handleDrop}
-          onDragOver={(e) => {
-            e.preventDefault();
+          onDragOver={(event) => {
+            event.preventDefault();
             setIsDragActive(true);
           }}
           onDragLeave={() => setIsDragActive(false)}
@@ -154,26 +113,37 @@ const InvoiceUpload = ({ onInvoiceProcessed }: InvoiceUploadProps) => {
                 <Zap className="h-8 w-8 text-emerald-500" />
               </div>
               <div>
-                <p className="text-lg font-medium text-emerald-700">Processando com OCR...</p>
-                <p className="text-sm text-gray-600">Extraindo dados e salvando no banco</p>
+                <p className="text-lg font-medium text-emerald-700">
+                  Lendo a fatura e montando o resumo...
+                </p>
+                <p className="text-sm text-gray-600">
+                  O proximo passo sera a analise simples com score e orientacao do mascote.
+                </p>
               </div>
             </div>
           ) : uploadedFile ? (
             <div className="flex flex-col items-center space-y-4">
               <CheckCircle className="h-8 w-8 text-emerald-500" />
               <div>
-                <p className="text-lg font-medium text-emerald-700">Fatura processada e salva!</p>
+                <p className="text-lg font-medium text-emerald-700">
+                  Fatura recebida e conectada a jornada
+                </p>
                 <p className="text-sm text-gray-600">{uploadedFile.name}</p>
                 <div className="flex items-center justify-center mt-2 text-xs text-emerald-600">
                   <Database className="h-3 w-3 mr-1" />
-                  Dados salvos no Supabase
+                  {savedInJourney
+                    ? 'Dados vinculados ao estado da jornada MVP'
+                    : 'Fluxo mantido na jornada atual'}
                 </div>
               </div>
-              <Button 
+              <Button
                 onClick={() => {
                   setUploadedFile(null);
+                  setSavedInJourney(false);
                   const input = document.getElementById('file-upload') as HTMLInputElement;
-                  if (input) input.value = '';
+                  if (input) {
+                    input.value = '';
+                  }
                 }}
                 variant="outline"
                 size="sm"
@@ -189,10 +159,10 @@ const InvoiceUpload = ({ onInvoiceProcessed }: InvoiceUploadProps) => {
                   Arraste sua fatura aqui ou clique para selecionar
                 </p>
                 <p className="text-sm text-gray-500">
-                  Suporta PDF, JPG e PNG • Máximo 10MB • Dados salvos automaticamente
+                  Suporta PDF, JPG e PNG. O envio gera analise simples, score e proximos passos.
                 </p>
               </div>
-              
+
               <input
                 id="file-upload"
                 type="file"
@@ -200,8 +170,8 @@ const InvoiceUpload = ({ onInvoiceProcessed }: InvoiceUploadProps) => {
                 onChange={handleFileSelect}
                 className="hidden"
               />
-              
-              <Button 
+
+              <Button
                 onClick={() => document.getElementById('file-upload')?.click()}
                 className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700"
               >
@@ -214,24 +184,24 @@ const InvoiceUpload = ({ onInvoiceProcessed }: InvoiceUploadProps) => {
 
         <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
           <div className="p-3 bg-emerald-50 rounded-lg">
-            <div className="text-lg font-bold text-emerald-600">OCR</div>
-            <div className="text-xs text-emerald-700">Leitura Automática</div>
+            <div className="text-lg font-bold text-emerald-600">MVP</div>
+            <div className="text-xs text-emerald-700">Interpretacao deterministica</div>
           </div>
           <div className="p-3 bg-blue-50 rounded-lg">
-            <div className="text-lg font-bold text-blue-600">kWh</div>
-            <div className="text-xs text-blue-700">Consumo Detectado</div>
+            <div className="text-lg font-bold text-blue-600">Perfil</div>
+            <div className="text-xs text-blue-700">Contexto aplicado</div>
           </div>
           <div className="p-3 bg-purple-50 rounded-lg">
-            <div className="text-lg font-bold text-purple-600">Score</div>
-            <div className="text-xs text-purple-700">Cálculo Automático</div>
+            <div className="text-lg font-bold text-purple-600">Resumo</div>
+            <div className="text-xs text-purple-700">Leitura simples</div>
           </div>
           <div className="p-3 bg-orange-50 rounded-lg">
-            <div className="text-lg font-bold text-orange-600">Dicas</div>
-            <div className="text-xs text-orange-700">Recomendações IA</div>
+            <div className="text-lg font-bold text-orange-600">Mascote</div>
+            <div className="text-xs text-orange-700">Orienta o proximo passo</div>
           </div>
           <div className="p-3 bg-indigo-50 rounded-lg">
-            <div className="text-lg font-bold text-indigo-600">DB</div>
-            <div className="text-xs text-indigo-700">Salvo no Supabase</div>
+            <div className="text-lg font-bold text-indigo-600">Score</div>
+            <div className="text-xs text-indigo-700">Eventos explicitos</div>
           </div>
         </div>
       </CardContent>

@@ -1,153 +1,230 @@
-import React, { useState } from 'react';
+import React from 'react';
 import Header from '../components/Header';
 import ScoreCard from '../components/ScoreCard';
-import ActionCards from '../components/ActionCards';
-import Leaderboard from '../components/Leaderboard';
 import LevelProgress from '../components/LevelProgress';
 import InvoiceUpload from '../components/InvoiceUpload';
 import InvoiceHistory from '../components/InvoiceHistory';
 import SmartRecommendations from '../components/SmartRecommendations';
 import UserProfile from '../components/UserProfile';
 import MascotCustomization from '../components/MascotCustomization';
-import EnergyNews from '../components/EnergyNews';
-import GamificationDashboard from '../components/gamification/GamificationDashboard';
-
-interface InvoiceData {
-  consumption: number;
-  totalValue: number;
-  taxPercentage: number;
-  peakHours: string;
-  month: string;
-}
-
-interface UserProfileData {
-  consumerType: string;
-  location: string;
-  propertySize: number;
-  peopleCount: number;
-  energyPreference: string;
-}
-
-interface MascotCustomization {
-  name: string;
-  emoji: string;
-  colorPalette: string;
-  borderEffect: string;
-}
+import AnalysisSummary from '../components/AnalysisSummary';
+import MascotGuidanceCard from '../components/MascotGuidanceCard';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { useMvpJourney } from '@/hooks/useMvpJourney';
+import { NextAction } from '@/types/mvp';
 
 const Index = () => {
-  const [invoiceData, setInvoiceData] = useState<InvoiceData | undefined>();
-  const [currentScore, setCurrentScore] = useState(1247);
-  const [currentLevel, setCurrentLevel] = useState(7);
-  const [userProfile, setUserProfile] = useState<UserProfileData>({
-    consumerType: 'Residencial',
-    location: '',
-    propertySize: 0,
-    peopleCount: 1,
-    energyPreference: 'Convencional'
-  });
-  const [mascotCustomization, setMascotCustomization] = useState<MascotCustomization>({
-    name: 'EcoFriend',
-    emoji: '🌱',
-    colorPalette: 'emerald',
-    borderEffect: 'none'
-  });
+  const { toast } = useToast();
+  const {
+    profile,
+    mascotCustomization,
+    profileCompletion,
+    isProfileComplete,
+    latestInvoice,
+    invoiceHistory,
+    latestAnalysis,
+    nextActions,
+    viewedActionIds,
+    scoreEvents,
+    scoreState,
+    mascotGuidance,
+    updateProfile,
+    updateMascotCustomization,
+    startInvoiceProcessing,
+    completeInvoiceFlow,
+    removeInvoiceFromHistory,
+    markActionViewed,
+  } = useMvpJourney();
 
-  const handleInvoiceProcessed = (data: InvoiceData) => {
-    setInvoiceData(data);
-    // Cálculo contextual do score baseado no perfil do usuário
-    const baseScoreBonus = Math.floor((300 - data.consumption) * 2);
-    
-    // Bônus contextual baseado no tipo de consumidor
-    let contextualMultiplier = 1;
-    if (userProfile.consumerType === 'Residencial' && data.consumption < 150) {
-      contextualMultiplier = 1.2; // Bônus para residências eficientes
-    } else if (userProfile.consumerType === 'Comercial' && data.consumption < 500) {
-      contextualMultiplier = 1.15;
-    }
-    
-    const finalBonus = Math.floor(baseScoreBonus * contextualMultiplier);
-    setCurrentScore(prev => prev + Math.max(finalBonus, 50));
-    
-    // Verifica se subiu de nível
-    const newLevel = Math.floor((currentScore + finalBonus) / 200);
-    if (newLevel > currentLevel) {
-      setCurrentLevel(newLevel);
+  const completedSteps = [
+    isProfileComplete,
+    Boolean(latestInvoice),
+    Boolean(latestAnalysis),
+  ].filter(Boolean).length;
+
+  const latestScoreEvent = scoreEvents[0];
+  const latestScoreLabel = latestScoreEvent
+    ? `${latestScoreEvent.label} (+${latestScoreEvent.points})`
+    : 'O score comeca a subir quando voce conclui as primeiras etapas da jornada.';
+
+  const efficiencyLabel = latestAnalysis?.efficiencyLabel || 'Aguardando primeira leitura';
+
+  const handleInvoiceProcessed = (file: File) => {
+    completeInvoiceFlow(file);
+  };
+
+  const handleActionViewed = (action: NextAction) => {
+    const alreadyViewed = viewedActionIds.includes(action.id);
+    markActionViewed(action);
+
+    if (!alreadyViewed) {
+      toast({
+        title: 'Acao revisada',
+        description: `Voce ganhou visibilidade sobre "${action.title}" e registrou esse passo no score.`,
+      });
     }
   };
 
-  const handleProfileUpdate = (profileData: UserProfileData) => {
-    setUserProfile(profileData);
-    console.log('Perfil atualizado:', profileData);
-  };
-
-  const handleMascotCustomization = (customization: MascotCustomization) => {
-    setMascotCustomization(customization);
-    console.log('Mascote personalizado:', customization);
+  const handleInvoiceRemoved = (fingerprint: string) => {
+    removeInvoiceFromHistory(fingerprint);
+    toast({
+      title: 'Fatura removida',
+      description: 'O historico da jornada MVP foi atualizado sem depender do fluxo legado.',
+    });
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-cyan-50">
       <Header />
       <main className="container mx-auto px-4 py-8 space-y-8">
-        {/* Upload de fatura - destaque no topo */}
-        <div className="max-w-4xl mx-auto">
-          <InvoiceUpload onInvoiceProcessed={handleInvoiceProcessed} />
-        </div>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
+          <div className="xl:col-span-2 space-y-8">
+            <Card className="border-2 border-emerald-100 shadow-lg">
+              <CardHeader>
+                <CardTitle className="text-emerald-700">Contexto do Perfil</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Badge variant={isProfileComplete ? 'default' : 'secondary'}>
+                    {isProfileComplete ? 'Perfil pronto para personalizar' : 'Perfil ainda parcial'}
+                  </Badge>
+                  <Badge variant="outline">{profile.consumerType}</Badge>
+                  {profile.location && <Badge variant="outline">{profile.location}</Badge>}
+                  {profile.energyPreference && <Badge variant="outline">{profile.energyPreference}</Badge>}
+                </div>
 
-        {/* Botões de configuração */}
-        <div className="flex justify-center space-x-4">
-          <UserProfile onProfileUpdate={handleProfileUpdate} />
-          <MascotCustomization 
-            onCustomizationUpdate={handleMascotCustomization}
-            currentScore={currentScore}
-          />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm text-slate-600">
+                    <span>Completacao do perfil</span>
+                    <span>{profileCompletion}%</span>
+                  </div>
+                  <Progress value={profileCompletion} className="h-3" />
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                  <div className="rounded-lg bg-slate-50 p-3">
+                    <div className="text-slate-500">Tipo</div>
+                    <div className="font-semibold text-slate-800">{profile.consumerType}</div>
+                  </div>
+                  <div className="rounded-lg bg-slate-50 p-3">
+                    <div className="text-slate-500">Local</div>
+                    <div className="font-semibold text-slate-800">
+                      {profile.location || 'Nao informado'}
+                    </div>
+                  </div>
+                  <div className="rounded-lg bg-slate-50 p-3">
+                    <div className="text-slate-500">Imovel</div>
+                    <div className="font-semibold text-slate-800">
+                      {profile.propertySize > 0 ? `${profile.propertySize} m2` : 'Nao informado'}
+                    </div>
+                  </div>
+                  <div className="rounded-lg bg-slate-50 p-3">
+                    <div className="text-slate-500">Pessoas</div>
+                    <div className="font-semibold text-slate-800">{profile.peopleCount}</div>
+                  </div>
+                  <div className="rounded-lg bg-slate-50 p-3">
+                    <div className="text-slate-500">Energia</div>
+                    <div className="font-semibold text-slate-800">{profile.energyPreference}</div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <UserProfile
+                    value={profile}
+                    completionPercent={profileCompletion}
+                    isComplete={isProfileComplete}
+                    onProfileUpdate={updateProfile}
+                  />
+                  <MascotCustomization
+                    value={mascotCustomization}
+                    onCustomizationUpdate={updateMascotCustomization}
+                    currentScore={scoreState.score}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <InvoiceUpload
+              profile={profile}
+              onUploadStarted={startInvoiceProcessing}
+              onInvoiceProcessed={handleInvoiceProcessed}
+            />
+
+            <AnalysisSummary invoice={latestInvoice} analysis={latestAnalysis} profile={profile} />
+          </div>
+
+          <div className="space-y-8">
+            <MascotGuidanceCard
+              guidance={mascotGuidance}
+              score={scoreState.score}
+              level={scoreState.level}
+              profile={profile}
+              customization={mascotCustomization}
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-          {/* Coluna principal - Score, Level e Ações */}
           <div className="xl:col-span-3 space-y-8">
-            <ScoreCard 
-              score={currentScore} 
-              level={currentLevel}
-              consumerType={userProfile.consumerType}
+            <ScoreCard
+              score={scoreState.score}
+              level={scoreState.level}
+              consumerType={profile.consumerType}
               mascotCustomization={mascotCustomization}
+              latestScoreLabel={latestScoreLabel}
+              completedSteps={completedSteps}
+              activeActionsCount={nextActions.length}
+              efficiencyLabel={efficiencyLabel}
+              showMascot={false}
             />
-            <LevelProgress />
-            <ActionCards />
-          </div>
-          
-          {/* Sidebar - Leaderboard e Recomendações */}
-          <div className="xl:col-span-1 space-y-8">
-            <Leaderboard />
-            <SmartRecommendations 
-              invoiceData={invoiceData}
-              currentScore={currentScore}
-              userLevel={currentLevel}
-              userProfile={userProfile}
+            <LevelProgress
+              score={scoreState.score}
+              level={scoreState.level}
+              nextLevelScore={scoreState.nextLevelScore}
+              progress={scoreState.progressToNextLevel}
             />
           </div>
+
+          <div className="xl:col-span-1">
+            <SmartRecommendations
+              actions={nextActions}
+              viewedActionIds={viewedActionIds}
+              invoice={latestInvoice}
+              analysis={latestAnalysis}
+              onActionViewed={handleActionViewed}
+            />
+          </div>
         </div>
 
-        {/* Histórico de Faturas */}
-        <div className="max-w-6xl mx-auto">
-          <InvoiceHistory />
-        </div>
-
-        {/* Central de Gamificação */}
-        <div className="max-w-6xl mx-auto">
-          <GamificationDashboard />
-        </div>
-
-        {/* Seção de Notícias */}
-        <div className="max-w-6xl mx-auto">
-          <EnergyNews />
-        </div>
-
-        {/* Nova seção - Perfil do Usuário */}
-        <div className="container mx-auto px-4 py-12">
-          <h1 className="text-4xl font-bold text-gray-800">Perfil do Usuário</h1>
-          <p className="mt-4 text-gray-600">Bem-vindo à sua página de perfil!</p>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+          <div className="xl:col-span-2">
+            <InvoiceHistory invoices={invoiceHistory} onDeleteInvoice={handleInvoiceRemoved} />
+          </div>
+          <Card className="border-2 border-slate-100 shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-slate-700">Eventos do Score</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {scoreEvents.length === 0 ? (
+                <p className="text-sm text-slate-600">
+                  Nenhum evento registrado ainda. O score cresce quando voce conclui etapas reais da
+                  jornada.
+                </p>
+              ) : (
+                scoreEvents.slice(0, 6).map((event) => (
+                  <div key={event.id} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-medium text-slate-800">{event.label}</p>
+                      <span className="text-sm font-semibold text-emerald-700">+{event.points}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
         </div>
       </main>
     </div>

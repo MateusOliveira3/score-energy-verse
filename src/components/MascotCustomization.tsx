@@ -1,48 +1,52 @@
-
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Palette, Type, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-
-interface MascotCustomization {
-  name: string;
-  emoji: string;
-  colorPalette: string;
-  borderEffect: string;
-}
+import { MascotCustomizationData } from '@/types/mvp';
 
 interface MascotCustomizationProps {
-  onCustomizationUpdate: (customization: MascotCustomization) => void;
+  value: MascotCustomizationData;
+  onCustomizationUpdate: (customization: MascotCustomizationData) => void;
   currentScore: number;
 }
 
-const MascotCustomizationComponent = ({ onCustomizationUpdate, currentScore }: MascotCustomizationProps) => {
+const MascotCustomizationComponent = ({
+  value,
+  onCustomizationUpdate,
+  currentScore,
+}: MascotCustomizationProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [customization, setCustomization] = useState<MascotCustomization>({
-    name: 'EcoFriend',
-    emoji: '🌱',
-    colorPalette: 'emerald',
-    borderEffect: 'none'
-  });
+  const [customization, setCustomization] = useState<MascotCustomizationData>(value);
+  const sectionLabelClassName =
+    'mb-2 flex items-center gap-2 text-sm font-semibold text-slate-800';
+
+  useEffect(() => {
+    setCustomization(value);
+  }, [value]);
 
   const emojis = ['🌱', '🌳', '🌿', '⚡', '🌞', '💧', '🔋', '♻️'];
   const colorPalettes = [
     { name: 'emerald', colors: 'from-emerald-400 to-green-500' },
     { name: 'blue', colors: 'from-blue-400 to-cyan-500' },
     { name: 'purple', colors: 'from-purple-400 to-indigo-500' },
-    { name: 'orange', colors: 'from-orange-400 to-red-500' }
+    { name: 'orange', colors: 'from-orange-400 to-red-500' },
   ];
 
   const borderEffects = [
     { name: 'none', label: 'Simples', requiredScore: 0 },
     { name: 'glow', label: 'Brilho', requiredScore: 500 },
-    { name: 'pulse', label: 'Pulsação', requiredScore: 1000 },
-    { name: 'rainbow', label: 'Arco-íris', requiredScore: 2000 }
+    { name: 'pulse', label: 'Pulsacao', requiredScore: 1000 },
+    { name: 'rainbow', label: 'Arco-iris', requiredScore: 2000 },
   ];
 
   const handleSave = () => {
-    onCustomizationUpdate(customization);
+    onCustomizationUpdate({
+      name: customization.name,
+      emoji: customization.emoji,
+      colorPalette: customization.colorPalette,
+      borderEffect: customization.borderEffect,
+    });
     setIsOpen(false);
   };
 
@@ -54,41 +58,65 @@ const MascotCustomizationComponent = ({ onCustomizationUpdate, currentScore }: M
           Personalizar Mascote
         </Button>
       </DialogTrigger>
-      
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+
+      <DialogContent className="max-w-md border border-emerald-100 bg-white shadow-2xl">
+        <DialogHeader className="space-y-2">
           <DialogTitle className="text-emerald-700">Personalizar EcoMascot</DialogTitle>
         </DialogHeader>
-        
-        <div className="space-y-4">
-          {/* Nome do Mascote */}
+
+        <div className="space-y-5">
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+            <div className="text-xs font-medium uppercase tracking-wide text-emerald-700">
+              Selecao atual
+            </div>
+            <div className="mt-2 flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-emerald-200 bg-white text-2xl shadow-sm">
+                {customization.emoji}
+              </div>
+              <div>
+                <div className="font-semibold text-slate-800">{customization.name || 'EcoFriend'}</div>
+                <div className="text-sm text-slate-600">
+                  Paleta {customization.colorPalette} • Efeito {customization.borderEffect}
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
-              <Type className="h-4 w-4 inline mr-1" />
+            <label className={sectionLabelClassName}>
+              <Type className="h-4 w-4 text-emerald-600" />
               Nome do Mascote
             </label>
             <Input
+              className="h-11 border-slate-300 bg-white text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
               placeholder="Ex: EcoAmigo"
               value={customization.name}
-              onChange={(e) => setCustomization(prev => ({...prev, name: e.target.value}))}
+              onChange={(event) =>
+                setCustomization((currentCustomization) => ({
+                  ...currentCustomization,
+                  name: event.target.value,
+                }))
+              }
             />
           </div>
 
-          {/* Emoji */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
-              Escolha um Emoji
-            </label>
-            <div className="grid grid-cols-4 gap-2">
-              {emojis.map(emoji => (
+            <label className={sectionLabelClassName}>Escolha um Emoji</label>
+            <div className="grid grid-cols-4 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              {emojis.map((emoji) => (
                 <button
                   key={emoji}
                   className={`p-2 text-2xl rounded-lg border-2 transition-all ${
-                    customization.emoji === emoji 
-                      ? 'border-emerald-500 bg-emerald-50' 
-                      : 'border-gray-200 hover:border-emerald-300'
+                    customization.emoji === emoji
+                      ? 'border-emerald-500 bg-white shadow-sm ring-2 ring-emerald-200'
+                      : 'border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50'
                   }`}
-                  onClick={() => setCustomization(prev => ({...prev, emoji}))}
+                  onClick={() =>
+                    setCustomization((currentCustomization) => ({
+                      ...currentCustomization,
+                      emoji,
+                    }))
+                  }
                 >
                   {emoji}
                 </button>
@@ -96,55 +124,64 @@ const MascotCustomizationComponent = ({ onCustomizationUpdate, currentScore }: M
             </div>
           </div>
 
-          {/* Paleta de Cores */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
-              Paleta de Cores
-            </label>
+            <label className={sectionLabelClassName}>Paleta de Cores</label>
             <div className="grid grid-cols-2 gap-2">
-              {colorPalettes.map(palette => (
+              {colorPalettes.map((palette) => (
                 <button
                   key={palette.name}
                   className={`p-3 rounded-lg border-2 transition-all ${
-                    customization.colorPalette === palette.name 
-                      ? 'border-emerald-500' 
-                      : 'border-gray-200 hover:border-emerald-300'
+                    customization.colorPalette === palette.name
+                      ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200'
+                      : 'border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50'
                   }`}
-                  onClick={() => setCustomization(prev => ({...prev, colorPalette: palette.name}))}
+                  onClick={() =>
+                    setCustomization((currentCustomization) => ({
+                      ...currentCustomization,
+                      colorPalette: palette.name,
+                    }))
+                  }
                 >
                   <div className={`w-full h-6 rounded bg-gradient-to-r ${palette.colors}`}></div>
-                  <span className="text-xs mt-1 block capitalize">{palette.name}</span>
+                  <span className="mt-2 block text-xs font-medium capitalize text-slate-700">
+                    {palette.name}
+                  </span>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Efeitos de Borda */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
-              <Sparkles className="h-4 w-4 inline mr-1" />
+            <label className={sectionLabelClassName}>
+              <Sparkles className="h-4 w-4 text-emerald-600" />
               Efeitos Especiais
             </label>
             <div className="space-y-2">
-              {borderEffects.map(effect => {
+              {borderEffects.map((effect) => {
                 const isUnlocked = currentScore >= effect.requiredScore;
                 return (
                   <button
                     key={effect.name}
                     disabled={!isUnlocked}
                     className={`w-full p-2 text-left rounded-lg border transition-all ${
-                      customization.borderEffect === effect.name 
-                        ? 'border-emerald-500 bg-emerald-50' 
-                        : isUnlocked 
-                          ? 'border-gray-200 hover:border-emerald-300' 
-                          : 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed'
+                      customization.borderEffect === effect.name
+                        ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200'
+                        : isUnlocked
+                          ? 'border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50'
+                          : 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
                     }`}
-                    onClick={() => isUnlocked && setCustomization(prev => ({...prev, borderEffect: effect.name}))}
+                    onClick={() =>
+                      isUnlocked &&
+                      setCustomization((currentCustomization) => ({
+                        ...currentCustomization,
+                        borderEffect: effect.name,
+                      }))
+                    }
                   >
                     <div className="flex justify-between items-center">
-                      <span>{effect.label}</span>
+                      <span className="font-medium">{effect.label}</span>
                       {!isUnlocked && (
-                        <span className="text-xs bg-gray-200 px-2 py-1 rounded">
+                        <span className="text-xs bg-white border border-slate-200 px-2 py-1 rounded text-slate-600">
                           {effect.requiredScore} pts
                         </span>
                       )}
@@ -155,8 +192,8 @@ const MascotCustomizationComponent = ({ onCustomizationUpdate, currentScore }: M
             </div>
           </div>
 
-          <Button onClick={handleSave} className="w-full bg-emerald-600 hover:bg-emerald-700">
-            Salvar Personalização
+          <Button onClick={handleSave} className="h-11 w-full bg-emerald-600 hover:bg-emerald-700 shadow-sm">
+            Salvar Personalizacao
           </Button>
         </div>
       </DialogContent>

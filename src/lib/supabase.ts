@@ -1,15 +1,16 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
-}
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// In local MVP development we allow the app to boot without Supabase so the
+// guided flow can be tested safely. Runtime callers must branch on this flag.
+export const supabase: SupabaseClient | null = isSupabaseConfigured
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;
 
-// Tipos para as tabelas do Supabase
 export type UserProfile = {
   id: string;
   email: string;
@@ -54,4 +55,4 @@ export type Invoice = {
   file_name?: string;
   created_at: string;
   updated_at: string;
-}; 
+};
