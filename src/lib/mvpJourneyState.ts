@@ -9,6 +9,9 @@ import {
   InvoiceData,
   JourneyStage,
   Mascot,
+  MascotContextQuestion,
+  MascotContextQuestionId,
+  MascotContextQuestionValue,
   MvpState,
   NextCycleGuidance,
   NextAction,
@@ -20,6 +23,7 @@ import {
   ScoreExplanationEvent,
   ScoreExplanationNextGain,
   ScoreExplanationSubtotal,
+  UserContextState,
 } from '@/types/mvp';
 import {
   buildNextActions,
@@ -77,6 +81,41 @@ const SCORE_EVENT_EXPLANATION: Record<ScoreEventType, { label: string; reason: s
   },
 };
 
+const MASCOT_CONTEXT_QUESTIONS: Record<MascotContextQuestionId, MascotContextQuestion> = {
+  usage_period: {
+    id: 'usage_period',
+    invite: 'Posso te fazer uma pergunta rapida pra melhorar suas dicas?',
+    question: 'Seu consumo costuma ser maior em qual periodo?',
+    options: [
+      { value: 'morning', label: 'Manha' },
+      { value: 'afternoon', label: 'Tarde' },
+      { value: 'night', label: 'Noite' },
+      { value: 'unknown', label: 'Nao sei' },
+    ],
+  },
+  electric_shower: {
+    id: 'electric_shower',
+    invite: 'Posso entender melhor um detalhe da sua rotina?',
+    question: 'Voce usa chuveiro eletrico com frequencia?',
+    options: [
+      { value: 'daily', label: 'Todos os dias' },
+      { value: 'sometimes', label: 'As vezes' },
+      { value: 'rarely', label: 'Raramente' },
+      { value: 'none', label: 'Nao uso' },
+    ],
+  },
+  primary_goal: {
+    id: 'primary_goal',
+    invite: 'Uma pergunta rapida ajuda a deixar o proximo ciclo mais claro.',
+    question: 'Seu objetivo principal agora e?',
+    options: [
+      { value: 'reduce_cost', label: 'Reduzir custo' },
+      { value: 'understand_consumption', label: 'Entender consumo' },
+      { value: 'both', label: 'Os dois' },
+    ],
+  },
+};
+
 export interface LegacyStoredJourneyState {
   profile?: Partial<Profile>;
   mascotCustomization?: Partial<Mascot>;
@@ -114,9 +153,14 @@ export const DEFAULT_ACTIONS_STATE: NextActionsState = {
   viewedActionIds: [],
 };
 
+export const DEFAULT_USER_CONTEXT_STATE: UserContextState = {
+  questions: {},
+};
+
 export const DEFAULT_MVP_STATE: MvpState = {
   profile: DEFAULT_PROFILE,
   mascot: DEFAULT_MASCOT,
+  userContext: DEFAULT_USER_CONTEXT_STATE,
   analysis: DEFAULT_ANALYSIS_STATE,
   scoreEvents: [],
   actions: DEFAULT_ACTIONS_STATE,
@@ -150,6 +194,54 @@ export const normalizeMascot = (mascot?: Partial<Mascot>): Mascot => ({
       ? mascot.borderEffect
       : DEFAULT_MASCOT.borderEffect,
 });
+
+const getMascotQuestionOption = (
+  questionId: MascotContextQuestionId,
+  value: MascotContextQuestionValue
+) => MASCOT_CONTEXT_QUESTIONS[questionId].options.find((option) => option.value === value);
+
+export const normalizeUserContext = (
+  userContext?: Partial<UserContextState>
+): UserContextState => {
+  const rawQuestions = userContext?.questions ?? {};
+  const questions: UserContextState['questions'] = {};
+
+  (Object.keys(MASCOT_CONTEXT_QUESTIONS) as MascotContextQuestionId[]).forEach((questionId) => {
+    const answer = rawQuestions[questionId];
+
+    if (!answer || (answer.status !== 'answered' && answer.status !== 'ignored')) {
+      return;
+    }
+
+    const updatedAt = typeof answer.updatedAt === 'string' ? answer.updatedAt : undefined;
+
+    if (answer.status === 'ignored') {
+      questions[questionId] = {
+        status: 'ignored',
+        updatedAt: updatedAt ?? '1970-01-01T00:00:00.000Z',
+      };
+      return;
+    }
+
+    const option =
+      typeof answer.value === 'string'
+        ? getMascotQuestionOption(questionId, answer.value)
+        : undefined;
+
+    if (!option) {
+      return;
+    }
+
+    questions[questionId] = {
+      status: 'answered',
+      value: option.value,
+      label: option.label,
+      updatedAt: updatedAt ?? '1970-01-01T00:00:00.000Z',
+    };
+  });
+
+  return { questions };
+};
 
 const normalizeAction = (
   action: Partial<NextAction> | undefined,
@@ -347,6 +439,7 @@ const resolveScoreEventsState = (
 export const resolveFullJourneyState = (state: MvpState): MvpState => {
   const profile = normalizeProfile(state.profile);
   const mascot = normalizeMascot(state.mascot);
+  const userContext = normalizeUserContext(state.userContext);
   const analysis = normalizeAnalysisState(state.analysis);
   const actions = resolveActionsState({
     profile,
@@ -366,6 +459,7 @@ export const resolveFullJourneyState = (state: MvpState): MvpState => {
     ...state,
     profile,
     mascot,
+    userContext,
     analysis,
     scoreEvents,
     actions,
@@ -522,6 +616,7 @@ export const normalizeState = (
     ...state,
     profile: normalizeProfile(state?.profile ?? legacyState?.profile),
     mascot: normalizeMascot(state?.mascot ?? legacyState?.mascotCustomization),
+    userContext: normalizeUserContext(state?.userContext),
     analysis,
     scoreEvents: normalizeScoreEvents(
       Array.isArray(state?.scoreEvents)
@@ -955,6 +1050,100 @@ export const buildNextCycleGuidance = (comparison: InvoiceComparison): NextCycle
     suggestion: hasCurrentInvoice
       ? 'Envie mais uma fatura para comparar consumo e custo.'
       : 'Envie uma fatura para comecar a base de comparacao.',
+  };
+};
+
+const hasHandledMascotQuestion = (
+  userContext: UserContextState,
+  questionId: MascotContextQuestionId
+) => Boolean(userContext.questions[questionId]);
+
+export const buildMascotContextQuestion = (
+  state: Pick<MvpState, 'analysis' | 'actions' | 'userContext'>
+): MascotContextQuestion | undefined => {
+  const userContext = normalizeUserContext(state.userContext);
+  const comparison = buildInvoiceComparison(state.analysis.invoiceHistory);
+  const hasObservedComparison =
+    comparison.status !== 'insufficient' && Boolean(comparison.previousInvoice);
+  const hasActionInteraction =
+    state.actions.viewedActionIds.length > 0 ||
+    state.actions.items.some((action) => action.status && action.status !== 'new');
+  const isAfterFirstAnalysis =
+    Boolean(state.analysis.latestInvoice && state.analysis.summary) &&
+    state.analysis.invoiceHistory.length === 1;
+
+  if (hasObservedComparison && !hasHandledMascotQuestion(userContext, 'primary_goal')) {
+    return MASCOT_CONTEXT_QUESTIONS.primary_goal;
+  }
+
+  if (
+    !hasObservedComparison &&
+    hasActionInteraction &&
+    state.actions.items.length > 0 &&
+    !hasHandledMascotQuestion(userContext, 'electric_shower')
+  ) {
+    return MASCOT_CONTEXT_QUESTIONS.electric_shower;
+  }
+
+  if (isAfterFirstAnalysis && !hasHandledMascotQuestion(userContext, 'usage_period')) {
+    return MASCOT_CONTEXT_QUESTIONS.usage_period;
+  }
+
+  return undefined;
+};
+
+export const answerMascotContextQuestion = (
+  state: MvpState,
+  questionId: MascotContextQuestionId,
+  value: MascotContextQuestionValue,
+  updatedAt = new Date().toISOString()
+): MvpState => {
+  const option = getMascotQuestionOption(questionId, value);
+
+  if (!option) {
+    return state;
+  }
+
+  const userContext = normalizeUserContext(state.userContext);
+
+  return {
+    ...state,
+    userContext: {
+      questions: {
+        ...userContext.questions,
+        [questionId]: {
+          status: 'answered',
+          value: option.value,
+          label: option.label,
+          updatedAt,
+        },
+      },
+    },
+  };
+};
+
+export const ignoreMascotContextQuestion = (
+  state: MvpState,
+  questionId: MascotContextQuestionId,
+  updatedAt = new Date().toISOString()
+): MvpState => {
+  if (!MASCOT_CONTEXT_QUESTIONS[questionId]) {
+    return state;
+  }
+
+  const userContext = normalizeUserContext(state.userContext);
+
+  return {
+    ...state,
+    userContext: {
+      questions: {
+        ...userContext.questions,
+        [questionId]: {
+          status: 'ignored',
+          updatedAt,
+        },
+      },
+    },
   };
 };
 

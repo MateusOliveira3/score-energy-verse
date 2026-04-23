@@ -9,10 +9,13 @@ import {
 import {
   buildActionResultLink,
   buildInvoiceComparison,
+  buildMascotContextQuestion,
   buildNextCycleGuidance,
   captureActionSnapshotsForInvoice,
   DEFAULT_MVP_STATE,
   getScoreExplanation,
+  answerMascotContextQuestion,
+  ignoreMascotContextQuestion,
   resolveFullJourneyState,
   updateActionStatus,
 } from '@/lib/mvpJourneyState';
@@ -585,6 +588,168 @@ test('guidance fica coerente com o stage resolvido', () => {
 
   assert.equal(guidance.stage, resolved.journeyStage);
   assert.equal(guidance.stage, 'analysis-ready');
+});
+
+test('mascote pergunta sobre periodo de consumo apos primeira analise', () => {
+  const resolved = resolveFullJourneyState(
+    makeState({
+      profile: completeProfile,
+      analysis: {
+        status: 'ready',
+        latestInvoice: invoice,
+        invoiceHistory: [invoice],
+        summary: analysis,
+      },
+    })
+  );
+  const question = buildMascotContextQuestion(resolved);
+
+  assert.equal(question?.id, 'usage_period');
+  assert.equal(question?.question, 'Seu consumo costuma ser maior em qual periodo?');
+});
+
+test('resposta do mascote e salva e a pergunta respondida nao reaparece', () => {
+  const resolved = resolveFullJourneyState(
+    makeState({
+      profile: completeProfile,
+      analysis: {
+        status: 'ready',
+        latestInvoice: invoice,
+        invoiceHistory: [invoice],
+        summary: analysis,
+      },
+    })
+  );
+  const answered = answerMascotContextQuestion(
+    resolved,
+    'usage_period',
+    'night',
+    '2026-04-23T12:00:00.000Z'
+  );
+
+  assert.equal(answered.userContext.questions.usage_period?.status, 'answered');
+  assert.equal(answered.userContext.questions.usage_period?.value, 'night');
+  assert.equal(buildMascotContextQuestion(answered), undefined);
+});
+
+test('mascote pergunta sobre chuveiro apos acoes aparecerem e serem iniciadas', () => {
+  const baseActions = buildNextActions(invoice, analysis, completeProfile);
+  const resolved = resolveFullJourneyState(
+    makeState({
+      profile: completeProfile,
+      userContext: {
+        questions: {
+          usage_period: {
+            status: 'answered',
+            value: 'night',
+            label: 'Noite',
+            updatedAt: '2026-04-23T12:00:00.000Z',
+          },
+        },
+      },
+      analysis: {
+        status: 'ready',
+        latestInvoice: invoice,
+        invoiceHistory: [invoice],
+        summary: analysis,
+      },
+      actions: {
+        items: baseActions.map((action, index) =>
+          index === 0 ? { ...action, status: 'in_progress' } : action
+        ),
+        viewedActionIds: [baseActions[0].id],
+      },
+    })
+  );
+  const question = buildMascotContextQuestion(resolved);
+
+  assert.equal(question?.id, 'electric_shower');
+  assert.equal(question?.question, 'Voce usa chuveiro eletrico com frequencia?');
+});
+
+test('pergunta ignorada pelo mascote nao reaparece', () => {
+  const baseActions = buildNextActions(invoice, analysis, completeProfile);
+  const resolved = resolveFullJourneyState(
+    makeState({
+      profile: completeProfile,
+      userContext: {
+        questions: {
+          usage_period: {
+            status: 'answered',
+            value: 'night',
+            label: 'Noite',
+            updatedAt: '2026-04-23T12:00:00.000Z',
+          },
+        },
+      },
+      analysis: {
+        status: 'ready',
+        latestInvoice: invoice,
+        invoiceHistory: [invoice],
+        summary: analysis,
+      },
+      actions: {
+        items: baseActions.map((action, index) =>
+          index === 0 ? { ...action, status: 'in_progress' } : action
+        ),
+        viewedActionIds: [baseActions[0].id],
+      },
+    })
+  );
+  const ignored = ignoreMascotContextQuestion(
+    resolved,
+    'electric_shower',
+    '2026-04-23T12:05:00.000Z'
+  );
+
+  assert.equal(ignored.userContext.questions.electric_shower?.status, 'ignored');
+  assert.equal(buildMascotContextQuestion(ignored), undefined);
+});
+
+test('mascote pergunta objetivo principal apos comparacao de fatura', () => {
+  const currentInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-05',
+    month: 'maio de 2026',
+    consumption: 320,
+    totalValue: 400,
+  });
+  const resolved = resolveFullJourneyState(
+    makeState({
+      profile: completeProfile,
+      userContext: {
+        questions: {
+          usage_period: {
+            status: 'answered',
+            value: 'night',
+            label: 'Noite',
+            updatedAt: '2026-04-23T12:00:00.000Z',
+          },
+          electric_shower: {
+            status: 'ignored',
+            updatedAt: '2026-04-23T12:05:00.000Z',
+          },
+        },
+      },
+      analysis: {
+        status: 'ready',
+        latestInvoice: currentInvoice,
+        invoiceHistory: [currentInvoice, invoice],
+        summary: analysis,
+      },
+    })
+  );
+  const question = buildMascotContextQuestion(resolved);
+  const answered = answerMascotContextQuestion(
+    resolved,
+    'primary_goal',
+    'both',
+    '2026-04-23T12:10:00.000Z'
+  );
+
+  assert.equal(question?.id, 'primary_goal');
+  assert.equal(question?.question, 'Seu objetivo principal agora e?');
+  assert.equal(answered.userContext.questions.primary_goal?.value, 'both');
+  assert.equal(buildMascotContextQuestion(answered), undefined);
 });
 
 test('resolveFullJourneyState e idempotente', () => {

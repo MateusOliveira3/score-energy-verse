@@ -11,11 +11,14 @@ import {
 } from '@/lib/mvpCoreFlow';
 import {
   addScoreEvent,
+  answerMascotContextQuestion as applyMascotContextAnswer,
+  buildMascotContextQuestion,
   buildInvoiceHistory,
   captureActionSnapshotsForInvoice,
   DEFAULT_MVP_STATE,
   getLatestInvoiceHistoryEntry,
   getScoreExplanation,
+  ignoreMascotContextQuestion as applyMascotContextIgnore,
   pruneInvoiceHistory,
   resolveFullJourneyState,
   setAnalysis,
@@ -31,6 +34,8 @@ import { getMvpJourneyService } from '@/services/mvpJourney';
 import {
   AnalysisSummary,
   MascotGuidance,
+  MascotContextQuestionId,
+  MascotContextQuestionValue,
   MvpState,
   NextAction,
   NextActionStatus,
@@ -284,9 +289,31 @@ export const useMvpJourney = () => {
     });
   };
 
+  const answerMascotContextQuestion = (
+    questionId: MascotContextQuestionId,
+    value: MascotContextQuestionValue
+  ) => {
+    handleStateUpdate((currentState) =>
+      applyMascotContextAnswer(currentState, questionId, value)
+    );
+  };
+
+  const ignoreMascotContextQuestion = (questionId: MascotContextQuestionId) => {
+    handleStateUpdate((currentState) => applyMascotContextIgnore(currentState, questionId));
+  };
+
   const profileCompletion = useMemo(() => getProfileCompletion(state.profile), [state.profile]);
   const scoreState = useMemo(() => getScoreState(state.scoreEvents), [state.scoreEvents]);
   const scoreExplanation = useMemo(() => getScoreExplanation(state), [state]);
+  const mascotContextQuestion = useMemo(
+    () =>
+      buildMascotContextQuestion({
+        analysis: state.analysis,
+        actions: state.actions,
+        userContext: state.userContext,
+      }),
+    [state.actions, state.analysis, state.userContext]
+  );
   const mascotGuidance: MascotGuidance = useMemo(
     () =>
       buildMascotGuidance({
@@ -313,6 +340,7 @@ export const useMvpJourney = () => {
     scoreExplanation,
     journeyStage: state.journeyStage,
     mascotGuidance,
+    mascotContextQuestion,
     updateProfile,
     updateMascotCustomization,
     startInvoiceProcessing,
@@ -320,5 +348,7 @@ export const useMvpJourney = () => {
     removeInvoiceFromHistory,
     markActionViewed,
     updateActionStatus,
+    answerMascotContextQuestion,
+    ignoreMascotContextQuestion,
   };
 };

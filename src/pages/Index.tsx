@@ -32,12 +32,15 @@ const Index = () => {
     scoreState,
     scoreExplanation,
     mascotGuidance,
+    mascotContextQuestion,
     updateProfile,
     updateMascotCustomization,
     startInvoiceProcessing,
     completeInvoiceFlow,
     removeInvoiceFromHistory,
     updateActionStatus,
+    answerMascotContextQuestion,
+    ignoreMascotContextQuestion,
   } = useMvpJourney();
 
   const completedSteps = [
@@ -80,79 +83,93 @@ const Index = () => {
       <Header />
       <main className="container mx-auto px-4 py-8 space-y-8">
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
-          <div className="xl:col-span-2 space-y-8">
+          <div className="xl:col-span-2">
             <Card className="border-2 border-emerald-100 shadow-lg">
               <CardHeader>
-                <CardTitle className="text-emerald-700">Contexto do Perfil</CardTitle>
+                <CardTitle className="text-emerald-700">Perfil e Score Energy</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-5">
-                <div className="flex flex-wrap items-center gap-3">
-                  <Badge variant={isProfileComplete ? 'default' : 'secondary'}>
-                    {isProfileComplete ? 'Perfil pronto para personalizar' : 'Perfil ainda parcial'}
-                  </Badge>
-                  <Badge variant="outline">{profile.consumerType}</Badge>
-                  {profile.location && <Badge variant="outline">{profile.location}</Badge>}
-                  {profile.energyPreference && <Badge variant="outline">{profile.energyPreference}</Badge>}
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm text-slate-600">
-                    <span>Completação do perfil</span>
-                    <span>{profileCompletion}%</span>
+              <CardContent className="grid grid-cols-1 gap-6 xl:grid-cols-5">
+                <div className="space-y-5 xl:col-span-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Badge variant={isProfileComplete ? 'default' : 'secondary'}>
+                      {isProfileComplete ? 'Perfil pronto para personalizar' : 'Perfil ainda parcial'}
+                    </Badge>
+                    <Badge variant="outline">{profile.consumerType}</Badge>
+                    {profile.location && <Badge variant="outline">{profile.location}</Badge>}
+                    {profile.energyPreference && <Badge variant="outline">{profile.energyPreference}</Badge>}
                   </div>
-                  <Progress value={profileCompletion} className="h-3" />
-                </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-                  <div className="rounded-lg bg-slate-50 p-3">
-                    <div className="text-slate-500">Tipo</div>
-                    <div className="font-semibold text-slate-800">{profile.consumerType}</div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm text-slate-600">
+                      <span>Completação do perfil</span>
+                      <span>{profileCompletion}%</span>
+                    </div>
+                    <Progress value={profileCompletion} className="h-3" />
                   </div>
-                  <div className="rounded-lg bg-slate-50 p-3">
-                    <div className="text-slate-500">Local</div>
-                    <div className="font-semibold text-slate-800">
-                      {profile.location || 'Não informado'}
+
+                  <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-3">
+                    <div className="rounded-lg bg-slate-50 p-3">
+                      <div className="text-slate-500">Tipo</div>
+                      <div className="font-semibold text-slate-800">{profile.consumerType}</div>
+                    </div>
+                    <div className="rounded-lg bg-slate-50 p-3">
+                      <div className="text-slate-500">Local</div>
+                      <div className="font-semibold text-slate-800">
+                        {profile.location || 'Não informado'}
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-slate-50 p-3">
+                      <div className="text-slate-500">Imóvel</div>
+                      <div className="font-semibold text-slate-800">
+                        {profile.propertySize > 0 ? `${profile.propertySize} m2` : 'Não informado'}
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-slate-50 p-3">
+                      <div className="text-slate-500">Pessoas</div>
+                      <div className="font-semibold text-slate-800">{profile.peopleCount}</div>
+                    </div>
+                    <div className="rounded-lg bg-slate-50 p-3">
+                      <div className="text-slate-500">Energia</div>
+                      <div className="font-semibold text-slate-800">{profile.energyPreference}</div>
                     </div>
                   </div>
-                  <div className="rounded-lg bg-slate-50 p-3">
-                    <div className="text-slate-500">Imóvel</div>
-                    <div className="font-semibold text-slate-800">
-                      {profile.propertySize > 0 ? `${profile.propertySize} m2` : 'Não informado'}
-                    </div>
-                  </div>
-                  <div className="rounded-lg bg-slate-50 p-3">
-                    <div className="text-slate-500">Pessoas</div>
-                    <div className="font-semibold text-slate-800">{profile.peopleCount}</div>
-                  </div>
-                  <div className="rounded-lg bg-slate-50 p-3">
-                    <div className="text-slate-500">Energia</div>
-                    <div className="font-semibold text-slate-800">{profile.energyPreference}</div>
+
+                  <div className="flex flex-wrap gap-3">
+                    <UserProfile
+                      value={profile}
+                      completionPercent={profileCompletion}
+                      isComplete={isProfileComplete}
+                      onProfileUpdate={updateProfile}
+                    />
+                    <MascotCustomization
+                      value={mascotCustomization}
+                      onCustomizationUpdate={updateMascotCustomization}
+                      currentScore={scoreState.score}
+                    />
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-3">
-                  <UserProfile
-                    value={profile}
-                    completionPercent={profileCompletion}
-                    isComplete={isProfileComplete}
-                    onProfileUpdate={updateProfile}
+                <div className="space-y-4 xl:col-span-2">
+                  <ScoreCard
+                    score={scoreState.score}
+                    level={scoreState.level}
+                    consumerType={profile.consumerType}
+                    mascotCustomization={mascotCustomization}
+                    latestScoreLabel={scoreExplanation.summary}
+                    completedSteps={completedSteps}
+                    activeActionsCount={nextActions.length}
+                    efficiencyLabel={efficiencyLabel}
+                    showMascot={false}
                   />
-                  <MascotCustomization
-                    value={mascotCustomization}
-                    onCustomizationUpdate={updateMascotCustomization}
-                    currentScore={scoreState.score}
+                  <LevelProgress
+                    score={scoreState.score}
+                    level={scoreState.level}
+                    nextLevelScore={scoreState.nextLevelScore}
+                    progress={scoreState.progressToNextLevel}
                   />
                 </div>
               </CardContent>
             </Card>
-
-            <InvoiceUpload
-              profile={profile}
-              onUploadStarted={startInvoiceProcessing}
-              onInvoiceProcessed={handleInvoiceProcessed}
-            />
-
-            <AnalysisSummary invoice={latestInvoice} analysis={latestAnalysis} profile={profile} />
           </div>
 
           <div className="space-y-8">
@@ -162,41 +179,28 @@ const Index = () => {
               level={scoreState.level}
               profile={profile}
               customization={mascotCustomization}
+              contextQuestion={mascotContextQuestion}
+              onContextQuestionAnswer={answerMascotContextQuestion}
+              onContextQuestionIgnore={ignoreMascotContextQuestion}
             />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-          <div className="xl:col-span-3 space-y-8">
-            <ScoreCard
-              score={scoreState.score}
-              level={scoreState.level}
-              consumerType={profile.consumerType}
-              mascotCustomization={mascotCustomization}
-              latestScoreLabel={scoreExplanation.summary}
-              completedSteps={completedSteps}
-              activeActionsCount={nextActions.length}
-              efficiencyLabel={efficiencyLabel}
-              showMascot={false}
-            />
-            <LevelProgress
-              score={scoreState.score}
-              level={scoreState.level}
-              nextLevelScore={scoreState.nextLevelScore}
-              progress={scoreState.progressToNextLevel}
-            />
-          </div>
+        <SmartRecommendations
+          actions={nextActions}
+          viewedActionIds={viewedActionIds}
+          invoice={latestInvoice}
+          analysis={latestAnalysis}
+          onActionStatusChange={handleActionStatusChange}
+        />
 
-          <div className="xl:col-span-1">
-            <SmartRecommendations
-              actions={nextActions}
-              viewedActionIds={viewedActionIds}
-              invoice={latestInvoice}
-              analysis={latestAnalysis}
-              onActionStatusChange={handleActionStatusChange}
-            />
-          </div>
-        </div>
+        <InvoiceUpload
+          profile={profile}
+          onUploadStarted={startInvoiceProcessing}
+          onInvoiceProcessed={handleInvoiceProcessed}
+        />
+
+        <AnalysisSummary invoice={latestInvoice} analysis={latestAnalysis} profile={profile} />
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
           <div className="xl:col-span-2">

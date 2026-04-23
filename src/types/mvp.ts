@@ -129,6 +129,47 @@ export interface MascotGuidance {
   stage: JourneyStage;
 }
 
+export type MascotContextQuestionId =
+  | 'usage_period'
+  | 'electric_shower'
+  | 'primary_goal';
+
+export type MascotContextQuestionValue =
+  | 'morning'
+  | 'afternoon'
+  | 'night'
+  | 'unknown'
+  | 'daily'
+  | 'sometimes'
+  | 'rarely'
+  | 'none'
+  | 'reduce_cost'
+  | 'understand_consumption'
+  | 'both';
+
+export interface MascotContextQuestionOption {
+  value: MascotContextQuestionValue;
+  label: string;
+}
+
+export interface MascotContextQuestion {
+  id: MascotContextQuestionId;
+  invite: string;
+  question: string;
+  options: MascotContextQuestionOption[];
+}
+
+export interface MascotContextAnswer {
+  status: 'answered' | 'ignored';
+  value?: MascotContextQuestionValue;
+  label?: string;
+  updatedAt: string;
+}
+
+export interface UserContextState {
+  questions: Partial<Record<MascotContextQuestionId, MascotContextAnswer>>;
+}
+
 export type ScoreEventType =
   | 'profile_completed'
   | 'invoice_uploaded'
@@ -207,6 +248,7 @@ export interface NextActionsState {
 export interface MvpState {
   profile: Profile;
   mascot: Mascot;
+  userContext: UserContextState;
   analysis: AnalysisState;
   scoreEvents: ScoreEvent[];
   actions: NextActionsState;

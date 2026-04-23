@@ -1,21 +1,33 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { MessageCircleHeart, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import EcoMascot from './EcoMascot';
-import { MascotGuidance, UserProfileData } from '@/types/mvp';
+import {
+  MascotContextQuestion,
+  MascotContextQuestionValue,
+  MascotGuidance,
+  UserProfileData,
+} from '@/types/mvp';
 
 interface MascotGuidanceCardProps {
   guidance: MascotGuidance;
   score: number;
   level: number;
   profile: UserProfileData;
+  contextQuestion?: MascotContextQuestion;
   customization?: {
     name: string;
     emoji: string;
     colorPalette: string;
     borderEffect: string;
   };
+  onContextQuestionAnswer?: (
+    questionId: MascotContextQuestion['id'],
+    value: MascotContextQuestionValue
+  ) => void;
+  onContextQuestionIgnore?: (questionId: MascotContextQuestion['id']) => void;
 }
 
 const stageLabels = {
@@ -31,8 +43,17 @@ const MascotGuidanceCard = ({
   score,
   level,
   profile,
+  contextQuestion,
   customization,
+  onContextQuestionAnswer,
+  onContextQuestionIgnore,
 }: MascotGuidanceCardProps) => {
+  const [isAnswering, setIsAnswering] = useState(false);
+
+  useEffect(() => {
+    setIsAnswering(false);
+  }, [contextQuestion?.id]);
+
   return (
     <Card className="border-2 border-emerald-100 shadow-lg">
       <CardHeader>
@@ -64,6 +85,50 @@ const MascotGuidanceCard = ({
                 O mascote resume o momento da jornada e reforça o próximo passo mais útil agora.
               </span>
             </div>
+
+            {contextQuestion && (
+              <div className="rounded-xl border border-emerald-100 bg-white p-3 shadow-sm">
+                {!isAnswering ? (
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium text-slate-700">
+                      {contextQuestion.invite}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" onClick={() => setIsAnswering(true)}>
+                        Responder
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onContextQuestionIgnore?.(contextQuestion.id)}
+                      >
+                        Ignorar
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold text-slate-800">
+                      {contextQuestion.question}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {contextQuestion.options.map((option) => (
+                        <Button
+                          key={option.value}
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            onContextQuestionAnswer?.(contextQuestion.id, option.value)
+                          }
+                        >
+                          {option.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </CardContent>
