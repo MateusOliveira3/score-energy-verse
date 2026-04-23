@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trophy, Medal, Award } from 'lucide-react';
+import { Trophy, Medal, Award, ShieldCheck, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -27,10 +27,16 @@ const Leaderboard = ({ entries }: LeaderboardProps) => {
   return (
     <Card className="h-fit border-2 border-emerald-100 shadow-lg">
       <CardHeader className="pb-4">
-        <CardTitle className="flex items-center space-x-2 text-emerald-700">
-          <Trophy className="h-5 w-5" />
-          <span>Jornadas pontuadas</span>
-        </CardTitle>
+        <div className="space-y-2">
+          <CardTitle className="flex items-center space-x-2 text-emerald-700">
+            <Trophy className="h-5 w-5" />
+            <span>Jornadas pontuadas</span>
+          </CardTitle>
+          <p className="text-sm text-slate-600">
+            Lista ordenada por score de eventos validos, com nivel e contexto do perfil para dar
+            sentido a cada posicao.
+          </p>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
@@ -72,6 +78,9 @@ const Leaderboard = ({ entries }: LeaderboardProps) => {
                     {entry.score.toLocaleString('pt-BR')} pontos
                   </span>
                   <Badge variant="secondary">Nivel {entry.level}</Badge>
+                  <Badge variant="outline" className="bg-white">
+                    Score explicavel
+                  </Badge>
                   {entry.badgeLabel && <Badge variant="outline">{entry.badgeLabel}</Badge>}
                 </div>
               </div>
@@ -80,10 +89,24 @@ const Leaderboard = ({ entries }: LeaderboardProps) => {
         </div>
 
         <div className="mt-6 rounded-lg bg-gradient-to-r from-blue-50 to-emerald-50 p-4">
-          <div className="text-center text-sm text-gray-600">
-            <span className="font-medium">Base do ranking:</span>
-            <div className="mt-1 text-lg font-bold text-emerald-600">
-              Score real salvo na jornada MVP
+          <div className="grid gap-3 text-sm text-slate-700 md:grid-cols-2">
+            <div className="flex items-start gap-2">
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
+              <div>
+                <span className="font-medium">Base do ranking</span>
+                <p className="mt-1 text-xs leading-5">
+                  Score salvo na jornada e derivado de eventos validos.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
+              <div>
+                <span className="font-medium">Leitura de progresso</span>
+                <p className="mt-1 text-xs leading-5">
+                  Nivel e contexto ajudam a entender evolucao, nao apenas posicao.
+                </p>
+              </div>
             </div>
           </div>
         </div>
