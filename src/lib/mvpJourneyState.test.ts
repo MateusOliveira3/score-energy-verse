@@ -7,7 +7,10 @@ import {
   getScoreState,
 } from '@/lib/mvpCoreFlow';
 import {
+  buildActionResultLink,
   buildInvoiceComparison,
+  buildNextCycleGuidance,
+  captureActionSnapshotsForInvoice,
   DEFAULT_MVP_STATE,
   getScoreExplanation,
   resolveFullJourneyState,
@@ -258,6 +261,23 @@ test('updateActionStatus inicia e conclui acao sem criar estrutura paralela', ()
   assert.ok(completed.actions.viewedActionIds.includes(targetActionId));
 });
 
+test('captura somente acoes em teste ou testadas para a proxima fatura', () => {
+  const baseActions = buildNextActions(invoice, analysis, completeProfile);
+  const snapshots = captureActionSnapshotsForInvoice({
+    items: baseActions.map((action, index) => ({
+      ...action,
+      status: index === 0 ? 'completed' : index === 1 ? 'in_progress' : 'viewed',
+    })),
+    viewedActionIds: baseActions.map((action) => action.id),
+  });
+
+  assert.equal(snapshots.length, 2);
+  assert.deepEqual(
+    snapshots.map((snapshot) => snapshot.status),
+    ['completed', 'in_progress']
+  );
+});
+
 test('comparacao de faturas sem historico suficiente fica honesta', () => {
   const comparison = buildInvoiceComparison([invoice]);
 
@@ -265,6 +285,14 @@ test('comparacao de faturas sem historico suficiente fica honesta', () => {
   assert.equal(comparison.previousInvoice, undefined);
   assert.equal(comparison.consumption, undefined);
   assert.ok(comparison.summary.includes('pelo menos duas faturas'));
+});
+
+test('guidance de proximo ciclo para historico insuficiente pede mais uma fatura', () => {
+  const comparison = buildInvoiceComparison([invoice]);
+  const guidance = buildNextCycleGuidance(comparison);
+
+  assert.equal(guidance.title, 'Criar base de comparacao');
+  assert.ok(guidance.suggestion.includes('mais uma fatura'));
 });
 
 test('comparacao identifica melhora observada entre duas faturas', () => {
@@ -281,6 +309,85 @@ test('comparacao identifica melhora observada entre duas faturas', () => {
   assert.equal(comparison.totalValue?.change, -40);
   assert.equal(comparison.consumption?.trend, 'down');
   assert.equal(comparison.totalValue?.trend, 'down');
+});
+
+test('guidance de proximo ciclo para melhora sugere manter e confirmar', () => {
+  const currentInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-05',
+    month: 'maio de 2026',
+    consumption: 310,
+    totalValue: 390,
+  });
+  const comparison = buildInvoiceComparison([currentInvoice, invoice]);
+  const guidance = buildNextCycleGuidance(comparison);
+
+  assert.equal(comparison.status, 'improved');
+  assert.equal(guidance.title, 'Manter e confirmar');
+  assert.ok(guidance.suggestion.includes('confirme'));
+});
+
+test('ligacao acao-resultado mostra acoes registradas antes da fatura comparada', () => {
+  const currentInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-05',
+    month: 'maio de 2026',
+    consumption: 310,
+    totalValue: 390,
+    actionSnapshots: [
+      {
+        id: 'choose-one-cost-cut',
+        title: 'Testar um corte de custo por 7 dias',
+        status: 'completed',
+        value: 'Criar um teste comparavel',
+      },
+    ],
+  });
+  const comparison = buildInvoiceComparison([currentInvoice, invoice]);
+  const link = buildActionResultLink(comparison);
+
+  assert.equal(link.hasObservedComparison, true);
+  assert.equal(link.actions.length, 1);
+  assert.equal(link.actions[0].status, 'completed');
+  assert.ok(link.message.includes('Antes desta fatura'));
+  assert.ok(link.note.includes('nao prova'));
+});
+
+test('ligacao acao-resultado fica honesta quando nao ha acao testada', () => {
+  const currentInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-05',
+    month: 'maio de 2026',
+    consumption: 310,
+    totalValue: 390,
+  });
+  const comparison = buildInvoiceComparison([currentInvoice, invoice]);
+  const link = buildActionResultLink(comparison);
+
+  assert.equal(link.hasObservedComparison, true);
+  assert.equal(link.actions.length, 0);
+  assert.equal(link.title, 'Sem acao testada registrada');
+  assert.ok(link.message.includes('nao havia acao marcada'));
+});
+
+test('ligacao acao-resultado e conservadora para acao apenas em execucao', () => {
+  const currentInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-05',
+    month: 'maio de 2026',
+    consumption: 310,
+    totalValue: 390,
+    actionSnapshots: [
+      {
+        id: 'choose-one-cost-cut',
+        title: 'Testar um corte de custo por 7 dias',
+        status: 'in_progress',
+      },
+    ],
+  });
+  const comparison = buildInvoiceComparison([currentInvoice, invoice]);
+  const link = buildActionResultLink(comparison);
+
+  assert.equal(link.hasObservedComparison, true);
+  assert.equal(link.actions[0].status, 'in_progress');
+  assert.ok(link.message.includes('em execucao'));
+  assert.ok(!link.note.includes('reduziu'));
 });
 
 test('comparacao usa competencia da fatura antes da ordem de envio', () => {
@@ -348,6 +455,21 @@ test('comparacao identifica piora observada entre duas faturas', () => {
   assert.equal(comparison.totalValue?.trend, 'up');
 });
 
+test('guidance de proximo ciclo para piora sugere acao mais focada', () => {
+  const currentInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-05',
+    month: 'maio de 2026',
+    consumption: 390,
+    totalValue: 470,
+  });
+  const comparison = buildInvoiceComparison([currentInvoice, invoice]);
+  const guidance = buildNextCycleGuidance(comparison);
+
+  assert.equal(comparison.status, 'worsened');
+  assert.equal(guidance.title, 'Ajustar o proximo teste');
+  assert.ok(guidance.suggestion.includes('mais focada'));
+});
+
 test('comparacao identifica estabilidade quando variacao e pequena', () => {
   const currentInvoice = makeInvoice({
     fingerprint: 'invoice-2026-05',
@@ -362,6 +484,21 @@ test('comparacao identifica estabilidade quando variacao e pequena', () => {
   assert.equal(comparison.totalValue?.trend, 'stable');
 });
 
+test('guidance de proximo ciclo para estabilidade sugere observar mais um ciclo', () => {
+  const currentInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-05',
+    month: 'maio de 2026',
+    consumption: 364,
+    totalValue: 434,
+  });
+  const comparison = buildInvoiceComparison([currentInvoice, invoice]);
+  const guidance = buildNextCycleGuidance(comparison);
+
+  assert.equal(comparison.status, 'stable');
+  assert.equal(guidance.title, 'Observar mais um ciclo');
+  assert.ok(guidance.suggestion.includes('antes de mudar'));
+});
+
 test('comparacao nao força conclusao quando consumo e custo divergem', () => {
   const currentInvoice = makeInvoice({
     fingerprint: 'invoice-2026-05',
@@ -374,6 +511,21 @@ test('comparacao nao força conclusao quando consumo e custo divergem', () => {
   assert.equal(comparison.status, 'mixed');
   assert.equal(comparison.consumption?.trend, 'down');
   assert.equal(comparison.totalValue?.trend, 'up');
+});
+
+test('guidance de proximo ciclo para leitura mista foca no eixo de atencao', () => {
+  const currentInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-05',
+    month: 'maio de 2026',
+    consumption: 320,
+    totalValue: 470,
+  });
+  const comparison = buildInvoiceComparison([currentInvoice, invoice]);
+  const guidance = buildNextCycleGuidance(comparison);
+
+  assert.equal(comparison.status, 'mixed');
+  assert.equal(guidance.title, 'Focar em um eixo');
+  assert.ok(guidance.suggestion.includes('custo'));
 });
 
 test('retorno apos inatividade com contexto retornavel resolve para return-visit', () => {

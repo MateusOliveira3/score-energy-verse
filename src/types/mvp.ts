@@ -23,6 +23,15 @@ export interface Mascot {
   borderEffect: string;
 }
 
+export type InvoiceActionSnapshotStatus = 'in_progress' | 'completed';
+
+export interface InvoiceActionSnapshot {
+  id: string;
+  title: string;
+  status: InvoiceActionSnapshotStatus;
+  value?: string;
+}
+
 export interface InvoiceData {
   fingerprint: string;
   fileName: string;
@@ -34,6 +43,7 @@ export interface InvoiceData {
   peakHours: string;
   month: string;
   uploadedAt?: string;
+  actionSnapshots?: InvoiceActionSnapshot[];
 }
 
 export type InvoiceComparisonStatus =
@@ -63,6 +73,20 @@ export interface InvoiceComparison {
   previousInvoice?: InvoiceData;
   consumption?: InvoiceMetricComparison;
   totalValue?: InvoiceMetricComparison;
+}
+
+export interface NextCycleGuidance {
+  title: string;
+  message: string;
+  suggestion: string;
+}
+
+export interface ActionResultLink {
+  title: string;
+  message: string;
+  actions: InvoiceActionSnapshot[];
+  note: string;
+  hasObservedComparison: boolean;
 }
 
 export interface Analysis {

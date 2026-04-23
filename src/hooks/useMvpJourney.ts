@@ -12,6 +12,7 @@ import {
 import {
   addScoreEvent,
   buildInvoiceHistory,
+  captureActionSnapshotsForInvoice,
   DEFAULT_MVP_STATE,
   getLatestInvoiceHistoryEntry,
   getScoreExplanation,
@@ -128,9 +129,11 @@ export const useMvpJourney = () => {
   const completeInvoiceFlow = (file: File) => {
     handleStateUpdate((currentState) => {
       const completedAt = new Date().toISOString();
+      const actionSnapshots = captureActionSnapshotsForInvoice(currentState.actions);
       const invoice = {
         ...interpretInvoiceFile(file, currentState.profile),
         uploadedAt: completedAt,
+        actionSnapshots: actionSnapshots.length > 0 ? actionSnapshots : undefined,
       };
       const analysis = buildAnalysisSummary(invoice, currentState.profile);
       const nextActions = buildNextActions(invoice, analysis, currentState.profile);

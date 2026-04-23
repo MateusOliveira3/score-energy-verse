@@ -3,8 +3,11 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   Calendar,
+  CheckCircle2,
+  Clock3,
   DollarSign,
   FileText,
+  Lightbulb,
   Minus,
   Trash2,
   TrendingDown,
@@ -14,8 +17,17 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { buildInvoiceComparison } from '@/lib/mvpJourneyState';
-import { InvoiceComparison, InvoiceComparisonTrend, InvoiceData } from '@/types/mvp';
+import {
+  buildActionResultLink,
+  buildInvoiceComparison,
+  buildNextCycleGuidance,
+} from '@/lib/mvpJourneyState';
+import {
+  InvoiceActionSnapshot,
+  InvoiceComparison,
+  InvoiceComparisonTrend,
+  InvoiceData,
+} from '@/types/mvp';
 
 interface InvoiceHistoryProps {
   invoices: InvoiceData[];
@@ -93,6 +105,16 @@ const trendIcon = {
   stable: <Minus className="h-4 w-4" />,
 } as const;
 
+const actionSnapshotLabel: Record<InvoiceActionSnapshot['status'], string> = {
+  in_progress: 'Em teste',
+  completed: 'Testada',
+};
+
+const actionSnapshotIcon = {
+  in_progress: <Clock3 className="h-4 w-4" />,
+  completed: <CheckCircle2 className="h-4 w-4" />,
+} as const;
+
 const formatMetricChange = (change: number, unit: string) => {
   if (change === 0) {
     return `0 ${unit}`;
@@ -132,6 +154,8 @@ const ComparisonMetric = ({
 const InvoiceHistory = ({ invoices, onDeleteInvoice }: InvoiceHistoryProps) => {
   const stats = getInvoiceStats(invoices);
   const comparison = buildInvoiceComparison(invoices);
+  const actionResultLink = buildActionResultLink(comparison);
+  const guidance = buildNextCycleGuidance(comparison);
 
   return (
     <div className="space-y-6">
@@ -194,6 +218,61 @@ const InvoiceHistory = ({ invoices, onDeleteInvoice }: InvoiceHistoryProps) => {
                 <ComparisonMetric label="Custo" unit="R$" metric={comparison.totalValue} />
               </div>
             )}
+          </div>
+
+          {actionResultLink.hasObservedComparison && (
+            <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                Acoes antes desta fatura
+              </div>
+              <h3 className="mt-1 text-base font-bold text-slate-900">
+                {actionResultLink.title}
+              </h3>
+              <p className="mt-1 text-sm text-slate-600">{actionResultLink.message}</p>
+
+              {actionResultLink.actions.length > 0 && (
+                <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                  {actionResultLink.actions.map((action) => (
+                    <div key={action.id} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-semibold text-slate-800">{action.title}</span>
+                        <Badge variant="outline" className="shrink-0 bg-white">
+                          <span className="mr-1">{actionSnapshotIcon[action.status]}</span>
+                          {actionSnapshotLabel[action.status]}
+                        </Badge>
+                      </div>
+                      {action.value && (
+                        <p className="mt-2 text-xs font-medium text-slate-500">
+                          Objetivo: {action.value}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                {actionResultLink.note}
+              </p>
+            </div>
+          )}
+
+          <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="rounded-lg bg-emerald-50 p-2 text-emerald-700">
+                <Lightbulb className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                  Proximo passo sugerido
+                </div>
+                <h3 className="mt-1 text-lg font-bold text-slate-900">{guidance.title}</h3>
+                <p className="mt-1 text-sm text-slate-600">{guidance.message}</p>
+                <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+                  {guidance.suggestion}
+                </p>
+              </div>
+            </div>
           </div>
 
           {invoices.length === 0 ? (

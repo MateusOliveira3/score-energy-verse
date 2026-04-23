@@ -1,13 +1,16 @@
 import {
   AnalysisState,
   AnalysisStatus,
+  ActionResultLink,
   InvoiceComparisonBasis,
   InvoiceComparison,
+  InvoiceActionSnapshot,
   InvoiceComparisonTrend,
   InvoiceData,
   JourneyStage,
   Mascot,
   MvpState,
+  NextCycleGuidance,
   NextAction,
   NextActionsState,
   Profile,
@@ -738,6 +741,27 @@ const buildMetricComparison = (
   };
 };
 
+const normalizeInvoiceActionSnapshots = (
+  snapshots?: InvoiceActionSnapshot[]
+): InvoiceActionSnapshot[] => {
+  if (!Array.isArray(snapshots)) {
+    return [];
+  }
+
+  return snapshots
+    .filter(
+      (snapshot) =>
+        Boolean(snapshot?.id && snapshot.title) &&
+        (snapshot.status === 'in_progress' || snapshot.status === 'completed')
+    )
+    .map((snapshot) => ({
+      id: snapshot.id,
+      title: snapshot.title,
+      status: snapshot.status,
+      value: typeof snapshot.value === 'string' ? snapshot.value : undefined,
+    }));
+};
+
 export const buildInvoiceComparison = (invoiceHistory: InvoiceData[]): InvoiceComparison => {
   const [currentInvoice, previousInvoice] = sortInvoicesForComparison(invoiceHistory);
 
@@ -816,6 +840,121 @@ export const buildInvoiceComparison = (invoiceHistory: InvoiceData[]): InvoiceCo
     previousInvoice,
     consumption,
     totalValue,
+  };
+};
+
+export const captureActionSnapshotsForInvoice = (
+  actions: NextActionsState
+): InvoiceActionSnapshot[] => {
+  const seenActionIds = new Set<string>();
+
+  return actions.items
+    .filter((action) => action.status === 'in_progress' || action.status === 'completed')
+    .filter((action) => {
+      if (seenActionIds.has(action.id)) {
+        return false;
+      }
+
+      seenActionIds.add(action.id);
+      return true;
+    })
+    .map((action) => ({
+      id: action.id,
+      title: action.title,
+      status: action.status as InvoiceActionSnapshot['status'],
+      value: action.value,
+    }));
+};
+
+export const buildActionResultLink = (comparison: InvoiceComparison): ActionResultLink => {
+  const actions = normalizeInvoiceActionSnapshots(comparison.currentInvoice?.actionSnapshots);
+
+  if (comparison.status === 'insufficient' || !comparison.previousInvoice) {
+    return {
+      title: 'Sem ciclo comparavel',
+      message:
+        'A ligacao com acoes fica limitada ate existir comparacao entre duas faturas.',
+      actions: [],
+      note: 'Use a proxima fatura para observar o contexto com mais seguranca.',
+      hasObservedComparison: false,
+    };
+  }
+
+  if (actions.length === 0) {
+    return {
+      title: 'Sem acao testada registrada',
+      message:
+        'A comparacao existe, mas nao havia acao marcada como em execucao ou testada antes desta fatura.',
+      actions,
+      note: 'Isso evita atribuir resultado a uma rotina que nao foi registrada.',
+      hasObservedComparison: true,
+    };
+  }
+
+  const hasCompletedAction = actions.some((action) => action.status === 'completed');
+
+  return {
+    title: 'Acoes observadas no ciclo',
+    message: hasCompletedAction
+      ? 'Antes desta fatura, voce tinha acoes marcadas como testadas ou em execucao.'
+      : 'Antes desta fatura, voce tinha acoes marcadas como em execucao.',
+    actions,
+    note: 'Isso e memoria contextual, nao prova que a acao causou o resultado.',
+    hasObservedComparison: true,
+  };
+};
+
+export const buildNextCycleGuidance = (comparison: InvoiceComparison): NextCycleGuidance => {
+  if (comparison.status === 'improved') {
+    return {
+      title: 'Manter e confirmar',
+      message: 'A fatura atual trouxe um sinal melhor que a anterior.',
+      suggestion: 'Mantenha o comportamento observado e confirme na proxima fatura.',
+    };
+  }
+
+  if (comparison.status === 'worsened') {
+    return {
+      title: 'Ajustar o proximo teste',
+      message: 'A fatura atual trouxe um sinal de aumento.',
+      suggestion: 'Escolha uma acao mais focada e acompanhe por um ciclo.',
+    };
+  }
+
+  if (comparison.status === 'stable') {
+    return {
+      title: 'Observar mais um ciclo',
+      message: 'Consumo e custo ficaram proximos da fatura anterior.',
+      suggestion: 'Continue acompanhando antes de mudar a estrategia.',
+    };
+  }
+
+  if (comparison.status === 'mixed') {
+    const focus =
+      comparison.consumption?.trend === 'up'
+        ? 'consumo'
+        : comparison.totalValue?.trend === 'up'
+          ? 'custo'
+          : 'um eixo por vez';
+
+    return {
+      title: 'Focar em um eixo',
+      message: 'Consumo e custo nao caminharam na mesma direcao.',
+      suggestion:
+        focus === 'um eixo por vez'
+          ? 'Observe um eixo por vez no proximo ciclo.'
+          : `No proximo ciclo, acompanhe primeiro o ${focus}.`,
+    };
+  }
+
+  const hasCurrentInvoice = Boolean(comparison.currentInvoice);
+
+  return {
+    title: 'Criar base de comparacao',
+    message: 'Ainda falta historico para orientar o proximo ciclo.',
+    suggestion: hasCurrentInvoice
+      ? 'Envie mais uma fatura para comparar consumo e custo.'
+      : 'Envie uma fatura para comecar a base de comparacao.',
   };
 };
 
