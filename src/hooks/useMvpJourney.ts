@@ -131,25 +131,28 @@ export const useMvpJourney = () => {
     handleStateUpdate((currentState) => setAnalysisProcessing(currentState));
   };
 
-  const completeInvoiceFlow = (file: File) => {
-    handleStateUpdate((currentState) => {
-      const completedAt = new Date().toISOString();
-      const actionSnapshots = captureActionSnapshotsForInvoice(currentState.actions);
-      const invoice = {
-        ...interpretInvoiceFile(file, currentState.profile),
-        uploadedAt: completedAt,
-        actionSnapshots: actionSnapshots.length > 0 ? actionSnapshots : undefined,
-      };
-      const analysis = buildAnalysisSummary(invoice, currentState.profile);
+  const completeInvoiceFlow = async (file: File) => {
+    const currentState = resolveFullJourneyState(state);
+    const completedAt = new Date().toISOString();
+    const actionSnapshots = captureActionSnapshotsForInvoice(currentState.actions);
+    const parsedInvoice = await interpretInvoiceFile(file, currentState.profile);
+    const invoice = {
+      ...parsedInvoice,
+      uploadedAt: completedAt,
+      actionSnapshots: actionSnapshots.length > 0 ? actionSnapshots : undefined,
+    };
+
+    handleStateUpdate((latestState) => {
+      const analysis = buildAnalysisSummary(invoice, latestState.profile);
       const nextActions = buildNextActions(
         invoice,
         analysis,
-        currentState.profile,
-        currentState.userContext
+        latestState.profile,
+        latestState.userContext
       );
-      const nextInvoiceHistory = buildInvoiceHistory(currentState.analysis.invoiceHistory, invoice);
+      const nextInvoiceHistory = buildInvoiceHistory(latestState.analysis.invoiceHistory, invoice);
 
-      let nextState = setAnalysis(currentState, {
+      let nextState = setAnalysis(latestState, {
         latestInvoice: invoice,
         invoiceHistory: nextInvoiceHistory,
         summary: analysis,
@@ -185,6 +188,8 @@ export const useMvpJourney = () => {
         journeyStage: 'analysis-ready',
       };
     });
+
+    return invoice;
   };
 
   const removeInvoiceFromHistory = (fingerprint: string) => {

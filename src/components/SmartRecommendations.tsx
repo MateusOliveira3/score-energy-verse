@@ -27,11 +27,17 @@ const priorityLabels = {
 } as const;
 
 const statusLabels: Record<NextActionStatus, string> = {
-  new: 'Não iniciada',
+  new: 'Nao iniciada',
   viewed: 'Revisada',
-  in_progress: 'Em execução',
+  in_progress: 'Em execucao',
   completed: 'Testada',
 };
+
+const formatCurrency = (value?: number) =>
+  typeof value === 'number' ? `R$ ${value.toFixed(2)}` : 'valor nao identificado';
+
+const formatConsumption = (value?: number) =>
+  typeof value === 'number' ? `${value} kWh` : 'consumo nao identificado';
 
 const SmartRecommendations = ({
   actions,
@@ -45,7 +51,7 @@ const SmartRecommendations = ({
       <CardHeader>
         <CardTitle className="flex items-center space-x-2 text-blue-700">
           <Lightbulb className="h-5 w-5" />
-          <span>Próximas ações</span>
+          <span>Proximas acoes</span>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -72,7 +78,7 @@ const SmartRecommendations = ({
                       <div className="flex flex-wrap items-center gap-2">
                         {index === 0 && (
                           <span className="rounded-full bg-emerald-600 px-2 py-1 text-xs font-semibold text-white">
-                            Ação principal
+                            Acao principal
                           </span>
                         )}
                         <h4 className="font-semibold text-gray-800">{action.title}</h4>
@@ -85,17 +91,13 @@ const SmartRecommendations = ({
                       </div>
 
                       <p className="text-sm text-gray-700">{action.description}</p>
-                      <p className="text-sm font-semibold text-emerald-700">
-                        Objetivo: {action.value}
-                      </p>
+                      <p className="text-sm font-semibold text-emerald-700">Objetivo: {action.value}</p>
                     </div>
 
                     <Button
                       size="sm"
                       variant={isCompleted ? 'outline' : 'default'}
-                      className={`shrink-0 ${
-                        isCompleted ? 'border-emerald-300 text-emerald-700' : ''
-                      }`}
+                      className={`shrink-0 ${isCompleted ? 'border-emerald-300 text-emerald-700' : ''}`}
                       disabled={isCompleted}
                       onClick={() =>
                         onActionStatusChange(action, isInProgress ? 'completed' : 'in_progress')
@@ -109,7 +111,7 @@ const SmartRecommendations = ({
                       ) : isInProgress ? (
                         'Marcar testada'
                       ) : (
-                        'Começar ação'
+                        'Comecar acao'
                       )}
                     </Button>
                   </div>
@@ -127,20 +129,18 @@ const SmartRecommendations = ({
                     </div>
                   )}
 
-                  {action.impact && (
-                    <p className="text-xs font-medium text-slate-500">{action.impact}</p>
-                  )}
+                  {action.impact && <p className="text-xs font-medium text-slate-500">{action.impact}</p>}
 
                   {isInProgress && (
                     <div className="rounded-md bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700">
-                      Ação em execução. Quando testar na rotina, marque como testada.
+                      Acao em execucao. Quando testar na rotina, marque como testada.
                     </div>
                   )}
 
                   {isCompleted && (
                     <div className="flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
                       <CheckCircle2 className="h-4 w-4" />
-                      Ação testada e registrada como progresso da jornada.
+                      Acao testada e registrada como progresso da jornada.
                     </div>
                   )}
                 </div>
@@ -152,9 +152,10 @@ const SmartRecommendations = ({
         {invoice && analysis && (
           <div className="mt-6 rounded-lg bg-gradient-to-r from-emerald-50 to-blue-50 p-4">
             <div className="text-center text-sm">
-              <p className="font-medium text-gray-700">Leitura atual do histórico: {invoice.month}</p>
+              <p className="font-medium text-gray-700">Leitura atual do historico: {invoice.month}</p>
               <p className="text-gray-600">
-                {invoice.consumption} kWh - R$ {invoice.totalValue} - {analysis.efficiencyLabel}
+                {formatConsumption(invoice.consumption)} - {formatCurrency(invoice.totalValue)} -{' '}
+                {analysis.efficiencyLabel}
               </p>
             </div>
           </div>

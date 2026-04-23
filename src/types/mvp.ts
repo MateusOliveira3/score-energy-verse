@@ -32,16 +32,50 @@ export interface InvoiceActionSnapshot {
   value?: string;
 }
 
+export type InvoiceFieldConfidence = 'high' | 'medium' | 'low' | 'missing';
+
+export interface InvoiceParsedField<T> {
+  value?: T;
+  confidence: InvoiceFieldConfidence;
+}
+
+export interface InvoiceParsedFields {
+  providerName: InvoiceParsedField<string>;
+  consumerUnit: InvoiceParsedField<string>;
+  referenceMonth: InvoiceParsedField<string>;
+  issueDate: InvoiceParsedField<string>;
+  dueDate: InvoiceParsedField<string>;
+  totalValue: InvoiceParsedField<number>;
+  consumptionKwh: InvoiceParsedField<number>;
+  daysBilled: InvoiceParsedField<number>;
+  previousReading: InvoiceParsedField<number>;
+  currentReading: InvoiceParsedField<number>;
+  meterConstant: InvoiceParsedField<number>;
+  tariffFlag: InvoiceParsedField<string>;
+  teValue: InvoiceParsedField<number>;
+  tusdValue: InvoiceParsedField<number>;
+  publicLightingFee: InvoiceParsedField<number>;
+  taxesTotal: InvoiceParsedField<number>;
+}
+
+export interface InvoiceParserResult {
+  rawTextAvailable: boolean;
+  textSource: 'pdf-text' | 'plain-text' | 'unsupported' | 'empty';
+  normalizedText: string;
+  fields: InvoiceParsedFields;
+}
+
 export interface InvoiceData {
   fingerprint: string;
   fileName: string;
   fileType: string;
   fileSize: number;
-  consumption: number;
-  totalValue: number;
-  taxPercentage: number;
-  peakHours: string;
+  consumption?: number;
+  totalValue?: number;
+  taxPercentage?: number;
+  peakHours?: string;
   month: string;
+  parser: InvoiceParserResult;
   uploadedAt?: string;
   actionSnapshots?: InvoiceActionSnapshot[];
 }
@@ -90,8 +124,8 @@ export interface ActionResultLink {
 }
 
 export interface Analysis {
-  consumptionLevel: 'baixo' | 'moderado' | 'alto';
-  costSignal: 'controlado' | 'atencao' | 'elevado';
+  consumptionLevel?: 'baixo' | 'moderado' | 'alto';
+  costSignal?: 'controlado' | 'atencao' | 'elevado';
   headline: string;
   observations: string[];
   whatMattersNext: string;

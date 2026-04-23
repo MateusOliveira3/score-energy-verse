@@ -6,6 +6,7 @@ import {
   getScoreEventPoints,
   getScoreState,
 } from '@/lib/mvpCoreFlow';
+import { parseInvoiceText } from '@/lib/invoiceParser';
 import {
   buildActionResultLink,
   buildInvoiceComparison,
@@ -23,7 +24,14 @@ import {
   buildRankingEntryFromSnapshot,
   buildRankingSnapshotFromState,
 } from '@/services/ranking/helpers';
-import { AnalysisSummary, InvoiceData, MvpState, NextAction, UserProfileData } from '@/types/mvp';
+import {
+  AnalysisSummary,
+  InvoiceData,
+  InvoiceParserResult,
+  MvpState,
+  NextAction,
+  UserProfileData,
+} from '@/types/mvp';
 
 const completeProfile: UserProfileData = {
   consumerType: 'Residencial',
@@ -32,6 +40,8 @@ const completeProfile: UserProfileData = {
   peopleCount: 3,
   energyPreference: 'Solar',
 };
+
+const makeParser = (text = ''): InvoiceParserResult => parseInvoiceText(text);
 
 const invoice: InvoiceData = {
   fingerprint: 'invoice-2026-04',
@@ -43,6 +53,14 @@ const invoice: InvoiceData = {
   taxPercentage: 28,
   peakHours: '18:00-22:00',
   month: 'abril de 2026',
+  parser: makeParser(`
+    DISTRIBUIDORA: ENERGIA TESTE
+    UNIDADE CONSUMIDORA: 1234567
+    REFERENCIA: 04/2026
+    VENCIMENTO: 22/04/2026
+    TOTAL A PAGAR: R$ 430,00
+    CONSUMO FATURADO: 360 kWh
+  `),
   uploadedAt: '2026-04-22T12:00:00.000Z',
 };
 
@@ -111,7 +129,7 @@ test('perfil suficientemente completo sem fatura resolve para before-upload', ()
 
   assert.equal(resolved.journeyStage, 'before-upload');
   assert.ok(resolved.actions.items.length > 0);
-  assert.equal(resolved.actions.items[0].title, 'Adicionar fatura ao histórico');
+  assert.equal(resolved.actions.items[0].title, 'Adicionar fatura ao historico');
 });
 
 test('fatura enviada sem analise pronta resolve para invoice-uploaded', () => {
@@ -1219,4 +1237,50 @@ test('proximo ganho possivel nao contradiz a jornada resolvida', () => {
   assert.equal(beforeUploadExplanation.nextGain?.relatedActionId, 'complete-profile');
   assert.equal(invoiceUploadedExplanation.journeyStage, 'invoice-uploaded');
   assert.equal(invoiceUploadedExplanation.nextGain?.relatedActionId, 'continue-after-analysis');
+});
+
+test('parser extrai referencia, vencimento, total, consumo e leituras com confianca', () => {
+  const parsed = parseInvoiceText(`
+    DISTRIBUIDORA: ENERGIA TESTE SA
+    UNIDADE CONSUMIDORA: 123456789
+    REFERENCIA: 04/2026
+    DATA DE EMISSAO: 10/04/2026
+    VENCIMENTO: 25/04/2026
+    TOTAL A PAGAR: R$ 321,45
+    CONSUMO FATURADO: 250 kWh
+    DIAS FATURADOS: 30
+    LEITURA ANTERIOR: 1000
+    LEITURA ATUAL: 1250
+    CONSTANTE: 1
+    BANDEIRA TARIFARIA: VERDE
+    TE: R$ 120,00
+    TUSD: R$ 88,30
+    CIP: R$ 19,40
+    TOTAL DE TRIBUTOS: R$ 52,10
+  `);
+
+  assert.equal(parsed.fields.referenceMonth.value, '04/2026');
+  assert.equal(parsed.fields.referenceMonth.confidence, 'high');
+  assert.equal(parsed.fields.dueDate.value, '25/04/2026');
+  assert.equal(parsed.fields.totalValue.value, 321.45);
+  assert.equal(parsed.fields.totalValue.confidence, 'high');
+  assert.equal(parsed.fields.consumptionKwh.value, 250);
+  assert.equal(parsed.fields.consumptionKwh.confidence, 'high');
+  assert.equal(parsed.fields.previousReading.value, 1000);
+  assert.equal(parsed.fields.currentReading.value, 1250);
+  assert.equal(parsed.fields.daysBilled.value, 30);
+  assert.equal(parsed.fields.tariffFlag.value, 'VERDE');
+});
+
+test('parser preserva ausencia segura quando campo nao existe', () => {
+  const parsed = parseInvoiceText(`
+    DISTRIBUIDORA: ENERGIA TESTE SA
+    REFERENCIA: 04/2026
+  `);
+
+  assert.equal(parsed.fields.referenceMonth.value, '04/2026');
+  assert.equal(parsed.fields.totalValue.value, undefined);
+  assert.equal(parsed.fields.totalValue.confidence, 'missing');
+  assert.equal(parsed.fields.consumptionKwh.value, undefined);
+  assert.equal(parsed.fields.consumptionKwh.confidence, 'missing');
 });

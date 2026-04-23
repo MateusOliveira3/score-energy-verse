@@ -42,6 +42,57 @@ const isFiniteNumber = (value: unknown): value is number =>
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
 
+const createEmptyParser = (): InvoiceData['parser'] => ({
+  rawTextAvailable: false,
+  textSource: 'unsupported',
+  normalizedText: '',
+  fields: {
+    providerName: { confidence: 'missing' },
+    consumerUnit: { confidence: 'missing' },
+    referenceMonth: { confidence: 'missing' },
+    issueDate: { confidence: 'missing' },
+    dueDate: { confidence: 'missing' },
+    totalValue: { confidence: 'missing' },
+    consumptionKwh: { confidence: 'missing' },
+    daysBilled: { confidence: 'missing' },
+    previousReading: { confidence: 'missing' },
+    currentReading: { confidence: 'missing' },
+    meterConstant: { confidence: 'missing' },
+    tariffFlag: { confidence: 'missing' },
+    teValue: { confidence: 'missing' },
+    tusdValue: { confidence: 'missing' },
+    publicLightingFee: { confidence: 'missing' },
+    taxesTotal: { confidence: 'missing' },
+  },
+});
+
+const normalizeInvoiceData = (invoice?: Partial<InvoiceData>): InvoiceData | null => {
+  if (!invoice?.fingerprint || !invoice.fileName || !invoice.month) {
+    return null;
+  }
+
+  const hasParser =
+    typeof invoice.parser?.rawTextAvailable === 'boolean' && invoice.parser.fields;
+
+  return {
+    fingerprint: invoice.fingerprint,
+    fileName: invoice.fileName,
+    fileType: typeof invoice.fileType === 'string' ? invoice.fileType : 'arquivo',
+    fileSize: isFiniteNumber(invoice.fileSize) ? invoice.fileSize : 0,
+    consumption: hasParser && isFiniteNumber(invoice.consumption) ? invoice.consumption : undefined,
+    totalValue: hasParser && isFiniteNumber(invoice.totalValue) ? invoice.totalValue : undefined,
+    taxPercentage:
+      hasParser && isFiniteNumber(invoice.taxPercentage) ? invoice.taxPercentage : undefined,
+    peakHours: hasParser && typeof invoice.peakHours === 'string' ? invoice.peakHours : undefined,
+    month: typeof invoice.month === 'string' && invoice.month.trim()
+      ? invoice.month
+      : 'Referencia nao identificada',
+    parser: hasParser ? invoice.parser : createEmptyParser(),
+    uploadedAt: typeof invoice.uploadedAt === 'string' ? invoice.uploadedAt : undefined,
+    actionSnapshots: Array.isArray(invoice.actionSnapshots) ? invoice.actionSnapshots : undefined,
+  };
+};
+
 const normalizeActionStatus = (
   status: unknown,
   actionId: string,
@@ -305,11 +356,10 @@ export const normalizeAnalysisState = (
     : latestInvoice
       ? [latestInvoice]
       : DEFAULT_ANALYSIS_STATE.invoiceHistory;
-  const invoiceHistory = rawInvoiceHistory.filter(
-    (invoice): invoice is InvoiceData =>
-      Boolean(invoice?.fingerprint && invoice.fileName && invoice.month)
-  );
-  const resolvedLatestInvoice = latestInvoice ?? invoiceHistory[0];
+  const invoiceHistory = rawInvoiceHistory
+    .map((invoice) => normalizeInvoiceData(invoice))
+    .filter((invoice): invoice is InvoiceData => Boolean(invoice));
+  const resolvedLatestInvoice = normalizeInvoiceData(latestInvoice) ?? invoiceHistory[0];
   const summary = analysis?.summary ?? legacySummary;
   const status =
     analysis?.status ??
@@ -730,6 +780,12 @@ const normalizeDateText = (value: string) =>
 
 const getInvoiceCompetenceTime = (invoice: InvoiceData) => {
   const normalizedMonth = normalizeDateText(invoice.month);
+  const numericMatch = normalizedMonth.match(/\b(0[1-9]|1[0-2])\/(\d{4})\b/);
+
+  if (numericMatch) {
+    return Date.UTC(Number(numericMatch[2]), Number(numericMatch[1]) - 1, 1);
+  }
+
   const monthKey = Object.keys(PT_BR_MONTH_INDEX).find((month) =>
     normalizedMonth.includes(month)
   );
@@ -870,6 +926,23 @@ export const buildInvoiceComparison = (invoiceHistory: InvoiceData[]): InvoiceCo
       summary:
         'Adicione pelo menos duas faturas ao histórico para observar se consumo e custo melhoraram, pioraram ou ficaram estaveis.',
       currentInvoice,
+    };
+  }
+
+  const canCompareConsumption =
+    typeof currentInvoice.consumption === 'number' && typeof previousInvoice.consumption === 'number';
+  const canCompareTotalValue =
+    typeof currentInvoice.totalValue === 'number' && typeof previousInvoice.totalValue === 'number';
+
+  if (!canCompareConsumption || !canCompareTotalValue) {
+    return {
+      status: 'insufficient',
+      basis: getComparisonBasis(currentInvoice, previousInvoice),
+      title: 'Leitura parcial entre faturas',
+      summary:
+        'Uma ou mais faturas do historico nao tem consumo e valor total extraidos com seguranca suficiente para comparacao.',
+      currentInvoice,
+      previousInvoice,
     };
   }
 

@@ -37,35 +37,36 @@ interface InvoiceHistoryProps {
 }
 
 const getInvoiceStats = (invoices: InvoiceData[]) => {
-  if (invoices.length === 0) {
-    return {
-      totalConsumption: 0,
-      averageConsumption: 0,
-      totalValue: 0,
-      averageValue: 0,
-      totalInvoices: 0,
-    };
-  }
-
-  const totalConsumption = invoices.reduce((sum, invoice) => sum + invoice.consumption, 0);
-  const totalValue = invoices.reduce((sum, invoice) => sum + invoice.totalValue, 0);
+  const invoicesWithConsumption = invoices.filter((invoice) => typeof invoice.consumption === 'number');
+  const invoicesWithValue = invoices.filter((invoice) => typeof invoice.totalValue === 'number');
+  const totalConsumption = invoicesWithConsumption.reduce(
+    (sum, invoice) => sum + (invoice.consumption ?? 0),
+    0
+  );
+  const totalValue = invoicesWithValue.reduce((sum, invoice) => sum + (invoice.totalValue ?? 0), 0);
 
   return {
     totalConsumption,
-    averageConsumption: Math.round(totalConsumption / invoices.length),
+    averageConsumption:
+      invoicesWithConsumption.length > 0
+        ? Math.round(totalConsumption / invoicesWithConsumption.length)
+        : undefined,
     totalValue,
-    averageValue: Math.round(totalValue / invoices.length),
+    averageValue:
+      invoicesWithValue.length > 0 ? Math.round(totalValue / invoicesWithValue.length) : undefined,
     totalInvoices: invoices.length,
   };
 };
 
-const getConsumptionColor = (consumption: number) => {
+const getConsumptionColor = (consumption?: number) => {
+  if (typeof consumption !== 'number') return 'text-slate-600 bg-slate-100';
   if (consumption < 200) return 'text-green-600 bg-green-100';
   if (consumption < 300) return 'text-yellow-600 bg-yellow-100';
   return 'text-red-600 bg-red-100';
 };
 
-const getConsumptionIcon = (consumption: number) => {
+const getConsumptionIcon = (consumption?: number) => {
+  if (typeof consumption !== 'number') return <Minus className="h-4 w-4" />;
   if (consumption < 200) return <TrendingDown className="h-4 w-4" />;
   if (consumption < 300) return <TrendingUp className="h-4 w-4" />;
   return <Zap className="h-4 w-4" />;
@@ -75,11 +76,17 @@ const formatInvoiceDate = (invoice: InvoiceData) => {
   const dateValue = invoice.uploadedAt;
 
   if (!dateValue) {
-    return 'Momento não registrado';
+    return 'Momento nao registrado';
   }
 
   return format(new Date(dateValue), 'dd/MM/yyyy', { locale: ptBR });
 };
+
+const formatCurrency = (value?: number) =>
+  typeof value === 'number' ? `R$ ${value.toFixed(2)}` : 'Nao identificado';
+
+const formatConsumption = (value?: number) =>
+  typeof value === 'number' ? `${value} kWh` : 'Nao identificado';
 
 const comparisonVariant: Record<InvoiceComparison['status'], string> = {
   insufficient: 'border-slate-100 bg-slate-50 text-slate-700',
@@ -90,9 +97,9 @@ const comparisonVariant: Record<InvoiceComparison['status'], string> = {
 };
 
 const comparisonBasisLabel: Record<InvoiceComparison['basis'], string> = {
-  competence: 'Ordem pela competência da fatura',
+  competence: 'Ordem pela competencia da fatura',
   upload: 'Ordem pela data de envio',
-  history: 'Ordem do histórico atual',
+  history: 'Ordem do historico atual',
 };
 
 const trendLabel: Record<InvoiceComparisonTrend, string> = {
@@ -147,7 +154,10 @@ const ComparisonMetric = ({
       <span className="text-slate-500"> vs {metric.previous}</span>
       <span className="ml-2 text-slate-600">
         ({formatMetricChange(metric.change, unit)}
-        {metric.percentChange !== undefined ? `, ${metric.percentChange > 0 ? '+' : ''}${metric.percentChange}%` : ''})
+        {metric.percentChange !== undefined
+          ? `, ${metric.percentChange > 0 ? '+' : ''}${metric.percentChange}%`
+          : ''}
+        )
       </span>
     </div>
   </div>
@@ -165,7 +175,7 @@ const InvoiceHistory = ({ invoices, onDeleteInvoice, userContext }: InvoiceHisto
         <CardHeader>
           <CardTitle className="flex items-center space-x-2 text-emerald-700">
             <FileText className="h-5 w-5" />
-            <span>Histórico de Faturas</span>
+            <span>Historico de Faturas</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -179,11 +189,15 @@ const InvoiceHistory = ({ invoices, onDeleteInvoice, userContext }: InvoiceHisto
               <div className="text-sm text-blue-700">kWh Total</div>
             </div>
             <div className="text-center p-4 bg-purple-50 rounded-lg">
-              <div className="text-2xl font-bold text-purple-600">{stats.averageConsumption}</div>
-              <div className="text-sm text-purple-700">kWh Media</div>
+              <div className="text-2xl font-bold text-purple-600">
+                {stats.averageConsumption ?? '-'}
+              </div>
+              <div className="text-sm text-purple-700">kWh Medio</div>
             </div>
             <div className="text-center p-4 bg-orange-50 rounded-lg">
-              <div className="text-2xl font-bold text-orange-600">R$ {stats.averageValue}</div>
+              <div className="text-2xl font-bold text-orange-600">
+                {stats.averageValue !== undefined ? `R$ ${stats.averageValue}` : '-'}
+              </div>
               <div className="text-sm text-orange-700">Valor Medio</div>
             </div>
           </div>
@@ -192,7 +206,7 @@ const InvoiceHistory = ({ invoices, onDeleteInvoice, userContext }: InvoiceHisto
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
                 <div className="text-sm font-semibold uppercase tracking-wide">
-                  Comparação com a fatura anterior
+                  Comparacao com a fatura anterior
                 </div>
                 <h3 className="mt-1 text-lg font-bold">{comparison.title}</h3>
                 <p className="mt-1 text-sm">{comparison.summary}</p>
@@ -227,9 +241,7 @@ const InvoiceHistory = ({ invoices, onDeleteInvoice, userContext }: InvoiceHisto
               <div className="text-sm font-semibold uppercase tracking-wide text-slate-500">
                 Acoes antes desta fatura
               </div>
-              <h3 className="mt-1 text-base font-bold text-slate-900">
-                {actionResultLink.title}
-              </h3>
+              <h3 className="mt-1 text-base font-bold text-slate-900">{actionResultLink.title}</h3>
               <p className="mt-1 text-sm text-slate-600">{actionResultLink.message}</p>
 
               {actionResultLink.actions.length > 0 && (
@@ -280,9 +292,9 @@ const InvoiceHistory = ({ invoices, onDeleteInvoice, userContext }: InvoiceHisto
           {invoices.length === 0 ? (
             <div className="text-center py-8">
               <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-700 mb-2">Seu histórico ainda está vazio</h3>
+              <h3 className="text-lg font-medium text-gray-700 mb-2">Seu historico ainda esta vazio</h3>
               <p className="text-gray-500">
-                Adicione uma fatura ao histórico para iniciar sua leitura de consumo.
+                Adicione uma fatura ao historico para iniciar sua leitura de consumo.
               </p>
             </div>
           ) : (
@@ -300,26 +312,26 @@ const InvoiceHistory = ({ invoices, onDeleteInvoice, userContext }: InvoiceHisto
                             <h3 className="font-medium text-gray-900">Fatura - {invoice.month}</h3>
                             <Badge variant="secondary" className={getConsumptionColor(invoice.consumption)}>
                               {getConsumptionIcon(invoice.consumption)}
-                              <span className="ml-1">{invoice.consumption} kWh</span>
+                              <span className="ml-1">{formatConsumption(invoice.consumption)}</span>
                             </Badge>
                           </div>
                           <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mt-1">
                             <div className="flex items-center">
                               <DollarSign className="h-3 w-3 mr-1" />
-                              R$ {invoice.totalValue}
-                            </div>
-                            <div className="flex items-center">
-                              <Zap className="h-3 w-3 mr-1" />
-                              {invoice.peakHours}
+                              {formatCurrency(invoice.totalValue)}
                             </div>
                             <div className="flex items-center">
                               <Calendar className="h-3 w-3 mr-1" />
                               {formatInvoiceDate(invoice)}
                             </div>
+                            {invoice.parser.fields.consumerUnit.value && (
+                              <div className="flex items-center">
+                                <Zap className="h-3 w-3 mr-1" />
+                                UC {invoice.parser.fields.consumerUnit.value}
+                              </div>
+                            )}
                           </div>
-                          <p className="text-xs text-slate-500 mt-2">
-                            Arquivo base: {invoice.fileName}
-                          </p>
+                          <p className="text-xs text-slate-500 mt-2">Arquivo base: {invoice.fileName}</p>
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -327,7 +339,7 @@ const InvoiceHistory = ({ invoices, onDeleteInvoice, userContext }: InvoiceHisto
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            if (confirm('Tem certeza que deseja excluir esta fatura do histórico MVP?')) {
+                            if (confirm('Tem certeza que deseja excluir esta fatura do historico MVP?')) {
                               onDeleteInvoice(invoice.fingerprint);
                             }
                           }}

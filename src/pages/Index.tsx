@@ -51,8 +51,8 @@ const Index = () => {
 
   const efficiencyLabel = latestAnalysis?.efficiencyLabel || 'Aguardando primeira leitura';
 
-  const handleInvoiceProcessed = (file: File) => {
-    completeInvoiceFlow(file);
+  const handleInvoiceProcessed = async (file: File) => {
+    return completeInvoiceFlow(file);
   };
 
   const handleActionStatusChange = (

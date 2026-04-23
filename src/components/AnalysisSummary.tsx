@@ -24,9 +24,15 @@ const costVariant = {
 
 const costLabel = {
   controlado: 'controlado',
-  atencao: 'atenção',
+  atencao: 'atencao',
   elevado: 'elevado',
 } as const;
+
+const formatCurrency = (value?: number) =>
+  typeof value === 'number' ? `R$ ${value.toFixed(2)}` : 'Nao identificado';
+
+const formatConsumption = (value?: number) =>
+  typeof value === 'number' ? `${value} kWh` : 'Nao identificado';
 
 const AnalysisSummary = ({ invoice, analysis, profile }: AnalysisSummaryProps) => {
   if (!invoice || !analysis) {
@@ -35,17 +41,17 @@ const AnalysisSummary = ({ invoice, analysis, profile }: AnalysisSummaryProps) =
         <CardHeader>
           <CardTitle className="flex items-center space-x-2 text-slate-700">
             <ScanSearch className="h-5 w-5" />
-            <span>Resumo da análise</span>
+            <span>Resumo da analise</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-slate-600">
           <p>
-            A análise aparece logo após adicionar uma fatura ao histórico. Ela transforma o arquivo em sinais
-            simples de consumo, custo e próximo passo.
+            A analise aparece logo apos adicionar uma fatura ao historico. Ela transforma o
+            arquivo em campos reais quando o texto da conta permitir leitura segura.
           </p>
           <p>
-            O contexto do perfil {profile.consumerType.toLowerCase()} será usado para deixar essa
-            leitura mais justa.
+            O contexto do perfil {profile.consumerType.toLowerCase()} continua sendo usado apenas
+            para interpretar a leitura, nao para inventar numeros ausentes.
           </p>
         </CardContent>
       </Card>
@@ -57,31 +63,48 @@ const AnalysisSummary = ({ invoice, analysis, profile }: AnalysisSummaryProps) =
       <CardHeader>
         <CardTitle className="flex items-center space-x-2 text-slate-700">
           <FileBarChart className="h-5 w-5" />
-          <span>Resumo da análise</span>
+          <span>Resumo da analise</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className={consumptionVariant[analysis.consumptionLevel]}>
-            Consumo {analysis.consumptionLevel}
-          </Badge>
-          <Badge className={costVariant[analysis.costSignal]}>Custo {costLabel[analysis.costSignal]}</Badge>
+          {analysis.consumptionLevel && (
+            <Badge className={consumptionVariant[analysis.consumptionLevel]}>
+              Consumo {analysis.consumptionLevel}
+            </Badge>
+          )}
+          {analysis.costSignal && (
+            <Badge className={costVariant[analysis.costSignal]}>
+              Custo {costLabel[analysis.costSignal]}
+            </Badge>
+          )}
           <Badge variant="outline">{invoice.month}</Badge>
+          {invoice.parser.fields.providerName.value && (
+            <Badge variant="outline">{invoice.parser.fields.providerName.value}</Badge>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="rounded-xl bg-emerald-50 p-4">
-            <div className="text-sm text-emerald-700">Consumo estimado</div>
-            <div className="text-3xl font-bold text-emerald-900">{invoice.consumption} kWh</div>
-            <div className="text-sm text-emerald-700">Perfil {profile.consumerType.toLowerCase()}</div>
+            <div className="text-sm text-emerald-700">Consumo extraido</div>
+            <div className="text-3xl font-bold text-emerald-900">
+              {formatConsumption(invoice.consumption)}
+            </div>
+            <div className="text-sm text-emerald-700">
+              Perfil {profile.consumerType.toLowerCase()}
+            </div>
           </div>
           <div className="rounded-xl bg-blue-50 p-4">
             <div className="text-sm text-blue-700 flex items-center gap-2">
               <Wallet className="h-4 w-4" />
-              Sinal de custo
+              Valor total extraido
             </div>
-            <div className="text-3xl font-bold text-blue-900">R$ {invoice.totalValue}</div>
-            <div className="text-sm text-blue-700">Pico estimado em {invoice.peakHours}</div>
+            <div className="text-3xl font-bold text-blue-900">{formatCurrency(invoice.totalValue)}</div>
+            <div className="text-sm text-blue-700">
+              {invoice.parser.fields.dueDate.value
+                ? `Vencimento ${invoice.parser.fields.dueDate.value}`
+                : 'Vencimento nao identificado'}
+            </div>
           </div>
         </div>
 
