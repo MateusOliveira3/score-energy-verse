@@ -283,6 +283,55 @@ test('comparacao identifica melhora observada entre duas faturas', () => {
   assert.equal(comparison.totalValue?.trend, 'down');
 });
 
+test('comparacao usa competencia da fatura antes da ordem de envio', () => {
+  const olderInvoiceUploadedLater = makeInvoice({
+    fingerprint: 'invoice-2026-04-late-upload',
+    month: 'abril de 2026',
+    consumption: 360,
+    totalValue: 430,
+    uploadedAt: '2026-06-10T12:00:00.000Z',
+  });
+  const newerInvoiceUploadedEarlier = makeInvoice({
+    fingerprint: 'invoice-2026-05',
+    month: 'maio de 2026',
+    consumption: 320,
+    totalValue: 390,
+    uploadedAt: '2026-05-10T12:00:00.000Z',
+  });
+  const comparison = buildInvoiceComparison([
+    olderInvoiceUploadedLater,
+    newerInvoiceUploadedEarlier,
+  ]);
+
+  assert.equal(comparison.basis, 'competence');
+  assert.equal(comparison.currentInvoice?.fingerprint, newerInvoiceUploadedEarlier.fingerprint);
+  assert.equal(comparison.previousInvoice?.fingerprint, olderInvoiceUploadedLater.fingerprint);
+  assert.equal(comparison.status, 'improved');
+});
+
+test('comparacao usa data de envio quando competencia esta ambigua', () => {
+  const previousInvoice = makeInvoice({
+    fingerprint: 'invoice-ambiguous-previous',
+    month: 'ciclo anterior',
+    consumption: 360,
+    totalValue: 430,
+    uploadedAt: '2026-04-10T12:00:00.000Z',
+  });
+  const currentInvoice = makeInvoice({
+    fingerprint: 'invoice-ambiguous-current',
+    month: 'ciclo atual',
+    consumption: 330,
+    totalValue: 400,
+    uploadedAt: '2026-05-10T12:00:00.000Z',
+  });
+  const comparison = buildInvoiceComparison([previousInvoice, currentInvoice]);
+
+  assert.equal(comparison.basis, 'upload');
+  assert.equal(comparison.currentInvoice?.fingerprint, currentInvoice.fingerprint);
+  assert.equal(comparison.previousInvoice?.fingerprint, previousInvoice.fingerprint);
+  assert.equal(comparison.status, 'improved');
+});
+
 test('comparacao identifica piora observada entre duas faturas', () => {
   const currentInvoice = makeInvoice({
     fingerprint: 'invoice-2026-05',

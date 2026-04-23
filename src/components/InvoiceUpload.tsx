@@ -27,7 +27,7 @@ const InvoiceUpload = ({ profile, onUploadStarted, onInvoiceProcessed }: Invoice
 
       if (!validTypes.includes(file.type)) {
         toast({
-          title: 'Formato invalido',
+          title: 'Formato inválido',
           description: 'Por favor, envie apenas arquivos PDF, JPG ou PNG.',
           variant: 'destructive',
         });
@@ -53,7 +53,7 @@ const InvoiceUpload = ({ profile, onUploadStarted, onInvoiceProcessed }: Invoice
         console.error('Erro no processamento:', error);
         toast({
           title: 'Erro no processamento',
-          description: 'Nao foi possivel processar a fatura. Tente novamente.',
+          description: 'Não foi possível processar a fatura. Tente novamente.',
           variant: 'destructive',
         });
       } finally {
@@ -117,7 +117,7 @@ const InvoiceUpload = ({ profile, onUploadStarted, onInvoiceProcessed }: Invoice
                   Lendo a fatura e montando o resumo...
                 </p>
                 <p className="text-sm text-gray-600">
-                  O proximo passo sera a analise simples com score e orientacao do mascote.
+                  O próximo passo será uma análise simples com score e resumo do momento.
                 </p>
               </div>
             </div>
@@ -126,7 +126,7 @@ const InvoiceUpload = ({ profile, onUploadStarted, onInvoiceProcessed }: Invoice
               <CheckCircle className="h-8 w-8 text-emerald-500" />
               <div>
                 <p className="text-lg font-medium text-emerald-700">
-                  Fatura recebida e conectada a jornada
+                  Fatura recebida e conectada à jornada
                 </p>
                 <p className="text-sm text-gray-600">{uploadedFile.name}</p>
                 <div className="flex items-center justify-center mt-2 text-xs text-emerald-600">
@@ -159,7 +159,7 @@ const InvoiceUpload = ({ profile, onUploadStarted, onInvoiceProcessed }: Invoice
                   Arraste sua fatura aqui ou clique para selecionar
                 </p>
                 <p className="text-sm text-gray-500">
-                  Suporta PDF, JPG e PNG. O envio gera analise simples, score e proximos passos.
+                  Suporta PDF, JPG e PNG. O envio gera análise simples, score e próximos passos.
                 </p>
               </div>
 
@@ -185,7 +185,7 @@ const InvoiceUpload = ({ profile, onUploadStarted, onInvoiceProcessed }: Invoice
         <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
           <div className="p-3 bg-emerald-50 rounded-lg">
             <div className="text-lg font-bold text-emerald-600">MVP</div>
-            <div className="text-xs text-emerald-700">Interpretacao deterministica</div>
+            <div className="text-xs text-emerald-700">Interpretação determinística</div>
           </div>
           <div className="p-3 bg-blue-50 rounded-lg">
             <div className="text-lg font-bold text-blue-600">Perfil</div>
@@ -197,11 +197,11 @@ const InvoiceUpload = ({ profile, onUploadStarted, onInvoiceProcessed }: Invoice
           </div>
           <div className="p-3 bg-orange-50 rounded-lg">
             <div className="text-lg font-bold text-orange-600">Mascote</div>
-            <div className="text-xs text-orange-700">Orienta o proximo passo</div>
+            <div className="text-xs text-orange-700">Resume o próximo passo</div>
           </div>
           <div className="p-3 bg-indigo-50 rounded-lg">
             <div className="text-lg font-bold text-indigo-600">Score</div>
-            <div className="text-xs text-indigo-700">Eventos explicitos</div>
+            <div className="text-xs text-indigo-700">Eventos explícitos</div>
           </div>
         </div>
       </CardContent>

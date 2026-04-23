@@ -44,6 +44,7 @@ export type InvoiceComparisonStatus =
   | 'mixed';
 
 export type InvoiceComparisonTrend = 'down' | 'up' | 'stable';
+export type InvoiceComparisonBasis = 'competence' | 'upload' | 'history';
 
 export interface InvoiceMetricComparison {
   current: number;
@@ -55,6 +56,7 @@ export interface InvoiceMetricComparison {
 
 export interface InvoiceComparison {
   status: InvoiceComparisonStatus;
+  basis: InvoiceComparisonBasis;
   title: string;
   summary: string;
   currentInvoice?: InvoiceData;

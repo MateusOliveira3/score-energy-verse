@@ -22,6 +22,12 @@ const costVariant = {
   elevado: 'bg-rose-100 text-rose-700',
 } as const;
 
+const costLabel = {
+  controlado: 'controlado',
+  atencao: 'atenção',
+  elevado: 'elevado',
+} as const;
+
 const AnalysisSummary = ({ invoice, analysis, profile }: AnalysisSummaryProps) => {
   if (!invoice || !analysis) {
     return (
@@ -29,16 +35,16 @@ const AnalysisSummary = ({ invoice, analysis, profile }: AnalysisSummaryProps) =
         <CardHeader>
           <CardTitle className="flex items-center space-x-2 text-slate-700">
             <ScanSearch className="h-5 w-5" />
-            <span>Resumo da Analise</span>
+            <span>Resumo da análise</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-slate-600">
           <p>
-            A analise aparece logo apos o envio da fatura. Ela transforma o arquivo em sinais
-            simples de consumo, custo e proximo passo.
+            A análise aparece logo após o envio da fatura. Ela transforma o arquivo em sinais
+            simples de consumo, custo e próximo passo.
           </p>
           <p>
-            O contexto do perfil {profile.consumerType.toLowerCase()} sera usado para deixar essa
+            O contexto do perfil {profile.consumerType.toLowerCase()} será usado para deixar essa
             leitura mais justa.
           </p>
         </CardContent>
@@ -51,7 +57,7 @@ const AnalysisSummary = ({ invoice, analysis, profile }: AnalysisSummaryProps) =
       <CardHeader>
         <CardTitle className="flex items-center space-x-2 text-slate-700">
           <FileBarChart className="h-5 w-5" />
-          <span>Resumo da Analise</span>
+          <span>Resumo da análise</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -59,7 +65,7 @@ const AnalysisSummary = ({ invoice, analysis, profile }: AnalysisSummaryProps) =
           <Badge className={consumptionVariant[analysis.consumptionLevel]}>
             Consumo {analysis.consumptionLevel}
           </Badge>
-          <Badge className={costVariant[analysis.costSignal]}>Custo {analysis.costSignal}</Badge>
+          <Badge className={costVariant[analysis.costSignal]}>Custo {costLabel[analysis.costSignal]}</Badge>
           <Badge variant="outline">{invoice.month}</Badge>
         </div>
 

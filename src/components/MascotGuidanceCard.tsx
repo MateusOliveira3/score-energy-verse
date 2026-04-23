@@ -21,8 +21,8 @@ interface MascotGuidanceCardProps {
 const stageLabels = {
   onboarding: 'Onboarding',
   'before-upload': 'Antes do upload',
-  'invoice-uploaded': 'Upload concluido',
-  'analysis-ready': 'Analise pronta',
+  'invoice-uploaded': 'Upload concluído',
+  'analysis-ready': 'Análise pronta',
   'return-visit': 'Retorno',
 } as const;
 
@@ -38,7 +38,7 @@ const MascotGuidanceCard = ({
       <CardHeader>
         <CardTitle className="flex items-center space-x-2 text-emerald-700">
           <MessageCircleHeart className="h-5 w-5" />
-          <span>Guia do Mascote</span>
+          <span>Resumo do Mascote</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -61,8 +61,7 @@ const MascotGuidanceCard = ({
             <div className="rounded-lg bg-emerald-50 p-3 text-xs text-emerald-800 flex items-start gap-2">
               <Sparkles className="h-4 w-4 mt-0.5 shrink-0" />
               <span>
-                O mascote age como guia do fluxo: explica o momento atual da jornada e aponta um
-                proximo passo concreto.
+                O mascote resume o momento da jornada e reforça o próximo passo mais útil agora.
               </span>
             </div>
           </div>

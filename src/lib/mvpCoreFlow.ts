@@ -187,6 +187,7 @@ export const buildAnalysisSummary = (
   const resolvedProfile = getResolvedProfile(profile);
   const consumptionLevel = getConsumptionLevel(invoice.consumption, resolvedProfile.consumerType);
   const costSignal = getCostSignal(invoice.totalValue);
+  const costSignalLabel = costSignal === 'atencao' ? 'atenção' : costSignal;
   const observations: string[] = [];
 
   if (consumptionLevel === 'alto') {
@@ -195,52 +196,52 @@ export const buildAnalysisSummary = (
     );
   } else if (consumptionLevel === 'moderado') {
     observations.push(
-      'O consumo estimado esta em uma faixa intermediaria, com espaco claro para ajustes simples antes de pensar em investimentos maiores.'
+      'O consumo estimado está em uma faixa intermediária, com espaço para ajustes simples antes de pensar em investimentos maiores.'
     );
   } else {
     observations.push(
-      'O consumo estimado ficou em uma faixa positiva para este perfil, indicando uma base eficiente para evoluir o score com consistencia.'
+      'O consumo estimado ficou em uma faixa positiva para este perfil, indicando uma base eficiente para evoluir com consistência.'
     );
   }
 
   if (costSignal === 'elevado') {
     observations.push(
-      'O valor da conta pede atencao imediata porque o custo final esta alto mesmo para o contexto atual do usuario.'
+      'O valor da conta pede atenção porque o custo final está alto para o contexto atual do usuário.'
     );
   } else if (invoice.peakHours.includes('18:00') || invoice.peakHours.includes('17:00')) {
     observations.push(
-      'Os horarios de pico merecem foco porque parte importante do gasto pode estar concentrada no fim do dia.'
+      'Os horários de pico merecem foco porque parte do gasto pode estar concentrada nesse período.'
     );
   } else {
     observations.push(
-      'O proximo ganho mais provavel vem de acompanhar rotina e uso de equipamentos antes de partir para uma mudanca estrutural.'
+      'O próximo ganho provável vem de acompanhar rotina e uso de equipamentos antes de uma mudança estrutural.'
     );
   }
 
   if (resolvedProfile.energyPreference === 'Solar' && costSignal !== 'controlado') {
     observations[1] =
-      'Como o perfil ja sinaliza interesse em energia solar, vale usar este ciclo para medir melhor padroes de uso antes de avaliar qualquer solucao maior.';
+      'Como o perfil já sinaliza interesse em energia solar, vale medir padrões de uso antes de avaliar uma solução maior.';
   }
 
   const whatMattersNext =
     consumptionLevel === 'alto'
-      ? 'O que mais importa agora e reduzir desperdicios visiveis e observar quais usos acontecem no horario de maior impacto.'
+      ? 'O que mais importa agora é reduzir desperdícios visíveis e observar usos no horário de maior impacto.'
       : costSignal === 'elevado'
-        ? 'O que mais importa agora e controlar o custo da proxima fatura com uma mudanca simples e mensuravel.'
-        : 'O que mais importa agora e manter a consistencia e registrar uma proxima fatura para comparar evolucao.';
+        ? 'O que mais importa agora é controlar o custo da próxima fatura com uma mudança simples e mensurável.'
+        : 'O que mais importa agora é manter consistência e enviar a próxima fatura para comparar evolução.';
 
   return {
     consumptionLevel,
     costSignal,
-    headline: `Consumo ${consumptionLevel} e sinal de custo ${costSignal}.`,
+    headline: `Consumo ${consumptionLevel} e sinal de custo ${costSignalLabel}.`,
     observations: observations.slice(0, 2),
     whatMattersNext,
     efficiencyLabel:
       consumptionLevel === 'baixo'
         ? 'Base eficiente'
         : consumptionLevel === 'moderado'
-          ? 'Eficiencia em ajuste'
-          : 'Eficiencia sob atencao',
+          ? 'Eficiência em ajuste'
+          : 'Eficiência sob atenção',
   };
 };
 
@@ -263,13 +264,13 @@ export const buildNextActions = (
       id: 'continue-after-analysis',
       title: 'Continuar quando o resumo estiver pronto',
       description:
-        'A fatura ja foi enviada. Revise o resumo antes de escolher qualquer mudanca de rotina.',
-      value: 'Mantem a jornada coerente entre envio e leitura',
-      context: `Use esta acao para a fatura de ${invoice.month}, enquanto a analise ainda nao aparece como pronta.`,
+        'Fatura enviada. Revise o resumo antes de mudar a rotina.',
+      value: 'Mantém envio e leitura alinhados',
+      context: `Use na fatura de ${invoice.month}, enquanto o resumo ainda não estiver pronto.`,
       suggestion:
-        'Assim que o resumo aparecer, confira consumo, custo e horario de pico antes de revisar uma acao operacional.',
-      impact: `Pode liberar o ganho de analise concluida e preparar a proxima acao revisada (+${actionReviewPoints} pontos quando revisada).`,
-      validation: 'A analise deve aparecer como pronta antes de marcar novas mudancas de consumo.',
+        'Confira consumo, custo e horário de pico antes de iniciar uma ação.',
+      impact: `Prepara a próxima ação revisada (+${actionReviewPoints} pontos ao revisar).`,
+      validation: 'Resumo pronto antes de novas mudanças.',
       priority: 'high',
       status: 'new',
       source: 'invoice',
@@ -283,25 +284,25 @@ export const buildNextActions = (
 
     actions.push({
       id: 'complete-profile',
-      title: hasCompleteProfile ? 'Enviar a primeira fatura' : 'Completar o perfil minimo',
+      title: hasCompleteProfile ? 'Enviar a primeira fatura' : 'Completar perfil mínimo',
       description: hasCompleteProfile
-        ? 'Use a conta de luz mais recente para gerar uma leitura personalizada e deixar as proximas acoes menos genericas.'
-        : 'Preencha local, tipo de consumidor, tamanho do imovel e pessoas para tornar a analise mais justa.',
+        ? 'Envie a conta de luz mais recente para gerar uma leitura personalizada.'
+        : 'Preencha local, tipo de consumidor, tamanho do imóvel e pessoas.',
       value: hasCompleteProfile
-        ? 'Desbloqueia analise e score inicial'
-        : 'Melhora personalizacao da jornada',
+        ? 'Libera análise e score inicial'
+        : 'Personaliza a jornada',
       context: hasCompleteProfile
-        ? `Perfil ${profileLabel} ja tem contexto suficiente; falta a fatura real para comparar consumo e custo.`
-        : 'Use esta acao antes da primeira fatura, enquanto o sistema ainda nao tem contexto minimo do usuario.',
+        ? `Perfil ${profileLabel} já tem contexto; falta a fatura real.`
+        : 'Use antes da primeira fatura, enquanto o contexto ainda é mínimo.',
       suggestion: hasCompleteProfile
-        ? 'Separe a fatura mais recente em PDF, JPG ou PNG e envie no bloco de upload da jornada.'
-        : 'Priorize os campos que mudam a leitura de consumo: cidade, tipo de consumidor, tamanho do imovel e quantidade de pessoas.',
+        ? 'Separe a fatura mais recente em PDF, JPG ou PNG.'
+        : 'Priorize cidade, tipo de consumidor, tamanho do imóvel e pessoas.',
       impact: hasCompleteProfile
-        ? `Pode gerar eventos de fatura enviada e analise concluida, somando ate ${invoiceCyclePoints} pontos validos.`
-        : `Pode liberar o evento de perfil completo (+${SCORE_EVENT_POINTS.profile_completed} pontos) e melhorar as recomendacoes seguintes.`,
+        ? `Pode somar até ${invoiceCyclePoints} pontos com fatura e análise.`
+        : `Pode liberar perfil completo (+${SCORE_EVENT_POINTS.profile_completed} pontos).`,
       validation: hasCompleteProfile
-        ? 'A fatura deve aparecer no historico e gerar um resumo antes das acoes de consumo.'
-        : 'O perfil deve ficar em pelo menos 80% de completacao.',
+        ? 'Fatura aparece no histórico e gera resumo.'
+        : 'Perfil com pelo menos 80% de completude.',
       priority: 'high',
       status: 'new',
       source: hasCompleteProfile ? 'journey' : 'profile',
@@ -313,14 +314,14 @@ export const buildNextActions = (
   if (analysis.consumptionLevel === 'alto') {
     actions.push({
       id: 'map-peak-usage',
-      title: 'Mapear usos no horario de pico desta fatura',
+      title: 'Mapear uso no horário de pico',
       description: `Por 3 dias, liste os principais equipamentos usados entre ${invoice.peakHours} para descobrir onde o consumo pesa mais.`,
-      value: 'Ajuda a reduzir desperdicios logo no proximo ciclo',
+      value: 'Encontrar desperdícios visíveis',
       context: `Prioridade alta porque a fatura de ${invoice.month} mostrou consumo alto para um perfil ${profileLabel}.`,
       suggestion:
-        'Anote chuveiro, ar-condicionado, fornos, maquinas ou varios aparelhos ligados ao mesmo tempo nesse intervalo.',
-      impact: `Ajuda a escolher um ajuste com maior chance de baixar consumo; revisar a acao tambem registra +${actionReviewPoints} pontos no score.`,
-      validation: 'Ao final, deve existir uma lista curta com os 2 ou 3 usos mais frequentes no pico.',
+        'Anote chuveiro, ar-condicionado, forno, máquinas e usos simultâneos.',
+      impact: `Ajuda a escolher um ajuste mais provável (+${actionReviewPoints} pontos ao revisar).`,
+      validation: 'Liste os 2 ou 3 usos mais frequentes no pico.',
       priority: 'high',
       status: 'new',
       source: 'analysis',
@@ -332,13 +333,13 @@ export const buildNextActions = (
       id: 'choose-one-cost-cut',
       title: 'Testar um corte de custo por 7 dias',
       description:
-        `Escolha uma unica mudanca para testar nesta semana, de preferencia perto de ${invoice.peakHours} ou em um uso recorrente.`,
-      value: 'Cria um teste claro para comparar a proxima fatura',
-      context: `O sinal de custo esta ${analysis.costSignal}; a melhor resposta agora e um teste pequeno, nao uma mudanca grande sem medicao.`,
+        `Escolha uma mudança simples para testar nesta semana, de preferência perto de ${invoice.peakHours}.`,
+      value: 'Criar um teste comparável',
+      context: `O sinal de custo está ${analysis.costSignal}; comece por um teste pequeno.`,
       suggestion:
-        'Exemplos praticos: reduzir aparelhos ligados ao mesmo tempo, encurtar um uso intenso ou revisar iluminacao que fica acesa todos os dias.',
-      impact: `Contribui para evolucao do score ao transformar a recomendacao em comportamento acompanhado (+${actionReviewPoints} pontos ao revisar).`,
-      validation: 'Depois de 7 dias, confirme se a mudanca foi aplicada em pelo menos 5 dias.',
+        'Reduza uso simultâneo, encurte um uso intenso ou revise luzes recorrentes.',
+      impact: `Transforma recomendação em comportamento acompanhado (+${actionReviewPoints} pontos ao revisar).`,
+      validation: 'Aplicar em pelo menos 5 dos 7 dias.',
       priority: 'high',
       status: 'new',
       source: 'analysis',
@@ -348,15 +349,15 @@ export const buildNextActions = (
   if (resolvedProfile.energyPreference === 'Solar' || resolvedProfile.energyPreference === 'Hibrido') {
     actions.push({
       id: 'record-demand-pattern',
-      title: 'Registrar padrao de demanda antes de investir',
+      title: 'Registrar padrão de demanda',
       description:
-        'Anote em quais periodos o consumo parece mais intenso antes de avaliar energia solar, hibrida ou qualquer investimento maior.',
-      value: 'Evita decisoes grandes sem contexto suficiente',
-      context: `O perfil indica preferencia ${resolvedProfile.energyPreference}; antes de decidir, vale entender a rotina real do imovel.`,
+        'Anote quando o consumo parece mais intenso antes de avaliar energia solar, híbrida ou outro investimento.',
+      value: 'Evitar decisão sem contexto',
+      context: `O perfil indica preferência ${resolvedProfile.energyPreference}; antes de decidir, vale entender a rotina real do imóvel.`,
       suggestion:
-        'Durante uma semana, marque manha, tarde ou noite como periodo de maior uso e registre eventos fora da rotina.',
-      impact: `Melhora a qualidade da decisao e mantem o score conectado a acoes observaveis (+${actionReviewPoints} pontos ao revisar).`,
-      validation: 'Ter pelo menos 5 dias anotados com periodo de maior demanda.',
+        'Por uma semana, marque manhã, tarde ou noite como período de maior uso.',
+      impact: `Melhora a decisão e mantém o score conectado a ações observáveis (+${actionReviewPoints} pontos ao revisar).`,
+      validation: 'Ter pelo menos 5 dias anotados.',
       priority: 'medium',
       status: 'new',
       source: 'profile',
@@ -366,15 +367,15 @@ export const buildNextActions = (
   if (actions.length < 3) {
     actions.push({
       id: 'return-next-bill',
-      title: 'Voltar com a proxima fatura',
+      title: 'Enviar a próxima fatura',
       description:
-        'No proximo ciclo, envie a nova fatura para comparar consumo, custo e efeito das acoes revisadas agora.',
-      value: 'Transforma uma leitura isolada em progresso visivel',
-      context: `A leitura atual e da fatura de ${invoice.month}; a comparacao fica mais confiavel com um novo ciclo.`,
+        'No próximo ciclo, envie a nova fatura para comparar consumo e custo.',
+      value: 'Transformar leitura em evolução',
+      context: `A leitura atual é da fatura de ${invoice.month}; a comparação melhora com outro ciclo.`,
       suggestion:
-        'Guarde a proxima conta de luz e volte ao sistema assim que ela estiver disponivel para repetir o envio.',
-      impact: `Pode gerar novo ciclo de fatura e analise, somando ate ${invoiceCyclePoints} pontos validos quando houver nova fatura.`,
-      validation: 'A proxima fatura deve aparecer no historico para permitir comparacao.',
+        'Guarde a próxima conta e volte quando ela estiver disponível.',
+      impact: `Pode somar até ${invoiceCyclePoints} pontos em novo ciclo de fatura e análise.`,
+      validation: 'Próxima fatura aparece no histórico.',
       priority: 'medium',
       status: 'new',
       source: 'journey',
@@ -403,42 +404,42 @@ export const buildMascotGuidance = ({
   if (stage === 'return-visit') {
     return {
       stage,
-      title: 'Vamos retomar de onde voce parou',
+      title: 'Retomando sua jornada',
       message: analysis
-        ? `Ja existe uma leitura recente para o seu perfil ${profileLabel}. Podemos continuar pelo que mais importa agora: acompanhar a proxima acao e comparar a evolucao da fatura.`
-        : `Que bom ver voce de volta. O proximo passo mais util continua sendo enviar uma fatura para transformar o perfil ${profileLabel} em orientacoes praticas.`,
+        ? `Já existe uma leitura recente para o perfil ${profileLabel}. O próximo foco é acompanhar a ação atual e comparar a próxima fatura.`
+        : `Que bom ver você de volta. O passo mais útil agora é enviar uma fatura para gerar um resumo simples do perfil ${profileLabel}.`,
     };
   }
 
   if (stage === 'invoice-uploaded') {
     return {
       stage,
-      title: 'Recebi sua fatura',
-      message: `Agora estou transformando esse envio em um resumo simples para o seu perfil ${profileLabel}. Vou destacar o que merece atencao primeiro e evitar termos tecnicos desnecessarios.`,
+      title: 'Fatura recebida',
+      message: `Agora o sistema gera um resumo simples para o perfil ${profileLabel}, destacando consumo, custo e próximo passo.`,
     };
   }
 
   if (stage === 'analysis-ready' && invoice && analysis) {
     return {
       stage,
-      title: 'Resumo pronto para agir',
-      message: `Na fatura de ${invoice.month}, o consumo ficou ${analysis.consumptionLevel} e o ponto principal agora e: ${analysis.whatMattersNext.toLowerCase()}`,
+      title: 'Resumo do momento',
+      message: `Na fatura de ${invoice.month}, o consumo ficou ${analysis.consumptionLevel}. Próximo foco: ${analysis.whatMattersNext.toLowerCase()}`,
     };
   }
 
   if (isProfileComplete(resolvedProfile)) {
     return {
       stage: 'before-upload',
-      title: 'Seu contexto ja ajuda',
-      message: `Seu perfil ${profileLabel} ja esta pronto o suficiente para uma leitura mais justa. Envie a fatura mais recente e eu mostro os sinais principais de consumo e custo.`,
+      title: 'Contexto suficiente',
+      message: `O perfil ${profileLabel} já permite uma leitura mais justa. Envie a fatura mais recente para ver consumo, custo e próximo passo.`,
     };
   }
 
   return {
     stage: 'onboarding',
-    title: 'Vamos montar sua base primeiro',
+    title: 'Monte sua base primeiro',
     message:
-      'Complete um perfil simples e depois envie sua conta de luz. Assim a analise fica mais clara, o score fica explicavel e os proximos passos deixam de ser genericos.',
+      'Complete um perfil simples e depois envie sua conta de luz. Assim a análise fica mais clara, o score fica explicável e os próximos passos deixam de ser genéricos.',
   };
 };
 

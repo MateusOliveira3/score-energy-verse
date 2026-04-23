@@ -1,6 +1,7 @@
 import {
   AnalysisState,
   AnalysisStatus,
+  InvoiceComparisonBasis,
   InvoiceComparison,
   InvoiceComparisonTrend,
   InvoiceData,
@@ -61,15 +62,15 @@ const SCORE_EVENT_EXPLANATION: Record<ScoreEventType, { label: string; reason: s
   },
   invoice_uploaded: {
     label: 'Fatura enviada',
-    reason: 'Conta porque uma fatura real da jornada foi enviada e ficou registrada no historico.',
+    reason: 'Conta porque uma fatura real da jornada foi enviada e ficou registrada no histórico.',
   },
   analysis_completed: {
-    label: 'Analise concluida',
-    reason: 'Conta porque existe uma analise pronta vinculada a uma fatura valida da jornada.',
+    label: 'Análise concluída',
+    reason: 'Conta porque existe uma análise pronta vinculada a uma fatura válida da jornada.',
   },
   action_viewed: {
-    label: 'Acao revisada',
-    reason: 'Conta porque uma proxima acao valida foi revisada pelo usuario.',
+    label: 'Ação revisada',
+    reason: 'Conta porque uma próxima ação válida foi revisada pelo usuário.',
   },
 };
 
@@ -427,8 +428,8 @@ const buildScoreNextGain = (state: MvpState): ScoreExplanationNextGain | undefin
   if (state.journeyStage === 'onboarding') {
     return {
       title: 'Completar o perfil',
-      description: 'Finalize o contexto minimo para liberar uma analise mais justa.',
-      reason: 'O proximo ganho claro e o evento de perfil completo.',
+      description: 'Finalize o contexto mínimo para liberar uma análise mais justa.',
+      reason: 'O próximo ganho claro é o evento de perfil completo.',
       potentialPoints: getScoreEventPoints('profile_completed'),
       relatedActionId: state.actions.items[0]?.id,
     };
@@ -437,8 +438,8 @@ const buildScoreNextGain = (state: MvpState): ScoreExplanationNextGain | undefin
   if (state.journeyStage === 'before-upload') {
     return {
       title: 'Enviar a primeira fatura',
-      description: 'Use a fatura mais recente para gerar envio e analise da jornada.',
-      reason: 'O envio da fatura pode gerar os eventos de fatura enviada e analise concluida.',
+      description: 'Use a fatura mais recente para gerar envio e análise da jornada.',
+      reason: 'O envio da fatura pode gerar os eventos de fatura enviada e análise concluída.',
       potentialPoints:
         getScoreEventPoints('invoice_uploaded') + getScoreEventPoints('analysis_completed'),
       relatedActionId: state.actions.items[0]?.id,
@@ -447,9 +448,9 @@ const buildScoreNextGain = (state: MvpState): ScoreExplanationNextGain | undefin
 
   if (state.journeyStage === 'invoice-uploaded') {
     return {
-      title: 'Continuar apos a analise',
-      description: 'Revise o resumo assim que a analise da fatura estiver pronta.',
-      reason: 'A proxima evolucao esperada e concluir a analise da fatura enviada.',
+      title: 'Continuar após a análise',
+      description: 'Revise o resumo assim que a análise da fatura estiver pronta.',
+      reason: 'A próxima evolução esperada é concluir a análise da fatura enviada.',
       potentialPoints: getScoreEventPoints('analysis_completed'),
       relatedActionId: state.actions.items[0]?.id,
     };
@@ -461,7 +462,7 @@ const buildScoreNextGain = (state: MvpState): ScoreExplanationNextGain | undefin
     return {
       title: nextAction.title,
       description: nextAction.description,
-      reason: 'A proxima evolucao vem de revisar uma acao sugerida ainda nao vista.',
+      reason: 'A próxima evolução vem de revisar uma ação sugerida ainda não vista.',
       potentialPoints: getScoreEventPoints('action_viewed'),
       relatedActionId: nextAction.id,
     };
@@ -470,7 +471,7 @@ const buildScoreNextGain = (state: MvpState): ScoreExplanationNextGain | undefin
   return {
     title: 'Voltar com uma nova fatura',
     description: 'Traga a proxima conta de luz para comparar a evolucao com o ciclo atual.',
-    reason: 'Com as acoes atuais ja revisadas, o proximo ganho claro vem de um novo ciclo de fatura.',
+    reason: 'Com as ações atuais já revisadas, o próximo ganho claro vem de um novo ciclo de fatura.',
     potentialPoints:
       getScoreEventPoints('invoice_uploaded') + getScoreEventPoints('analysis_completed'),
   };
@@ -494,7 +495,7 @@ export const getScoreExplanation = (state: MvpState): ScoreExplanation => {
     summary:
       events.length > 0
         ? `Score explicado por ${events.length} evento(s) valido(s) da jornada.`
-        : 'O score ainda nao tem eventos validos contabilizados.',
+        : 'O score ainda não tem eventos válidos contabilizados.',
     nextGain: buildScoreNextGain(resolvedState),
   };
 };
@@ -606,6 +607,105 @@ export const pruneInvoiceHistory = (
 
 export const getLatestInvoiceHistoryEntry = (invoiceHistory: InvoiceData[]) => invoiceHistory[0];
 
+const PT_BR_MONTH_INDEX: Record<string, number> = {
+  janeiro: 0,
+  fevereiro: 1,
+  marco: 2,
+  abril: 3,
+  maio: 4,
+  junho: 5,
+  julho: 6,
+  agosto: 7,
+  setembro: 8,
+  outubro: 9,
+  novembro: 10,
+  dezembro: 11,
+};
+
+const normalizeDateText = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+const getInvoiceCompetenceTime = (invoice: InvoiceData) => {
+  const normalizedMonth = normalizeDateText(invoice.month);
+  const monthKey = Object.keys(PT_BR_MONTH_INDEX).find((month) =>
+    normalizedMonth.includes(month)
+  );
+  const year = Number(normalizedMonth.match(/\b\d{4}\b/)?.[0]);
+
+  if (!monthKey || !Number.isFinite(year)) {
+    return undefined;
+  }
+
+  return Date.UTC(year, PT_BR_MONTH_INDEX[monthKey], 1);
+};
+
+const getInvoiceUploadTime = (invoice: InvoiceData) => {
+  if (!invoice.uploadedAt) {
+    return undefined;
+  }
+
+  const time = new Date(invoice.uploadedAt).getTime();
+  return Number.isNaN(time) ? undefined : time;
+};
+
+const getInvoiceReference = (invoice: InvoiceData) => {
+  const competenceTime = getInvoiceCompetenceTime(invoice);
+
+  if (competenceTime !== undefined) {
+    return {
+      basis: 'competence' as const,
+      time: competenceTime,
+    };
+  }
+
+  const uploadTime = getInvoiceUploadTime(invoice);
+
+  if (uploadTime !== undefined) {
+    return {
+      basis: 'upload' as const,
+      time: uploadTime,
+    };
+  }
+
+  return {
+    basis: 'history' as const,
+    time: undefined,
+  };
+};
+
+const getComparisonBasis = (
+  currentInvoice: InvoiceData,
+  previousInvoice: InvoiceData
+): InvoiceComparisonBasis => {
+  const currentReference = getInvoiceReference(currentInvoice);
+  const previousReference = getInvoiceReference(previousInvoice);
+
+  if (currentReference.basis === 'competence' && previousReference.basis === 'competence') {
+    return 'competence';
+  }
+
+  if (currentReference.basis === 'upload' || previousReference.basis === 'upload') {
+    return 'upload';
+  }
+
+  return 'history';
+};
+
+const sortInvoicesForComparison = (invoiceHistory: InvoiceData[]) =>
+  [...invoiceHistory].sort((left, right) => {
+    const leftReference = getInvoiceReference(left);
+    const rightReference = getInvoiceReference(right);
+
+    if (leftReference.time === undefined || rightReference.time === undefined) {
+      return 0;
+    }
+
+    return rightReference.time - leftReference.time;
+  });
+
 const getMetricTrend = (
   change: number,
   percentChange: number | undefined,
@@ -639,12 +739,13 @@ const buildMetricComparison = (
 };
 
 export const buildInvoiceComparison = (invoiceHistory: InvoiceData[]): InvoiceComparison => {
-  const [currentInvoice, previousInvoice] = invoiceHistory;
+  const [currentInvoice, previousInvoice] = sortInvoicesForComparison(invoiceHistory);
 
   if (!currentInvoice || !previousInvoice) {
     return {
       status: 'insufficient',
-      title: 'Ainda nao ha comparacao entre faturas',
+      basis: 'history',
+      title: 'Ainda não há comparação entre faturas',
       summary:
         'Envie pelo menos duas faturas para observar se consumo e custo melhoraram, pioraram ou ficaram estaveis.',
       currentInvoice,
@@ -661,13 +762,15 @@ export const buildInvoiceComparison = (invoiceHistory: InvoiceData[]): InvoiceCo
   const consumptionWorsened = consumption.trend === 'up';
   const costImproved = totalValue.trend === 'down';
   const costWorsened = totalValue.trend === 'up';
+  const basis = getComparisonBasis(currentInvoice, previousInvoice);
 
   if (consumption.trend === 'stable' && totalValue.trend === 'stable') {
     return {
       status: 'stable',
-      title: 'Fatura estavel em relacao a anterior',
+      basis,
+      title: 'Fatura estável em relação à anterior',
       summary:
-        'Consumo e custo ficaram proximos da fatura anterior. Ainda vale acompanhar o proximo ciclo antes de concluir tendencia.',
+        'Consumo e custo ficaram próximos da fatura anterior. Acompanhe o próximo ciclo antes de concluir tendência.',
       currentInvoice,
       previousInvoice,
       consumption,
@@ -678,9 +781,10 @@ export const buildInvoiceComparison = (invoiceHistory: InvoiceData[]): InvoiceCo
   if ((consumptionImproved || consumption.trend === 'stable') && (costImproved || totalValue.trend === 'stable')) {
     return {
       status: 'improved',
-      title: 'Reducao observada nesta fatura',
+      basis,
+      title: 'Redução observada nesta fatura',
       summary:
-        'A fatura atual ficou melhor em pelo menos um sinal sem piorar o outro. Isso indica evolucao observada, ainda sem atribuir causa direta.',
+        'A fatura atual melhorou em pelo menos um sinal sem piorar o outro. É evolução observada, sem atribuir causa direta.',
       currentInvoice,
       previousInvoice,
       consumption,
@@ -691,9 +795,10 @@ export const buildInvoiceComparison = (invoiceHistory: InvoiceData[]): InvoiceCo
   if ((consumptionWorsened || consumption.trend === 'stable') && (costWorsened || totalValue.trend === 'stable')) {
     return {
       status: 'worsened',
+      basis,
       title: 'Aumento observado nesta fatura',
       summary:
-        'A fatura atual piorou em pelo menos um sinal sem melhora compensatoria no outro. Vale revisar rotina e acompanhar o proximo ciclo.',
+        'A fatura atual piorou em pelo menos um sinal sem melhora compensatória no outro. Revise a rotina e acompanhe o próximo ciclo.',
       currentInvoice,
       previousInvoice,
       consumption,
@@ -703,9 +808,10 @@ export const buildInvoiceComparison = (invoiceHistory: InvoiceData[]): InvoiceCo
 
   return {
     status: 'mixed',
+    basis,
     title: 'Leitura mista entre consumo e custo',
     summary:
-      'Consumo e custo apontaram em direcoes diferentes. O melhor uso desta comparacao e acompanhar mais um ciclo antes de concluir tendencia.',
+      'Consumo e custo apontaram em direções diferentes. Acompanhe mais um ciclo antes de concluir tendência.',
     currentInvoice,
     previousInvoice,
     consumption,

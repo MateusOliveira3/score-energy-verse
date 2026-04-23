@@ -59,11 +59,11 @@ const Index = () => {
     updateActionStatus(action, status);
 
     toast({
-      title: status === 'completed' ? 'Acao testada' : 'Acao iniciada',
+      title: status === 'completed' ? 'Ação testada' : 'Ação iniciada',
       description:
         status === 'completed'
-          ? `Voce marcou "${action.title}" como testada na jornada.`
-          : `Voce comecou "${action.title}" e registrou progresso real na jornada.`,
+          ? `Você marcou "${action.title}" como testada na jornada.`
+          : `Você começou "${action.title}" e registrou progresso real na jornada.`,
     });
   };
 
@@ -71,7 +71,7 @@ const Index = () => {
     removeInvoiceFromHistory(fingerprint);
     toast({
       title: 'Fatura removida',
-      description: 'O historico da jornada MVP foi atualizado sem depender do fluxo legado.',
+      description: 'O histórico da jornada MVP foi atualizado sem depender do fluxo legado.',
     });
   };
 
@@ -97,7 +97,7 @@ const Index = () => {
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm text-slate-600">
-                    <span>Completacao do perfil</span>
+                    <span>Completação do perfil</span>
                     <span>{profileCompletion}%</span>
                   </div>
                   <Progress value={profileCompletion} className="h-3" />
@@ -111,13 +111,13 @@ const Index = () => {
                   <div className="rounded-lg bg-slate-50 p-3">
                     <div className="text-slate-500">Local</div>
                     <div className="font-semibold text-slate-800">
-                      {profile.location || 'Nao informado'}
+                      {profile.location || 'Não informado'}
                     </div>
                   </div>
                   <div className="rounded-lg bg-slate-50 p-3">
-                    <div className="text-slate-500">Imovel</div>
+                    <div className="text-slate-500">Imóvel</div>
                     <div className="font-semibold text-slate-800">
-                      {profile.propertySize > 0 ? `${profile.propertySize} m2` : 'Nao informado'}
+                      {profile.propertySize > 0 ? `${profile.propertySize} m2` : 'Não informado'}
                     </div>
                   </div>
                   <div className="rounded-lg bg-slate-50 p-3">

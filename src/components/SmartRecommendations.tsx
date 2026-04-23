@@ -27,9 +27,9 @@ const priorityLabels = {
 } as const;
 
 const statusLabels: Record<NextActionStatus, string> = {
-  new: 'Nao iniciada',
+  new: 'Não iniciada',
   viewed: 'Revisada',
-  in_progress: 'Em execucao',
+  in_progress: 'Em execução',
   completed: 'Testada',
 };
 
@@ -45,7 +45,7 @@ const SmartRecommendations = ({
       <CardHeader>
         <CardTitle className="flex items-center space-x-2 text-blue-700">
           <Lightbulb className="h-5 w-5" />
-          <span>Proximas Acoes Prioritarias</span>
+          <span>Próximas ações</span>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -55,9 +55,7 @@ const SmartRecommendations = ({
             const isCompleted = status === 'completed';
             const isInProgress = status === 'in_progress';
             const details = [
-              { label: 'Quando aplicar', value: action.context },
-              { label: 'Como executar', value: action.suggestion },
-              { label: 'Impacto esperado', value: action.impact },
+              { label: 'Como fazer', value: action.suggestion },
               { label: 'Como validar', value: action.validation },
             ].filter((detail) => Boolean(detail.value));
 
@@ -74,7 +72,7 @@ const SmartRecommendations = ({
                       <div className="flex flex-wrap items-center gap-2">
                         {index === 0 && (
                           <span className="rounded-full bg-emerald-600 px-2 py-1 text-xs font-semibold text-white">
-                            Acao principal
+                            Ação principal
                           </span>
                         )}
                         <h4 className="font-semibold text-gray-800">{action.title}</h4>
@@ -111,13 +109,13 @@ const SmartRecommendations = ({
                       ) : isInProgress ? (
                         'Marcar testada'
                       ) : (
-                        'Comecar acao'
+                        'Começar ação'
                       )}
                     </Button>
                   </div>
 
                   {details.length > 0 && (
-                    <div className="space-y-3 rounded-md bg-white/75 p-3">
+                    <div className="grid grid-cols-1 gap-3 rounded-md bg-white/75 p-3">
                       {details.map((detail) => (
                         <div key={detail.label} className="space-y-1">
                           <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -129,16 +127,20 @@ const SmartRecommendations = ({
                     </div>
                   )}
 
+                  {action.impact && (
+                    <p className="text-xs font-medium text-slate-500">{action.impact}</p>
+                  )}
+
                   {isInProgress && (
                     <div className="rounded-md bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700">
-                      Acao em execucao. Quando testar na rotina, marque como testada.
+                      Ação em execução. Quando testar na rotina, marque como testada.
                     </div>
                   )}
 
                   {isCompleted && (
                     <div className="flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
                       <CheckCircle2 className="h-4 w-4" />
-                      Acao testada e registrada como progresso da jornada.
+                      Ação testada e registrada como progresso da jornada.
                     </div>
                   )}
                 </div>

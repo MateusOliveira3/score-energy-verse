@@ -61,7 +61,7 @@ const formatInvoiceDate = (invoice: InvoiceData) => {
   const dateValue = invoice.uploadedAt;
 
   if (!dateValue) {
-    return 'Momento nao registrado';
+    return 'Momento não registrado';
   }
 
   return format(new Date(dateValue), 'dd/MM/yyyy', { locale: ptBR });
@@ -73,6 +73,12 @@ const comparisonVariant: Record<InvoiceComparison['status'], string> = {
   worsened: 'border-rose-100 bg-rose-50 text-rose-800',
   stable: 'border-blue-100 bg-blue-50 text-blue-800',
   mixed: 'border-amber-100 bg-amber-50 text-amber-800',
+};
+
+const comparisonBasisLabel: Record<InvoiceComparison['basis'], string> = {
+  competence: 'Ordem pela competência da fatura',
+  upload: 'Ordem pela data de envio',
+  history: 'Ordem do histórico atual',
 };
 
 const trendLabel: Record<InvoiceComparisonTrend, string> = {
@@ -133,7 +139,7 @@ const InvoiceHistory = ({ invoices, onDeleteInvoice }: InvoiceHistoryProps) => {
         <CardHeader>
           <CardTitle className="flex items-center space-x-2 text-emerald-700">
             <FileText className="h-5 w-5" />
-            <span>Historico de Faturas</span>
+            <span>Histórico de Faturas</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -160,7 +166,7 @@ const InvoiceHistory = ({ invoices, onDeleteInvoice }: InvoiceHistoryProps) => {
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
                 <div className="text-sm font-semibold uppercase tracking-wide">
-                  Comparacao com a fatura anterior
+                  Comparação com a fatura anterior
                 </div>
                 <h3 className="mt-1 text-lg font-bold">{comparison.title}</h3>
                 <p className="mt-1 text-sm">{comparison.summary}</p>
@@ -170,11 +176,16 @@ const InvoiceHistory = ({ invoices, onDeleteInvoice }: InvoiceHistoryProps) => {
                   </p>
                 )}
               </div>
-              {comparison.status !== 'insufficient' && (
+              <div className="flex flex-wrap gap-2 md:justify-end">
                 <Badge variant="outline" className="w-fit bg-white/70">
-                  Leitura observada
+                  {comparisonBasisLabel[comparison.basis]}
                 </Badge>
-              )}
+                {comparison.status !== 'insufficient' && (
+                  <Badge variant="outline" className="w-fit bg-white/70">
+                    Leitura observada
+                  </Badge>
+                )}
+              </div>
             </div>
 
             {comparison.consumption && comparison.totalValue && (
@@ -190,7 +201,7 @@ const InvoiceHistory = ({ invoices, onDeleteInvoice }: InvoiceHistoryProps) => {
               <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-700 mb-2">Nenhuma fatura encontrada</h3>
               <p className="text-gray-500">
-                Faca upload da sua primeira fatura para comecar a acompanhar seu consumo.
+                Envie sua primeira fatura para começar a acompanhar seu consumo.
               </p>
             </div>
           ) : (
@@ -235,7 +246,7 @@ const InvoiceHistory = ({ invoices, onDeleteInvoice }: InvoiceHistoryProps) => {
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            if (confirm('Tem certeza que deseja excluir esta fatura do historico MVP?')) {
+                            if (confirm('Tem certeza que deseja excluir esta fatura do histórico MVP?')) {
                               onDeleteInvoice(invoice.fingerprint);
                             }
                           }}
