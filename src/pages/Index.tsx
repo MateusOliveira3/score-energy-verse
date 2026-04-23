@@ -2,6 +2,7 @@ import React from 'react';
 import Header from '../components/Header';
 import ScoreCard from '../components/ScoreCard';
 import LevelProgress from '../components/LevelProgress';
+import ScoreExplanationCard from '../components/ScoreExplanationCard';
 import InvoiceUpload from '../components/InvoiceUpload';
 import InvoiceHistory from '../components/InvoiceHistory';
 import SmartRecommendations from '../components/SmartRecommendations';
@@ -28,8 +29,8 @@ const Index = () => {
     latestAnalysis,
     nextActions,
     viewedActionIds,
-    scoreEvents,
     scoreState,
+    scoreExplanation,
     mascotGuidance,
     updateProfile,
     updateMascotCustomization,
@@ -44,11 +45,6 @@ const Index = () => {
     Boolean(latestInvoice),
     Boolean(latestAnalysis),
   ].filter(Boolean).length;
-
-  const latestScoreEvent = scoreEvents[0];
-  const latestScoreLabel = latestScoreEvent
-    ? `${latestScoreEvent.label} (+${latestScoreEvent.points})`
-    : 'O score comeca a subir quando voce conclui as primeiras etapas da jornada.';
 
   const efficiencyLabel = latestAnalysis?.efficiencyLabel || 'Aguardando primeira leitura';
 
@@ -174,7 +170,7 @@ const Index = () => {
               level={scoreState.level}
               consumerType={profile.consumerType}
               mascotCustomization={mascotCustomization}
-              latestScoreLabel={latestScoreLabel}
+              latestScoreLabel={scoreExplanation.summary}
               completedSteps={completedSteps}
               activeActionsCount={nextActions.length}
               efficiencyLabel={efficiencyLabel}
@@ -203,28 +199,7 @@ const Index = () => {
           <div className="xl:col-span-2">
             <InvoiceHistory invoices={invoiceHistory} onDeleteInvoice={handleInvoiceRemoved} />
           </div>
-          <Card className="border-2 border-slate-100 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-slate-700">Eventos do Score</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {scoreEvents.length === 0 ? (
-                <p className="text-sm text-slate-600">
-                  Nenhum evento registrado ainda. O score cresce quando voce conclui etapas reais da
-                  jornada.
-                </p>
-              ) : (
-                scoreEvents.slice(0, 6).map((event) => (
-                  <div key={event.id} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-medium text-slate-800">{event.label}</p>
-                      <span className="text-sm font-semibold text-emerald-700">+{event.points}</span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
+          <ScoreExplanationCard explanation={scoreExplanation} />
         </div>
       </main>
     </div>

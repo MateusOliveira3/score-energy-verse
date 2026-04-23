@@ -14,6 +14,7 @@ import {
   buildInvoiceHistory,
   DEFAULT_MVP_STATE,
   getLatestInvoiceHistoryEntry,
+  getScoreExplanation,
   pruneInvoiceHistory,
   resolveFullJourneyState,
   setAnalysis,
@@ -256,6 +257,7 @@ export const useMvpJourney = () => {
 
   const profileCompletion = useMemo(() => getProfileCompletion(state.profile), [state.profile]);
   const scoreState = useMemo(() => getScoreState(state.scoreEvents), [state.scoreEvents]);
+  const scoreExplanation = useMemo(() => getScoreExplanation(state), [state]);
   const mascotGuidance: MascotGuidance = useMemo(
     () =>
       buildMascotGuidance({
@@ -279,6 +281,7 @@ export const useMvpJourney = () => {
     viewedActionIds: state.actions.viewedActionIds,
     scoreEvents: state.scoreEvents,
     scoreState,
+    scoreExplanation,
     journeyStage: state.journeyStage,
     mascotGuidance,
     updateProfile,
