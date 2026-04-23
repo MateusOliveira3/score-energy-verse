@@ -357,13 +357,14 @@ export const resolveJourneyStage = (
 };
 
 const resolveActionsState = (
-  state: Pick<MvpState, 'profile' | 'analysis' | 'actions'>
+  state: Pick<MvpState, 'profile' | 'analysis' | 'actions' | 'userContext'>
 ): NextActionsState => {
   const normalizedActions = normalizeActionsState(state.actions);
   const nextItems = buildNextActions(
     state.analysis.latestInvoice,
     state.analysis.summary,
-    state.profile
+    state.profile,
+    state.userContext
   );
   const nextItemIds = new Set(nextItems.map((action) => action.id));
   const persistedActionMap = new Map(
@@ -445,6 +446,7 @@ export const resolveFullJourneyState = (state: MvpState): MvpState => {
     profile,
     analysis,
     actions: state.actions,
+    userContext,
   });
   const scoreEvents = resolveScoreEventsState({
     profile,
@@ -999,12 +1001,26 @@ export const buildActionResultLink = (comparison: InvoiceComparison): ActionResu
   };
 };
 
-export const buildNextCycleGuidance = (comparison: InvoiceComparison): NextCycleGuidance => {
+export const buildNextCycleGuidance = (
+  comparison: InvoiceComparison,
+  userContext?: Partial<UserContextState>
+): NextCycleGuidance => {
+  const hasCurrentInvoice = Boolean(comparison.currentInvoice);
+  const normalizedUserContext = normalizeUserContext(userContext);
+  const primaryGoal = normalizedUserContext.questions.primary_goal?.status === 'answered'
+    ? normalizedUserContext.questions.primary_goal.value
+    : undefined;
+
   if (comparison.status === 'improved') {
     return {
       title: 'Manter e confirmar',
       message: 'A fatura atual trouxe um sinal melhor que a anterior.',
-      suggestion: 'Mantenha o comportamento observado e confirme na proxima fatura.',
+      suggestion:
+        primaryGoal === 'reduce_cost'
+          ? 'Mantenha o ajuste e confirme se o custo responde na proxima fatura.'
+          : primaryGoal === 'understand_consumption'
+            ? 'Mantenha o ajuste e observe se o padrao se repete na proxima fatura.'
+            : 'Mantenha o comportamento observado e confirme na proxima fatura.',
     };
   }
 
@@ -1012,7 +1028,12 @@ export const buildNextCycleGuidance = (comparison: InvoiceComparison): NextCycle
     return {
       title: 'Ajustar o proximo teste',
       message: 'A fatura atual trouxe um sinal de aumento.',
-      suggestion: 'Escolha uma acao mais focada e acompanhe por um ciclo.',
+      suggestion:
+        primaryGoal === 'reduce_cost'
+          ? 'Escolha um ajuste mais focado em reduzir custo e acompanhe por um ciclo.'
+          : primaryGoal === 'understand_consumption'
+            ? 'Escolha um ajuste mais focado em observar o padrao e acompanhe por um ciclo.'
+            : 'Escolha uma acao mais focada e acompanhe por um ciclo.',
     };
   }
 
@@ -1020,7 +1041,10 @@ export const buildNextCycleGuidance = (comparison: InvoiceComparison): NextCycle
     return {
       title: 'Observar mais um ciclo',
       message: 'Consumo e custo ficaram proximos da fatura anterior.',
-      suggestion: 'Continue acompanhando antes de mudar a estrategia.',
+      suggestion:
+        primaryGoal === 'understand_consumption'
+          ? 'Continue observando o padrao antes de mudar a estrategia.'
+          : 'Continue acompanhando antes de mudar a estrategia.',
     };
   }
 
@@ -1036,13 +1060,15 @@ export const buildNextCycleGuidance = (comparison: InvoiceComparison): NextCycle
       title: 'Focar em um eixo',
       message: 'Consumo e custo nao caminharam na mesma direcao.',
       suggestion:
-        focus === 'um eixo por vez'
+        primaryGoal === 'reduce_cost'
+          ? 'No proximo ciclo, acompanhe primeiro o custo.'
+          : primaryGoal === 'understand_consumption'
+            ? 'No proximo ciclo, observe primeiro o padrao de consumo.'
+            : focus === 'um eixo por vez'
           ? 'Observe um eixo por vez no proximo ciclo.'
           : `No proximo ciclo, acompanhe primeiro o ${focus}.`,
     };
   }
-
-  const hasCurrentInvoice = Boolean(comparison.currentInvoice);
 
   return {
     title: 'Criar base de comparacao',

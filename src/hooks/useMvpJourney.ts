@@ -141,7 +141,12 @@ export const useMvpJourney = () => {
         actionSnapshots: actionSnapshots.length > 0 ? actionSnapshots : undefined,
       };
       const analysis = buildAnalysisSummary(invoice, currentState.profile);
-      const nextActions = buildNextActions(invoice, analysis, currentState.profile);
+      const nextActions = buildNextActions(
+        invoice,
+        analysis,
+        currentState.profile,
+        currentState.userContext
+      );
       const nextInvoiceHistory = buildInvoiceHistory(currentState.analysis.invoiceHistory, invoice);
 
       let nextState = setAnalysis(currentState, {
@@ -202,7 +207,7 @@ export const useMvpJourney = () => {
         });
 
         nextState = updateActions(nextState, {
-          items: buildNextActions(undefined, undefined, currentState.profile),
+          items: buildNextActions(undefined, undefined, currentState.profile, currentState.userContext),
           viewedActionIds: [],
         });
 
@@ -216,7 +221,8 @@ export const useMvpJourney = () => {
       const fallbackActions = buildNextActions(
         latestHistoryInvoice,
         fallbackAnalysis,
-        currentState.profile
+        currentState.profile,
+        currentState.userContext
       );
       const viewedFallbackActionIds = currentState.actions.viewedActionIds.filter((viewedActionId) =>
         fallbackActions.some((action) => action.id === viewedActionId)
@@ -321,8 +327,15 @@ export const useMvpJourney = () => {
         profile: state.profile,
         invoice: state.analysis.latestInvoice,
         analysis: state.analysis.summary,
+        userContext: state.userContext,
       }),
-    [state.analysis.latestInvoice, state.analysis.summary, state.journeyStage, state.profile]
+    [
+      state.analysis.latestInvoice,
+      state.analysis.summary,
+      state.journeyStage,
+      state.profile,
+      state.userContext,
+    ]
   );
 
   return {
@@ -341,6 +354,7 @@ export const useMvpJourney = () => {
     journeyStage: state.journeyStage,
     mascotGuidance,
     mascotContextQuestion,
+    userContext: state.userContext,
     updateProfile,
     updateMascotCustomization,
     startInvoiceProcessing,

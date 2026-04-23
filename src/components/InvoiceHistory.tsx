@@ -27,11 +27,13 @@ import {
   InvoiceComparison,
   InvoiceComparisonTrend,
   InvoiceData,
+  UserContextState,
 } from '@/types/mvp';
 
 interface InvoiceHistoryProps {
   invoices: InvoiceData[];
   onDeleteInvoice: (fingerprint: string) => void;
+  userContext?: Partial<UserContextState>;
 }
 
 const getInvoiceStats = (invoices: InvoiceData[]) => {
@@ -151,11 +153,11 @@ const ComparisonMetric = ({
   </div>
 );
 
-const InvoiceHistory = ({ invoices, onDeleteInvoice }: InvoiceHistoryProps) => {
+const InvoiceHistory = ({ invoices, onDeleteInvoice, userContext }: InvoiceHistoryProps) => {
   const stats = getInvoiceStats(invoices);
   const comparison = buildInvoiceComparison(invoices);
   const actionResultLink = buildActionResultLink(comparison);
-  const guidance = buildNextCycleGuidance(comparison);
+  const guidance = buildNextCycleGuidance(comparison, userContext);
 
   return (
     <div className="space-y-6">

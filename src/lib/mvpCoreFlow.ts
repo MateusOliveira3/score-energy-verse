@@ -7,6 +7,7 @@ import {
   ScoreEvent,
   ScoreEventType,
   ScoreState,
+  UserContextState,
   UserProfileData,
 } from '@/types/mvp';
 
@@ -81,6 +82,14 @@ const getResolvedProfile = (profile?: Partial<UserProfileData>): UserProfileData
   ...DEFAULT_PROFILE,
   ...profile,
 });
+
+const getAnsweredContextValue = (
+  userContext: Partial<UserContextState> | undefined,
+  questionId: 'usage_period' | 'electric_shower' | 'primary_goal'
+) => {
+  const answer = userContext?.questions?.[questionId];
+  return answer?.status === 'answered' ? answer.value : undefined;
+};
 
 export const getProfileCompletion = (profile?: Partial<UserProfileData>) => {
   const resolvedProfile = getResolvedProfile(profile);
@@ -248,12 +257,16 @@ export const buildAnalysisSummary = (
 export const buildNextActions = (
   invoice: InvoiceData | undefined,
   analysis: AnalysisSummary | undefined,
-  profile?: Partial<UserProfileData>
+  profile?: Partial<UserProfileData>,
+  userContext?: Partial<UserContextState>
 ): NextAction[] => {
   const resolvedProfile = getResolvedProfile(profile);
   const profileLabel = resolvedProfile.location
     ? `${resolvedProfile.consumerType.toLowerCase()} em ${resolvedProfile.location}`
     : resolvedProfile.consumerType.toLowerCase();
+  const usagePeriod = getAnsweredContextValue(userContext, 'usage_period');
+  const electricShowerUsage = getAnsweredContextValue(userContext, 'electric_shower');
+  const primaryGoal = getAnsweredContextValue(userContext, 'primary_goal');
   const actionReviewPoints = SCORE_EVENT_POINTS.action_viewed;
   const invoiceCyclePoints =
     SCORE_EVENT_POINTS.invoice_uploaded + SCORE_EVENT_POINTS.analysis_completed;
@@ -319,7 +332,13 @@ export const buildNextActions = (
       value: 'Encontrar desperdícios visíveis',
       context: `Prioridade alta porque a fatura de ${invoice.month} mostrou consumo alto para um perfil ${profileLabel}.`,
       suggestion:
-        'Anote chuveiro, ar-condicionado, forno, máquinas e usos simultâneos.',
+        electricShowerUsage === 'daily' || electricShowerUsage === 'sometimes'
+          ? 'Anote chuveiro, ar-condicionado, forno e outros usos simultâneos.'
+          : usagePeriod === 'night'
+            ? 'Anote o que mais pesa no uso noturno e no horário de pico.'
+            : primaryGoal === 'understand_consumption'
+              ? 'Anote os usos para observar melhor o padrão de consumo.'
+              : 'Anote chuveiro, ar-condicionado, forno, máquinas e usos simultâneos.',
       impact: `Ajuda a escolher um ajuste mais provável (+${actionReviewPoints} pontos ao revisar).`,
       validation: 'Liste os 2 ou 3 usos mais frequentes no pico.',
       priority: 'high',
@@ -334,7 +353,14 @@ export const buildNextActions = (
       title: 'Testar um corte de custo por 7 dias',
       description:
         `Escolha uma mudança simples para testar nesta semana, de preferência perto de ${invoice.peakHours}.`,
-      value: 'Criar um teste comparável',
+      value:
+        primaryGoal === 'reduce_cost'
+          ? 'Buscar impacto direto na fatura'
+          : primaryGoal === 'understand_consumption'
+            ? 'Observar padrão com um teste comparável'
+            : primaryGoal === 'both'
+              ? 'Reduzir custo sem perder leitura do padrão'
+              : 'Criar um teste comparável',
       context: `O sinal de custo está ${analysis.costSignal}; comece por um teste pequeno.`,
       suggestion:
         'Reduza uso simultâneo, encurte um uso intenso ou revise luzes recorrentes.',
@@ -373,7 +399,11 @@ export const buildNextActions = (
       value: 'Transformar leitura em evolução',
       context: `A leitura atual é da fatura de ${invoice.month}; a comparação melhora com outro ciclo.`,
       suggestion:
-        'Guarde a próxima conta e volte quando ela estiver disponível.',
+        primaryGoal === 'reduce_cost'
+          ? 'Guarde a próxima conta para ver se o custo responde ao ajuste.'
+          : primaryGoal === 'understand_consumption'
+            ? 'Guarde a próxima conta para observar se o padrão se repete.'
+            : 'Guarde a próxima conta e volte quando ela estiver disponível.',
       impact: `Pode somar até ${invoiceCyclePoints} pontos em novo ciclo de fatura e análise.`,
       validation: 'Próxima fatura aparece no histórico.',
       priority: 'medium',
@@ -390,16 +420,20 @@ export const buildMascotGuidance = ({
   profile,
   invoice,
   analysis,
+  userContext,
 }: {
   stage: JourneyStage;
   profile?: Partial<UserProfileData>;
   invoice?: InvoiceData;
   analysis?: AnalysisSummary;
+  userContext?: Partial<UserContextState>;
 }): MascotGuidance => {
   const resolvedProfile = getResolvedProfile(profile);
   const profileLabel = resolvedProfile.location
     ? `${resolvedProfile.consumerType.toLowerCase()} em ${resolvedProfile.location}`
     : resolvedProfile.consumerType.toLowerCase();
+  const usagePeriod = getAnsweredContextValue(userContext, 'usage_period');
+  const primaryGoal = getAnsweredContextValue(userContext, 'primary_goal');
 
   if (stage === 'return-visit') {
     return {
@@ -423,7 +457,7 @@ export const buildMascotGuidance = ({
     return {
       stage,
       title: 'Resumo do momento',
-      message: `Na fatura de ${invoice.month}, o consumo ficou ${analysis.consumptionLevel}. Próximo foco: ${analysis.whatMattersNext.toLowerCase()}`,
+      message: `Na fatura de ${invoice.month}, o consumo ficou ${analysis.consumptionLevel}${primaryGoal === 'reduce_cost' ? ', com foco em reduzir custo' : primaryGoal === 'understand_consumption' ? ', para entender melhor o consumo' : usagePeriod === 'night' ? ', com atenção ao uso noturno' : ''}. Próximo foco: ${analysis.whatMattersNext.toLowerCase()}`,
     };
   }
 

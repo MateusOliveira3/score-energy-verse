@@ -33,6 +33,7 @@ const Index = () => {
     scoreExplanation,
     mascotGuidance,
     mascotContextQuestion,
+    userContext,
     updateProfile,
     updateMascotCustomization,
     startInvoiceProcessing,
@@ -204,7 +205,11 @@ const Index = () => {
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
           <div className="xl:col-span-2">
-            <InvoiceHistory invoices={invoiceHistory} onDeleteInvoice={handleInvoiceRemoved} />
+            <InvoiceHistory
+              invoices={invoiceHistory}
+              onDeleteInvoice={handleInvoiceRemoved}
+              userContext={userContext}
+            />
           </div>
           <ScoreExplanationCard explanation={scoreExplanation} />
         </div>

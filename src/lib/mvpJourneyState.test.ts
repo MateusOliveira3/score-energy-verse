@@ -71,6 +71,12 @@ const makeState = (overrides: Partial<MvpState> = {}): MvpState => ({
   ...overrides,
   profile: overrides.profile ?? DEFAULT_MVP_STATE.profile,
   mascot: overrides.mascot ?? DEFAULT_MVP_STATE.mascot,
+  userContext: {
+    ...DEFAULT_MVP_STATE.userContext,
+    ...overrides.userContext,
+    questions:
+      overrides.userContext?.questions ?? DEFAULT_MVP_STATE.userContext.questions,
+  },
   analysis: {
     ...DEFAULT_MVP_STATE.analysis,
     ...overrides.analysis,
@@ -155,6 +161,60 @@ test('nextActions de analise pronta incluem contexto, execucao e impacto no scor
   assert.ok(costCutAction.suggestion);
   assert.ok(costCutAction.validation);
   assert.ok(costCutAction.impact?.includes(`+${getScoreEventPoints('action_viewed')}`));
+});
+
+test('nextActions ajusta microcopy com contexto leve do usuario', () => {
+  const actions = buildNextActions(
+    invoice,
+    {
+      ...analysis,
+      consumptionLevel: 'alto',
+    },
+    completeProfile,
+    {
+    questions: {
+      usage_period: {
+        status: 'answered',
+        value: 'night',
+        label: 'Noite',
+        updatedAt: '2026-04-23T12:00:00.000Z',
+      },
+      electric_shower: {
+        status: 'answered',
+        value: 'daily',
+        label: 'Todos os dias',
+        updatedAt: '2026-04-23T12:05:00.000Z',
+      },
+      primary_goal: {
+        status: 'answered',
+        value: 'reduce_cost',
+        label: 'Reduzir custo',
+        updatedAt: '2026-04-23T12:10:00.000Z',
+      },
+    },
+    }
+  );
+  const peakUsageAction = actions.find((action) => action.id === 'map-peak-usage');
+  const costCutAction = actions.find((action) => action.id === 'choose-one-cost-cut');
+
+  assert.ok(peakUsageAction?.suggestion?.includes('chuveiro'));
+  assert.equal(costCutAction?.value, 'Buscar impacto direto na fatura');
+});
+
+test('nextActions ajusta o retorno do proximo ciclo com foco do usuario', () => {
+  const actions = buildNextActions(invoice, analysis, completeProfile, {
+    questions: {
+      primary_goal: {
+        status: 'answered',
+        value: 'reduce_cost',
+        label: 'Reduzir custo',
+        updatedAt: '2026-04-23T12:10:00.000Z',
+      },
+    },
+  });
+  const nextBillAction = actions.find((action) => action.id === 'return-next-bill');
+
+  assert.ok(nextBillAction?.suggestion?.includes('custo responde'));
 });
 
 test('normalizacao preserva campos opcionais de nextActions enriquecidas', () => {
@@ -531,6 +591,29 @@ test('guidance de proximo ciclo para leitura mista foca no eixo de atencao', () 
   assert.ok(guidance.suggestion.includes('custo'));
 });
 
+test('guidance de proximo ciclo ajusta microcopy com objetivo principal', () => {
+  const currentInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-05',
+    month: 'maio de 2026',
+    consumption: 390,
+    totalValue: 470,
+  });
+  const comparison = buildInvoiceComparison([currentInvoice, invoice]);
+  const guidance = buildNextCycleGuidance(comparison, {
+    questions: {
+      primary_goal: {
+        status: 'answered',
+        value: 'reduce_cost',
+        label: 'Reduzir custo',
+        updatedAt: '2026-04-23T12:00:00.000Z',
+      },
+    },
+  });
+
+  assert.equal(comparison.status, 'worsened');
+  assert.ok(guidance.suggestion.includes('reduzir custo'));
+});
+
 test('retorno apos inatividade com contexto retornavel resolve para return-visit', () => {
   const resolved = resolveFullJourneyState(
     makeState({
@@ -588,6 +671,27 @@ test('guidance fica coerente com o stage resolvido', () => {
 
   assert.equal(guidance.stage, resolved.journeyStage);
   assert.equal(guidance.stage, 'analysis-ready');
+});
+
+test('mascote ajusta microcopy com objetivo principal do usuario', () => {
+  const guidance = buildMascotGuidance({
+    stage: 'analysis-ready',
+    profile: completeProfile,
+    invoice,
+    analysis,
+    userContext: {
+      questions: {
+        primary_goal: {
+          status: 'answered',
+          value: 'understand_consumption',
+          label: 'Entender consumo',
+          updatedAt: '2026-04-23T12:00:00.000Z',
+        },
+      },
+    },
+  });
+
+  assert.ok(guidance.message.includes('entender melhor o consumo'));
 });
 
 test('mascote pergunta sobre periodo de consumo apos primeira analise', () => {
