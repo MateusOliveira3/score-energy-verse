@@ -5,6 +5,7 @@ import {
   Calendar,
   DollarSign,
   FileText,
+  Minus,
   Trash2,
   TrendingDown,
   TrendingUp,
@@ -13,7 +14,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { InvoiceData } from '@/types/mvp';
+import { buildInvoiceComparison } from '@/lib/mvpJourneyState';
+import { InvoiceComparison, InvoiceComparisonTrend, InvoiceData } from '@/types/mvp';
 
 interface InvoiceHistoryProps {
   invoices: InvoiceData[];
@@ -65,8 +67,65 @@ const formatInvoiceDate = (invoice: InvoiceData) => {
   return format(new Date(dateValue), 'dd/MM/yyyy', { locale: ptBR });
 };
 
+const comparisonVariant: Record<InvoiceComparison['status'], string> = {
+  insufficient: 'border-slate-100 bg-slate-50 text-slate-700',
+  improved: 'border-emerald-100 bg-emerald-50 text-emerald-800',
+  worsened: 'border-rose-100 bg-rose-50 text-rose-800',
+  stable: 'border-blue-100 bg-blue-50 text-blue-800',
+  mixed: 'border-amber-100 bg-amber-50 text-amber-800',
+};
+
+const trendLabel: Record<InvoiceComparisonTrend, string> = {
+  down: 'reduziu',
+  up: 'aumentou',
+  stable: 'manteve',
+};
+
+const trendIcon = {
+  down: <TrendingDown className="h-4 w-4" />,
+  up: <TrendingUp className="h-4 w-4" />,
+  stable: <Minus className="h-4 w-4" />,
+} as const;
+
+const formatMetricChange = (change: number, unit: string) => {
+  if (change === 0) {
+    return `0 ${unit}`;
+  }
+
+  return `${change > 0 ? '+' : ''}${change} ${unit}`;
+};
+
+const ComparisonMetric = ({
+  label,
+  unit,
+  metric,
+}: {
+  label: string;
+  unit: string;
+  metric: NonNullable<InvoiceComparison['consumption']>;
+}) => (
+  <div className="rounded-lg bg-white/70 p-3">
+    <div className="flex items-center justify-between gap-3 text-sm font-medium">
+      <span>{label}</span>
+      <span className="flex items-center gap-1">
+        {trendIcon[metric.trend]}
+        {trendLabel[metric.trend]}
+      </span>
+    </div>
+    <div className="mt-2 text-sm">
+      <span className="font-semibold">{metric.current}</span>
+      <span className="text-slate-500"> vs {metric.previous}</span>
+      <span className="ml-2 text-slate-600">
+        ({formatMetricChange(metric.change, unit)}
+        {metric.percentChange !== undefined ? `, ${metric.percentChange > 0 ? '+' : ''}${metric.percentChange}%` : ''})
+      </span>
+    </div>
+  </div>
+);
+
 const InvoiceHistory = ({ invoices, onDeleteInvoice }: InvoiceHistoryProps) => {
   const stats = getInvoiceStats(invoices);
+  const comparison = buildInvoiceComparison(invoices);
 
   return (
     <div className="space-y-6">
@@ -95,6 +154,35 @@ const InvoiceHistory = ({ invoices, onDeleteInvoice }: InvoiceHistoryProps) => {
               <div className="text-2xl font-bold text-orange-600">R$ {stats.averageValue}</div>
               <div className="text-sm text-orange-700">Valor Medio</div>
             </div>
+          </div>
+
+          <div className={`mb-6 rounded-xl border p-4 ${comparisonVariant[comparison.status]}`}>
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div className="text-sm font-semibold uppercase tracking-wide">
+                  Comparacao com a fatura anterior
+                </div>
+                <h3 className="mt-1 text-lg font-bold">{comparison.title}</h3>
+                <p className="mt-1 text-sm">{comparison.summary}</p>
+                {comparison.currentInvoice && comparison.previousInvoice && (
+                  <p className="mt-2 text-xs opacity-80">
+                    Comparando {comparison.currentInvoice.month} com {comparison.previousInvoice.month}.
+                  </p>
+                )}
+              </div>
+              {comparison.status !== 'insufficient' && (
+                <Badge variant="outline" className="w-fit bg-white/70">
+                  Leitura observada
+                </Badge>
+              )}
+            </div>
+
+            {comparison.consumption && comparison.totalValue && (
+              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                <ComparisonMetric label="Consumo" unit="kWh" metric={comparison.consumption} />
+                <ComparisonMetric label="Custo" unit="R$" metric={comparison.totalValue} />
+              </div>
+            )}
           </div>
 
           {invoices.length === 0 ? (

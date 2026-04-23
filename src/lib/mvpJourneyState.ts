@@ -1,6 +1,8 @@
 import {
   AnalysisState,
   AnalysisStatus,
+  InvoiceComparison,
+  InvoiceComparisonTrend,
   InvoiceData,
   JourneyStage,
   Mascot,
@@ -603,6 +605,113 @@ export const pruneInvoiceHistory = (
 ): InvoiceData[] => invoiceHistory.filter((invoice) => invoice.fingerprint !== fingerprint);
 
 export const getLatestInvoiceHistoryEntry = (invoiceHistory: InvoiceData[]) => invoiceHistory[0];
+
+const getMetricTrend = (
+  change: number,
+  percentChange: number | undefined,
+  stableAbsoluteThreshold: number
+): InvoiceComparisonTrend => {
+  const isStableByAbsoluteChange = Math.abs(change) <= stableAbsoluteThreshold;
+  const isStableByPercentage = percentChange !== undefined && Math.abs(percentChange) <= 2;
+
+  if (isStableByAbsoluteChange || isStableByPercentage) {
+    return 'stable';
+  }
+
+  return change < 0 ? 'down' : 'up';
+};
+
+const buildMetricComparison = (
+  current: number,
+  previous: number,
+  stableAbsoluteThreshold: number
+) => {
+  const change = current - previous;
+  const percentChange = previous > 0 ? Math.round((change / previous) * 100) : undefined;
+
+  return {
+    current,
+    previous,
+    change,
+    percentChange,
+    trend: getMetricTrend(change, percentChange, stableAbsoluteThreshold),
+  };
+};
+
+export const buildInvoiceComparison = (invoiceHistory: InvoiceData[]): InvoiceComparison => {
+  const [currentInvoice, previousInvoice] = invoiceHistory;
+
+  if (!currentInvoice || !previousInvoice) {
+    return {
+      status: 'insufficient',
+      title: 'Ainda nao ha comparacao entre faturas',
+      summary:
+        'Envie pelo menos duas faturas para observar se consumo e custo melhoraram, pioraram ou ficaram estaveis.',
+      currentInvoice,
+    };
+  }
+
+  const consumption = buildMetricComparison(
+    currentInvoice.consumption,
+    previousInvoice.consumption,
+    5
+  );
+  const totalValue = buildMetricComparison(currentInvoice.totalValue, previousInvoice.totalValue, 5);
+  const consumptionImproved = consumption.trend === 'down';
+  const consumptionWorsened = consumption.trend === 'up';
+  const costImproved = totalValue.trend === 'down';
+  const costWorsened = totalValue.trend === 'up';
+
+  if (consumption.trend === 'stable' && totalValue.trend === 'stable') {
+    return {
+      status: 'stable',
+      title: 'Fatura estavel em relacao a anterior',
+      summary:
+        'Consumo e custo ficaram proximos da fatura anterior. Ainda vale acompanhar o proximo ciclo antes de concluir tendencia.',
+      currentInvoice,
+      previousInvoice,
+      consumption,
+      totalValue,
+    };
+  }
+
+  if ((consumptionImproved || consumption.trend === 'stable') && (costImproved || totalValue.trend === 'stable')) {
+    return {
+      status: 'improved',
+      title: 'Reducao observada nesta fatura',
+      summary:
+        'A fatura atual ficou melhor em pelo menos um sinal sem piorar o outro. Isso indica evolucao observada, ainda sem atribuir causa direta.',
+      currentInvoice,
+      previousInvoice,
+      consumption,
+      totalValue,
+    };
+  }
+
+  if ((consumptionWorsened || consumption.trend === 'stable') && (costWorsened || totalValue.trend === 'stable')) {
+    return {
+      status: 'worsened',
+      title: 'Aumento observado nesta fatura',
+      summary:
+        'A fatura atual piorou em pelo menos um sinal sem melhora compensatoria no outro. Vale revisar rotina e acompanhar o proximo ciclo.',
+      currentInvoice,
+      previousInvoice,
+      consumption,
+      totalValue,
+    };
+  }
+
+  return {
+    status: 'mixed',
+    title: 'Leitura mista entre consumo e custo',
+    summary:
+      'Consumo e custo apontaram em direcoes diferentes. O melhor uso desta comparacao e acompanhar mais um ciclo antes de concluir tendencia.',
+    currentInvoice,
+    previousInvoice,
+    consumption,
+    totalValue,
+  };
+};
 
 export const updateActions = (
   state: MvpState,

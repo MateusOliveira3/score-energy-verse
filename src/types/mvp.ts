@@ -36,6 +36,33 @@ export interface InvoiceData {
   uploadedAt?: string;
 }
 
+export type InvoiceComparisonStatus =
+  | 'insufficient'
+  | 'improved'
+  | 'worsened'
+  | 'stable'
+  | 'mixed';
+
+export type InvoiceComparisonTrend = 'down' | 'up' | 'stable';
+
+export interface InvoiceMetricComparison {
+  current: number;
+  previous: number;
+  change: number;
+  percentChange?: number;
+  trend: InvoiceComparisonTrend;
+}
+
+export interface InvoiceComparison {
+  status: InvoiceComparisonStatus;
+  title: string;
+  summary: string;
+  currentInvoice?: InvoiceData;
+  previousInvoice?: InvoiceData;
+  consumption?: InvoiceMetricComparison;
+  totalValue?: InvoiceMetricComparison;
+}
+
 export interface Analysis {
   consumptionLevel: 'baixo' | 'moderado' | 'alto';
   costSignal: 'controlado' | 'atencao' | 'elevado';

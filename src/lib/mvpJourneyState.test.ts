@@ -7,6 +7,7 @@ import {
   getScoreState,
 } from '@/lib/mvpCoreFlow';
 import {
+  buildInvoiceComparison,
   DEFAULT_MVP_STATE,
   getScoreExplanation,
   resolveFullJourneyState,
@@ -38,6 +39,13 @@ const invoice: InvoiceData = {
   month: 'abril de 2026',
   uploadedAt: '2026-04-22T12:00:00.000Z',
 };
+
+const makeInvoice = (overrides: Partial<InvoiceData>): InvoiceData => ({
+  ...invoice,
+  ...overrides,
+  fingerprint: overrides.fingerprint ?? `invoice-${overrides.month ?? invoice.month}`,
+  fileName: overrides.fileName ?? `fatura-${overrides.month ?? invoice.month}.pdf`,
+});
 
 const analysis: AnalysisSummary = {
   consumptionLevel: 'moderado',
@@ -248,6 +256,75 @@ test('updateActionStatus inicia e conclui acao sem criar estrutura paralela', ()
   );
   assert.deepEqual(completed.actions.viewedActionIds, inProgress.actions.viewedActionIds);
   assert.ok(completed.actions.viewedActionIds.includes(targetActionId));
+});
+
+test('comparacao de faturas sem historico suficiente fica honesta', () => {
+  const comparison = buildInvoiceComparison([invoice]);
+
+  assert.equal(comparison.status, 'insufficient');
+  assert.equal(comparison.previousInvoice, undefined);
+  assert.equal(comparison.consumption, undefined);
+  assert.ok(comparison.summary.includes('pelo menos duas faturas'));
+});
+
+test('comparacao identifica melhora observada entre duas faturas', () => {
+  const currentInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-05',
+    month: 'maio de 2026',
+    consumption: 310,
+    totalValue: 390,
+  });
+  const comparison = buildInvoiceComparison([currentInvoice, invoice]);
+
+  assert.equal(comparison.status, 'improved');
+  assert.equal(comparison.consumption?.change, -50);
+  assert.equal(comparison.totalValue?.change, -40);
+  assert.equal(comparison.consumption?.trend, 'down');
+  assert.equal(comparison.totalValue?.trend, 'down');
+});
+
+test('comparacao identifica piora observada entre duas faturas', () => {
+  const currentInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-05',
+    month: 'maio de 2026',
+    consumption: 390,
+    totalValue: 470,
+  });
+  const comparison = buildInvoiceComparison([currentInvoice, invoice]);
+
+  assert.equal(comparison.status, 'worsened');
+  assert.equal(comparison.consumption?.change, 30);
+  assert.equal(comparison.totalValue?.change, 40);
+  assert.equal(comparison.consumption?.trend, 'up');
+  assert.equal(comparison.totalValue?.trend, 'up');
+});
+
+test('comparacao identifica estabilidade quando variacao e pequena', () => {
+  const currentInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-05',
+    month: 'maio de 2026',
+    consumption: 364,
+    totalValue: 434,
+  });
+  const comparison = buildInvoiceComparison([currentInvoice, invoice]);
+
+  assert.equal(comparison.status, 'stable');
+  assert.equal(comparison.consumption?.trend, 'stable');
+  assert.equal(comparison.totalValue?.trend, 'stable');
+});
+
+test('comparacao nao força conclusao quando consumo e custo divergem', () => {
+  const currentInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-05',
+    month: 'maio de 2026',
+    consumption: 320,
+    totalValue: 470,
+  });
+  const comparison = buildInvoiceComparison([currentInvoice, invoice]);
+
+  assert.equal(comparison.status, 'mixed');
+  assert.equal(comparison.consumption?.trend, 'down');
+  assert.equal(comparison.totalValue?.trend, 'up');
 });
 
 test('retorno apos inatividade com contexto retornavel resolve para return-visit', () => {
