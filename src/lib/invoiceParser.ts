@@ -108,10 +108,38 @@ const normalizeAscii = (value: string) =>
 export const normalizeInvoiceText = (value: string) =>
   normalizeAscii(value)
     .replace(/\0/g, ' ')
+    .replace(/[^\x20-\x7E\n]/g, ' ')
     .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .toUpperCase()
     .trim();
+
+const normalizeInlineWhitespace = (value: string) => value.replace(/\s+/g, ' ').trim();
+
+const buildSearchText = (normalizedText: string) => {
+  const lines = normalizedText
+    .split('\n')
+    .map((line) => normalizeInlineWhitespace(line))
+    .filter(Boolean);
+
+  if (lines.length === 0) {
+    return normalizedText;
+  }
+
+  const windows = new Set<string>();
+  const windowSize = 6;
+
+  for (let start = 0; start < lines.length; start += 1) {
+    let combined = '';
+
+    for (let offset = 0; offset < windowSize && start + offset < lines.length; offset += 1) {
+      combined = combined ? `${combined} ${lines[start + offset]}` : lines[start + offset];
+      windows.add(combined);
+    }
+  }
+
+  return [normalizedText, lines.join(' '), ...windows].join('\n');
+};
 
 const parseBrazilianNumber = (value: string): number | undefined => {
   const compact = value.replace(/[^\d,.-]/g, '');
@@ -146,6 +174,22 @@ const parseIntegerValue = (value: string): number | undefined => {
   }
 
   return Math.round(parsed);
+};
+
+const parseReadingNumber = (value: string): number | undefined => {
+  const compact = value.replace(/[^\d,.-]/g, '');
+
+  if (!compact) {
+    return undefined;
+  }
+
+  if (!compact.includes(',') && compact.includes('.')) {
+    const normalized = compact.replace(/\./g, '');
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  return parseBrazilianNumber(compact);
 };
 
 const normalizeDateValue = (value: string): string | undefined => {
@@ -220,10 +264,10 @@ const sanitizeTariffFlag = (value: string) => {
   }
 
   const knownFlag = cleaned.match(
-    /\b(VERDE|AMARELA|VERMELHA(?: PATAMAR ?[12])?|ESCASSEZ HIDRICA|SEM BANDEIRA)\b/
+    /\b(ESCASSEZ HIDRICA|SEM BANDEIRA|VERMELHA PATAMAR ?[12]|VERMELHA|AMARELA|VERDE)\b/
   );
 
-  return knownFlag?.[0] ?? cleaned;
+  return knownFlag?.[0];
 };
 
 const pushCandidate = <T>(
@@ -363,6 +407,20 @@ const decodePdfHexString = (value: string) => {
   return new TextDecoder('latin1').decode(bytes);
 };
 
+const decodePdfStringToken = (value: string) => {
+  const trimmed = value.trim();
+
+  if (trimmed.startsWith('(') && trimmed.endsWith(')')) {
+    return decodePdfLiteralString(trimmed.slice(1, -1));
+  }
+
+  if (trimmed.startsWith('<') && trimmed.endsWith('>')) {
+    return decodePdfHexString(trimmed.slice(1, -1));
+  }
+
+  return '';
+};
+
 const extractPdfStringsFromTextBlock = (value: string) => {
   const parts: string[] = [];
   const literalMatches = value.matchAll(/\(((?:\\.|[^\\()])*)\)/g);
@@ -380,21 +438,73 @@ const extractPdfStringsFromTextBlock = (value: string) => {
   return parts;
 };
 
+const extractPdfTextFromArrayOperator = (value: string) => {
+  const body = value.replace(/^\[/, '').replace(/\]\s*TJ$/i, '');
+  const tokens = body.match(/(\((?:\\.|[^\\()])*\)|<[\dA-F\s]+>|-?\d+(?:\.\d+)?)/g) ?? [];
+  let result = '';
+  let pendingSpace = false;
+  let sawTextToken = false;
+
+  tokens.forEach((token) => {
+    if (token.startsWith('(') || token.startsWith('<')) {
+      const decoded = normalizeInlineWhitespace(decodePdfStringToken(token));
+
+      if (!decoded) {
+        return;
+      }
+
+      if (pendingSpace && result && !/\s$/.test(result) && !/^[,.;:!?)]/.test(decoded)) {
+        result += ' ';
+      }
+
+      result += decoded;
+      pendingSpace = false;
+      sawTextToken = true;
+      return;
+    }
+
+    if (sawTextToken && Math.abs(Number(token)) >= 250) {
+      pendingSpace = true;
+    }
+  });
+
+  return result;
+};
+
+const extractPdfTextFromOperator = (value: string) => {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return '';
+  }
+
+  if (trimmed.startsWith('[')) {
+    return extractPdfTextFromArrayOperator(trimmed);
+  }
+
+  const tokenMatch = trimmed.match(/^(\((?:\\.|[^\\()])*\)|<[\dA-F\s]+>)/);
+  return tokenMatch ? normalizeInlineWhitespace(decodePdfStringToken(tokenMatch[1])) : '';
+};
+
 const extractPdfOperatorText = (value: string) => {
   const chunks: string[] = [];
   const operatorMatches = value.matchAll(
-    /(\[(?:.|[\r\n])*?\]\s*TJ|\((?:\\.|[^\\()])*\)\s*Tj|\((?:\\.|[^\\()])*\)\s*["'])/g
+    /(\[(?:.|[\r\n])*?\]\s*TJ|(?:\((?:\\.|[^\\()])*\)|<[\dA-F\s]+>)\s*(?:Tj|["']))/g
   );
 
   for (const match of operatorMatches) {
-    chunks.push(...extractPdfStringsFromTextBlock(match[1]));
+    const extracted = extractPdfTextFromOperator(match[1]);
+
+    if (extracted) {
+      chunks.push(extracted);
+    }
   }
 
   if (chunks.length > 0) {
     return chunks.join('\n');
   }
 
-  return extractPdfStringsFromTextBlock(value).join('\n');
+  return extractPdfStringsFromTextBlock(value).map(normalizeInlineWhitespace).filter(Boolean).join(' ');
 };
 
 const binaryStringToBytes = (value: string) => {
@@ -407,29 +517,159 @@ const binaryStringToBytes = (value: string) => {
   return bytes;
 };
 
+const bytesToLatinText = (value: Uint8Array) => new TextDecoder('latin1').decode(value);
+
+const decodeAsciiHexBytes = (value: Uint8Array) => {
+  const compact = bytesToLatinText(value)
+    .replace(/[^0-9A-F>]/gi, '')
+    .replace(/>.*$/g, '')
+    .trim();
+
+  if (!compact) {
+    return new Uint8Array();
+  }
+
+  const evenHex = compact.length % 2 === 0 ? compact : `${compact}0`;
+  const bytes = new Uint8Array(evenHex.length / 2);
+
+  for (let index = 0; index < evenHex.length; index += 2) {
+    bytes[index / 2] = Number.parseInt(evenHex.slice(index, index + 2), 16);
+  }
+
+  return bytes;
+};
+
+const decodeAscii85Bytes = (value: Uint8Array) => {
+  const source = bytesToLatinText(value);
+  const payload = source.includes('~>') ? source.slice(0, source.indexOf('~>')) : source;
+  const compact = payload.replace(/\s+/g, '');
+  const output: number[] = [];
+  let block = '';
+
+  for (const char of compact) {
+    if (char === 'z') {
+      if (block.length === 0) {
+        output.push(0, 0, 0, 0);
+      }
+
+      continue;
+    }
+
+    block += char;
+
+    if (block.length === 5) {
+      let value85 = 0;
+
+      for (const digit of block) {
+        value85 = value85 * 85 + (digit.charCodeAt(0) - 33);
+      }
+
+      output.push(
+        (value85 >>> 24) & 0xff,
+        (value85 >>> 16) & 0xff,
+        (value85 >>> 8) & 0xff,
+        value85 & 0xff
+      );
+      block = '';
+    }
+  }
+
+  if (block.length > 0) {
+    const padded = block.padEnd(5, 'u');
+    let value85 = 0;
+
+    for (const digit of padded) {
+      value85 = value85 * 85 + (digit.charCodeAt(0) - 33);
+    }
+
+    const remainder = [
+      (value85 >>> 24) & 0xff,
+      (value85 >>> 16) & 0xff,
+      (value85 >>> 8) & 0xff,
+      value85 & 0xff,
+    ];
+
+    output.push(...remainder.slice(0, block.length - 1));
+  }
+
+  return new Uint8Array(output);
+};
+
 const inflatePdfStream = async (bytes: Uint8Array) => {
   if (typeof DecompressionStream === 'undefined') {
     return undefined;
   }
 
-  try {
-    const stream = new Response(bytes).body;
+  for (const format of ['deflate', 'deflate-raw'] as const) {
+    try {
+      const stream = new Response(bytes).body;
 
-    if (!stream) {
+      if (!stream) {
+        return undefined;
+      }
+
+      const decompressed = stream.pipeThrough(new DecompressionStream(format));
+      const buffer = await new Response(decompressed).arrayBuffer();
+      return new Uint8Array(buffer);
+    } catch {
+      // Try the next deflate flavor.
+    }
+  }
+
+  return undefined;
+};
+
+const PDF_FILTER_ALIASES: Record<string, 'FLATEDECODE' | 'ASCIIHEXDECODE' | 'ASCII85DECODE'> = {
+  FLATEDECODE: 'FLATEDECODE',
+  FL: 'FLATEDECODE',
+  ASCIIHEXDECODE: 'ASCIIHEXDECODE',
+  AHX: 'ASCIIHEXDECODE',
+  ASCII85DECODE: 'ASCII85DECODE',
+  A85: 'ASCII85DECODE',
+};
+
+const extractPdfFilters = (dictionary: string) => {
+  const filterMatch = dictionary.match(/\/FILTER\s*(\[[^\]]+\]|\/[A-Z0-9]+)/i);
+
+  if (!filterMatch) {
+    return [];
+  }
+
+  return (filterMatch[1].match(/\/([A-Z0-9]+)/gi) ?? [])
+    .map((token) => token.replace('/', '').toUpperCase())
+    .map((token) => PDF_FILTER_ALIASES[token])
+    .filter((token): token is 'FLATEDECODE' | 'ASCIIHEXDECODE' | 'ASCII85DECODE' => Boolean(token));
+};
+
+const decodePdfStreamBytes = async (dictionary: string, streamValue: string) => {
+  const filters = extractPdfFilters(dictionary);
+  let bytes = binaryStringToBytes(streamValue);
+
+  for (const filter of filters) {
+    if (filter === 'ASCIIHEXDECODE') {
+      bytes = decodeAsciiHexBytes(bytes);
+      continue;
+    }
+
+    if (filter === 'ASCII85DECODE') {
+      bytes = decodeAscii85Bytes(bytes);
+      continue;
+    }
+
+    const inflated = await inflatePdfStream(bytes);
+
+    if (!inflated) {
       return undefined;
     }
 
-    const decompressed = stream.pipeThrough(new DecompressionStream('deflate'));
-    const buffer = await new Response(decompressed).arrayBuffer();
-    return new Uint8Array(buffer);
-  } catch {
-    return undefined;
+    bytes = inflated;
   }
+
+  return bytes;
 };
 
 const extractPdfText = async (bytes: Uint8Array) => {
-  const latinDecoder = new TextDecoder('latin1');
-  const binaryText = latinDecoder.decode(bytes);
+  const binaryText = bytesToLatinText(bytes);
   const textChunks = new Set<string>();
   const directText = extractPdfOperatorText(binaryText);
 
@@ -437,7 +677,7 @@ const extractPdfText = async (bytes: Uint8Array) => {
     textChunks.add(directText);
   }
 
-  const streamMatches = binaryText.matchAll(/<<(.*?)>>\s*stream\r?\n([\s\S]*?)\r?\nendstream/g);
+  const streamMatches = binaryText.matchAll(/<<([\s\S]*?)>>\s*stream\r?\n([\s\S]*?)\r?\nendstream/g);
 
   for (const match of streamMatches) {
     const dictionary = match[1] ?? '';
@@ -447,20 +687,13 @@ const extractPdfText = async (bytes: Uint8Array) => {
       continue;
     }
 
-    const sourceBytes = binaryStringToBytes(streamValue);
-    let decodedBytes = sourceBytes;
+    const decodedBytes = await decodePdfStreamBytes(dictionary, streamValue);
 
-    if (/\/FLATEDECODE/i.test(dictionary)) {
-      const inflated = await inflatePdfStream(sourceBytes);
-
-      if (inflated) {
-        decodedBytes = inflated;
-      } else {
-        continue;
-      }
+    if (!decodedBytes) {
+      continue;
     }
 
-    const decodedText = latinDecoder.decode(decodedBytes);
+    const decodedText = bytesToLatinText(decodedBytes);
     const extracted = extractPdfOperatorText(decodedText);
 
     if (extracted.trim()) {
@@ -472,10 +705,19 @@ const extractPdfText = async (bytes: Uint8Array) => {
 };
 
 const extractHeaderProviderName = (normalizedText: string) => {
-  const lines = normalizedText.split('\n').slice(0, 12);
+  const lines = normalizedText
+    .split('\n')
+    .map((line) => normalizeInlineWhitespace(line))
+    .filter(Boolean)
+    .slice(0, 18);
 
   for (const line of lines) {
-    if (/\b(ENERGIA|ELETRICA|DISTRIBUIDORA|COMPANHIA)\b/.test(line) && !/\d{4,}/.test(line)) {
+    if (
+      /\b(ENERGIA|ELETRICA|DISTRIBUIDORA|COMPANHIA|CELESC|ENEL|COELBA|EQUATORIAL|LIGHT|CPFL)\b/.test(
+        line
+      ) &&
+      !/\d{4,}/.test(line)
+    ) {
       const value = sanitizeProviderName(line);
 
       if (value) {
@@ -487,14 +729,154 @@ const extractHeaderProviderName = (normalizedText: string) => {
   return undefined;
 };
 
+const collectReadingPairCandidates = (searchText: string) => {
+  const previousCandidates: Candidate<number>[] = [];
+  const currentCandidates: Candidate<number>[] = [];
+  const pairRules = [
+    /LEITURA\s+ANTERIOR\s+LEITURA\s+ATUAL\s+([\d.,]+)\s+([\d.,]+)/g,
+    /LEITURA\s+ANTERIOR\s*[:\-]?\s*([\d.,]+)\s+(?:LEITURA\s+ATUAL\s*[:\-]?\s*)?([\d.,]+)/g,
+    /LEITURA\s+ANT\s*[:\-]?\s*([\d.,]+)\s+(?:LEITURA\s+AT(?:UAL)?\s*[:\-]?\s*)?([\d.,]+)/g,
+  ];
+
+  pairRules.forEach((pattern) => {
+    for (const match of searchText.matchAll(pattern)) {
+      const currentValue = parseReadingNumber(match[2]);
+      const normalizedPreviousValue = parseReadingNumber(match[1]);
+      const index = match.index ?? Number.MAX_SAFE_INTEGER;
+
+      pushCandidate(previousCandidates, normalizedPreviousValue, 'high', index, validateReading);
+      pushCandidate(currentCandidates, currentValue, 'high', index, validateReading);
+    }
+  });
+
+  return {
+      previousCandidates,
+      currentCandidates,
+    };
+};
+
+const collectClientHeaderCandidates = (searchText: string) => {
+  const consumerUnitCandidates: Candidate<string>[] = [];
+  const referenceMonthCandidates: Candidate<string>[] = [];
+  const dueDateCandidates: Candidate<string>[] = [];
+  const totalValueCandidates: Candidate<number>[] = [];
+  const clientHeaderPattern =
+    /(\d{6,})\s+(\d{6,})\s+CLIENTE:\s+((?:0[1-9]|1[0-2])\/\d{4})\s+(\d{2}\/\d{2}\/\d{4})\s+([\d.]+,\d{2})\s+R\$/g;
+
+  for (const match of searchText.matchAll(clientHeaderPattern)) {
+    const index = match.index ?? Number.MAX_SAFE_INTEGER;
+
+    pushCandidate(
+      consumerUnitCandidates,
+      sanitizeConsumerUnit(match[1]),
+      'high',
+      index
+    );
+    pushCandidate(
+      referenceMonthCandidates,
+      normalizeReferenceMonth(match[3]),
+      'high',
+      index
+    );
+    pushCandidate(
+      dueDateCandidates,
+      normalizeDateValue(match[4]),
+      'high',
+      index
+    );
+    pushCandidate(
+      totalValueCandidates,
+      parseBrazilianNumber(match[5]),
+      'high',
+      index,
+      validateCurrency
+    );
+  }
+
+  return {
+    consumerUnitCandidates,
+    referenceMonthCandidates,
+    dueDateCandidates,
+    totalValueCandidates,
+  };
+};
+
+const collectMeterSequenceCandidates = (searchText: string) => {
+  const consumptionCandidates: Candidate<number>[] = [];
+  const previousCandidates: Candidate<number>[] = [];
+  const currentCandidates: Candidate<number>[] = [];
+  const constantCandidates: Candidate<number>[] = [];
+  const meterPattern =
+    /LIDA\s+\d{4,}\s+ENERGIA\s+[A-Z]+\s+([\d.]+)\s+([\d.]+)\s+([\d.,]+)\s+([\d.,]+)\s+(\d+)\s+(?:LEGENDA|BENEFICIARIO)/g;
+
+  for (const match of searchText.matchAll(meterPattern)) {
+    const index = match.index ?? Number.MAX_SAFE_INTEGER;
+
+    pushCandidate(
+      previousCandidates,
+      parseReadingNumber(match[1]),
+      'high',
+      index,
+      validateReading
+    );
+    pushCandidate(
+      currentCandidates,
+      parseReadingNumber(match[2]),
+      'high',
+      index,
+      validateReading
+    );
+    pushCandidate(
+      constantCandidates,
+      parseBrazilianNumber(match[3]),
+      'high',
+      index,
+      validateConstant
+    );
+    pushCandidate(
+      consumptionCandidates,
+      parseBrazilianNumber(match[5]),
+      'high',
+      index,
+      validateConsumption
+    );
+  }
+
+  return {
+    consumptionCandidates,
+    previousCandidates,
+    currentCandidates,
+    constantCandidates,
+  };
+};
+
 const extractFieldsFromText = (normalizedText: string): InvoiceParsedFields => {
   const fields = buildEmptyFields();
+  const searchText = buildSearchText(normalizedText);
+  const { previousCandidates, currentCandidates } = collectReadingPairCandidates(searchText);
+  const {
+    consumerUnitCandidates,
+    referenceMonthCandidates,
+    dueDateCandidates,
+    totalValueCandidates,
+  } = collectClientHeaderCandidates(searchText);
+  const {
+    consumptionCandidates,
+    previousCandidates: meterPreviousCandidates,
+    currentCandidates: meterCurrentCandidates,
+    constantCandidates,
+  } = collectMeterSequenceCandidates(searchText);
 
   fields.providerName = resolveField([
-    ...collectCandidates(normalizedText, [
+    ...collectCandidates(searchText, [
       {
         pattern:
-          /(?:DISTRIBUIDORA|CONCESSIONARIA|CONCESSIONARIA RESPONSAVEL|FORNECEDORA)\s*[:\-]?\s*([A-Z][A-Z\s.&/-]{3,80})/g,
+          /(?:DISTRIBUIDORA|CONCESSIONARIA|CONCESSIONARIA RESPONSAVEL|FORNECEDORA|RAZAO SOCIAL)\s*[:\-]?\s*([A-Z][A-Z\s.&/-]{3,80})/g,
+        confidence: 'high',
+        parse: (match) => sanitizeProviderName(match[1]),
+      },
+      {
+        pattern: /BENEFICIARIO\s*:\s*([A-Z][A-Z\s.&/-]{4,80})\s*-\s*CNPJ/g,
         confidence: 'high',
         parse: (match) => sanitizeProviderName(match[1]),
       },
@@ -506,34 +888,40 @@ const extractFieldsFromText = (normalizedText: string): InvoiceParsedFields => {
   ]);
 
   fields.consumerUnit = resolveField(
-    collectCandidates(normalizedText, [
-      {
-        pattern:
-          /(?:UNIDADE\s+CONSUMIDORA|UNIDADE\s+CLIENTE|NUMERO\s+DA\s+UC|INSTALACAO)\s*[:\-]?\s*([A-Z0-9./-]{4,25})/g,
-        confidence: 'high',
-        parse: (match) => sanitizeConsumerUnit(match[1]),
-      },
-      {
-        pattern: /\bUC\s*[:\-]?\s*([A-Z0-9./-]{4,25})/g,
-        confidence: 'medium',
-        parse: (match) => sanitizeConsumerUnit(match[1]),
-      },
-    ])
+    [
+      ...consumerUnitCandidates,
+      ...collectCandidates(searchText, [
+        {
+          pattern:
+            /(?:UNIDADE\s+CONSUMIDORA|UNIDADE\s+CLIENTE|NUMERO\s+DA\s+UC|NUMERO\s+UC|N[OU]\s+DA\s+UC|INSTALACAO)\s*[:\-]?\s*([A-Z0-9./-]{4,25})/g,
+          confidence: 'high',
+          parse: (match) => sanitizeConsumerUnit(match[1]),
+        },
+        {
+          pattern: /\bUC\s*[:\-]?\s*([A-Z0-9./-]{4,25})/g,
+          confidence: 'medium',
+          parse: (match) => sanitizeConsumerUnit(match[1]),
+        },
+      ]),
+    ]
   );
 
   fields.referenceMonth = resolveField(
-    collectCandidates(normalizedText, [
-      {
-        pattern:
-          /(?:REFERENCIA|MES\/ANO|MES ANO|COMPETENCIA|PERIODO DE REFERENCIA)\s*[:\-]?\s*([A-Z0-9/ -]{4,20})/g,
-        confidence: 'high',
-        parse: (match) => normalizeReferenceMonth(match[1]),
-      },
-    ])
+    [
+      ...referenceMonthCandidates,
+      ...collectCandidates(searchText, [
+        {
+          pattern:
+            /(?:REFERENCIA|MES\/ANO|MES ANO|COMPETENCIA|PERIODO DE REFERENCIA)\s*[:\-]?\s*([A-Z0-9/ -]{4,20})/g,
+          confidence: 'high',
+          parse: (match) => normalizeReferenceMonth(match[1]),
+        },
+      ]),
+    ]
   );
 
   fields.issueDate = resolveField(
-    collectCandidates(normalizedText, [
+    collectCandidates(searchText, [
       {
         pattern:
           /(?:DATA\s+DE\s+EMISSAO|EMISSAO|EMITIDA\s+EM)\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{2,4})/g,
@@ -544,56 +932,65 @@ const extractFieldsFromText = (normalizedText: string): InvoiceParsedFields => {
   );
 
   fields.dueDate = resolveField(
-    collectCandidates(normalizedText, [
-      {
-        pattern:
-          /(?:VENCIMENTO|VCTO|VENCTO|PAGAR\s+ATE|DATA\s+DE\s+VENCIMENTO)\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{2,4})/g,
-        confidence: 'high',
-        parse: (match) => normalizeDateValue(match[1]),
-      },
-    ])
+    [
+      ...dueDateCandidates,
+      ...collectCandidates(searchText, [
+        {
+          pattern:
+            /(?:VENCIMENTO|VCTO|VENCTO|PAGAR\s+ATE|DATA\s+DE\s+VENCIMENTO)\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{2,4})/g,
+          confidence: 'high',
+          parse: (match) => normalizeDateValue(match[1]),
+        },
+      ]),
+    ]
   );
 
   fields.totalValue = resolveField(
-    collectCandidates(normalizedText, [
-      {
-        pattern:
-          /(?:TOTAL\s+A\s+PAGAR|VALOR\s+TOTAL(?:\s+DA\s+FATURA)?|TOTAL\s+DA\s+FATURA)\s*[:\-]?\s*(R?\$?\s*[\d.,]+)/g,
-        confidence: 'high',
-        parse: (match) => parseBrazilianNumber(match[1]),
-        validate: validateCurrency,
-      },
-      {
-        pattern: /\bTOTAL\b\s*[:\-]?\s*(R?\$?\s*[\d.,]+)/g,
-        confidence: 'medium',
-        parse: (match) => parseBrazilianNumber(match[1]),
-        validate: validateCurrency,
-      },
-    ])
+    [
+      ...totalValueCandidates,
+      ...collectCandidates(searchText, [
+        {
+          pattern:
+            /(?:TOTAL\s+A\s+PAGAR|VALOR\s+A\s+PAGAR|VALOR\s+TOTAL(?:\s+DA\s+FATURA)?|TOTAL\s+DA\s+FATURA)\s*[:\-]?\s*(R?\$?\s*[\d.,]+)/g,
+          confidence: 'high',
+          parse: (match) => parseBrazilianNumber(match[1]),
+          validate: validateCurrency,
+        },
+        {
+          pattern: /\bTOTAL\b\s*[:\-]?\s*(R?\$?\s*[\d.,]+)/g,
+          confidence: 'medium',
+          parse: (match) => parseBrazilianNumber(match[1]),
+          validate: validateCurrency,
+        },
+      ]),
+    ]
   );
 
   fields.consumptionKwh = resolveField(
-    collectCandidates(normalizedText, [
-      {
-        pattern:
-          /(?:CONSUMO\s+FATURADO|CONSUMO\s+TOTAL|TOTAL\s+APURADO|ENERGIA\s+ATIVA)\s*[:\-]?\s*([\d.,]+)\s*KWH\b/g,
-        confidence: 'high',
-        parse: (match) => parseBrazilianNumber(match[1]),
-        validate: validateConsumption,
-      },
-      {
-        pattern: /\bCONSUMO\b\s*[:\-]?\s*([\d.,]+)\s*KWH\b/g,
-        confidence: 'medium',
-        parse: (match) => parseBrazilianNumber(match[1]),
-        validate: validateConsumption,
-      },
-    ])
+    [
+      ...consumptionCandidates,
+      ...collectCandidates(searchText, [
+        {
+          pattern:
+            /(?:CONSUMO\s+FATURADO|CONSUMO\s+TOTAL|TOTAL\s+APURADO|ENERGIA\s+ATIVA(?:\s+TOTAL)?)\s*[:\-]?\s*([\d.,]+)\s*KWH\b/g,
+          confidence: 'high',
+          parse: (match) => parseBrazilianNumber(match[1]),
+          validate: validateConsumption,
+        },
+        {
+          pattern: /\bCONSUMO\b\s*[:\-]?\s*([\d.,]+)\s*KWH\b/g,
+          confidence: 'medium',
+          parse: (match) => parseBrazilianNumber(match[1]),
+          validate: validateConsumption,
+        },
+      ]),
+    ]
   );
 
   fields.daysBilled = resolveField(
-    collectCandidates(normalizedText, [
+    collectCandidates(searchText, [
       {
-        pattern: /(?:DIAS\s+FATURADOS|DIAS\s+DE\s+FATURAMENTO)\s*[:\-]?\s*(\d{1,3})/g,
+        pattern: /(?:DIAS\s+FATURADOS|DIAS\s+DE\s+FATURAMENTO|DIAS\s+DE\s+CONSUMO)\s*[:\-]?\s*(\d{1,3})/g,
         confidence: 'high',
         parse: (match) => parseIntegerValue(match[1]),
         validate: validateDays,
@@ -608,44 +1005,55 @@ const extractFieldsFromText = (normalizedText: string): InvoiceParsedFields => {
   );
 
   fields.previousReading = resolveField(
-    collectCandidates(normalizedText, [
-      {
-        pattern:
-          /(?:LEITURA\s+ANTERIOR|LEITURA\s+ANT)\s*[:\-]?\s*([\d.,]+)/g,
-        confidence: 'high',
-        parse: (match) => parseBrazilianNumber(match[1]),
-        validate: validateReading,
-      },
-    ])
+    [
+      ...previousCandidates,
+      ...meterPreviousCandidates,
+      ...collectCandidates(searchText, [
+        {
+          pattern:
+            /(?:LEITURA\s+ANTERIOR|LEITURA\s+ANT)\s*[:\-]?\s*([\d.,]+)/g,
+          confidence: 'high',
+          parse: (match) => parseReadingNumber(match[1]),
+          validate: validateReading,
+        },
+      ]),
+    ]
   );
 
   fields.currentReading = resolveField(
-    collectCandidates(normalizedText, [
-      {
-        pattern: /(?:LEITURA\s+ATUAL|LEITURA\s+AT)\s*[:\-]?\s*([\d.,]+)/g,
-        confidence: 'high',
-        parse: (match) => parseBrazilianNumber(match[1]),
-        validate: validateReading,
-      },
-    ])
+    [
+      ...currentCandidates,
+      ...meterCurrentCandidates,
+      ...collectCandidates(searchText, [
+        {
+          pattern: /(?:LEITURA\s+ATUAL|LEITURA\s+AT)\s*[:\-]?\s*([\d.,]+)/g,
+          confidence: 'high',
+          parse: (match) => parseReadingNumber(match[1]),
+          validate: validateReading,
+        },
+      ]),
+    ]
   );
 
   fields.meterConstant = resolveField(
-    collectCandidates(normalizedText, [
-      {
-        pattern: /(?:CONSTANTE(?:\s+DO\s+MEDIDOR)?|MULTIPLICADOR)\s*[:\-]?\s*([\d.,]+)/g,
-        confidence: 'high',
-        parse: (match) => parseBrazilianNumber(match[1]),
-        validate: validateConstant,
-      },
-    ])
+    [
+      ...constantCandidates,
+      ...collectCandidates(searchText, [
+        {
+          pattern: /(?:CONSTANTE(?:\s+DO\s+MEDIDOR)?|MULTIPLICADOR)\s*[:\-]?\s*([\d.,]+)/g,
+          confidence: 'high',
+          parse: (match) => parseBrazilianNumber(match[1]),
+          validate: validateConstant,
+        },
+      ]),
+    ]
   );
 
   fields.tariffFlag = resolveField(
-    collectCandidates(normalizedText, [
+    collectCandidates(searchText, [
       {
         pattern:
-          /(?:BANDEIRA(?:\s+TARIFARIA)?)\s*[:\-]?\s*([A-Z ]{4,40})/g,
+          /(?:BANDEIRA(?:\s+TARIFARIA)?)\s*[:\-]?\s*([A-Z0-9 ]{4,40})/g,
         confidence: 'high',
         parse: (match) => sanitizeTariffFlag(match[1]),
       },
@@ -653,7 +1061,7 @@ const extractFieldsFromText = (normalizedText: string): InvoiceParsedFields => {
   );
 
   fields.teValue = resolveField(
-    collectCandidates(normalizedText, [
+    collectCandidates(searchText, [
       {
         pattern: /\bTE\b[^\dR$]{0,15}(R?\$?\s*[\d.,]+)/g,
         confidence: 'medium',
@@ -664,7 +1072,7 @@ const extractFieldsFromText = (normalizedText: string): InvoiceParsedFields => {
   );
 
   fields.tusdValue = resolveField(
-    collectCandidates(normalizedText, [
+    collectCandidates(searchText, [
       {
         pattern: /\bTUSD\b[^\dR$]{0,15}(R?\$?\s*[\d.,]+)/g,
         confidence: 'medium',
@@ -675,7 +1083,7 @@ const extractFieldsFromText = (normalizedText: string): InvoiceParsedFields => {
   );
 
   fields.publicLightingFee = resolveField(
-    collectCandidates(normalizedText, [
+    collectCandidates(searchText, [
       {
         pattern:
           /(?:CIP|COSIP|CONTRIBUICAO\s+ILUMINACAO\s+PUBLICA)\s*[:\-]?\s*(R?\$?\s*[\d.,]+)/g,
@@ -687,7 +1095,7 @@ const extractFieldsFromText = (normalizedText: string): InvoiceParsedFields => {
   );
 
   fields.taxesTotal = resolveField(
-    collectCandidates(normalizedText, [
+    collectCandidates(searchText, [
       {
         pattern:
           /(?:TOTAL\s+DE\s+TRIBUTOS|TRIBUTOS|IMPOSTOS)\s*[:\-]?\s*(R?\$?\s*[\d.,]+)/g,
@@ -757,6 +1165,71 @@ const applyCrossValidation = (fields: InvoiceParsedFields) => {
   return adjusted;
 };
 
+const createAuditSample = (value: string) =>
+  value
+    .replace(/\r/g, '\n')
+    .replace(/[^\x20-\x7E\n]/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .trim()
+    .slice(0, 1000);
+
+const createRelevantAuditLines = (normalizedText: string) =>
+  normalizedText
+    .split('\n')
+    .map((line) => normalizeInlineWhitespace(line))
+    .filter(
+      (line) =>
+        Boolean(line) &&
+        (/\b(CLIENTE|REFERENCIA|VENCIMENTO|TOTAL|CONSUMO|KWH|LIDA|LEGENDA|BENEFICIARIO|SUBTOTAL|COSIP|DATA EMISSAO)\b/.test(
+          line
+        ) ||
+          /\b\d{2}\/\d{4}\b/.test(line) ||
+          /\b\d{2}\/\d{2}\/\d{4}\b/.test(line))
+    )
+    .slice(0, 20);
+
+const shouldLogParserAudit = () => {
+  const viteDev = Boolean((import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV);
+
+  if (viteDev) {
+    return true;
+  }
+
+  return typeof process !== 'undefined' && process.release?.name === 'node' && process.env.NODE_ENV !== 'production';
+};
+
+const logParserAudit = (
+  context: {
+    source: InvoiceParserResult['textSource'];
+    fileName?: string;
+    extractedTextLength: number;
+    rawTextSample?: string;
+  },
+  result: InvoiceParserResult
+) => {
+  if (!shouldLogParserAudit()) {
+    return;
+  }
+
+  const foundFields = Object.entries(result.fields)
+    .filter(([, field]) => field.confidence !== 'missing' && field.value !== undefined)
+    .map(([fieldName, field]) => `${fieldName}:${field.confidence}`);
+  const missingFields = Object.entries(result.fields)
+    .filter(([, field]) => field.confidence === 'missing' || field.value === undefined)
+    .map(([fieldName]) => fieldName);
+
+  console.debug('[invoice-parser]', {
+    fileName: context.fileName,
+    source: context.source,
+    extractedTextLength: context.extractedTextLength,
+    normalizedTextLength: result.normalizedText.length,
+    rawTextSample: context.rawTextSample,
+    relevantLines: createRelevantAuditLines(result.normalizedText),
+    foundFields,
+    missingFields,
+  });
+};
+
 export const parseInvoiceText = (rawText: string): InvoiceParserResult => {
   const normalizedText = normalizeInvoiceText(rawText);
 
@@ -783,18 +1256,39 @@ export const parseInvoiceFile = async (file: File): Promise<InvoiceParserResult>
 
   if (fileType === 'text/plain' || fileName.endsWith('.txt')) {
     const rawText = await file.text();
-    return parseInvoiceText(rawText);
+    const parsed = parseInvoiceText(rawText);
+    logParserAudit(
+      {
+        fileName: file.name,
+        source: parsed.textSource,
+        extractedTextLength: rawText.length,
+        rawTextSample: createAuditSample(rawText),
+      },
+      parsed
+    );
+    return parsed;
   }
 
   if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const rawText = await extractPdfText(bytes);
     const parsed = parseInvoiceText(rawText);
-
-    return {
+    const result = {
       ...parsed,
       textSource: parsed.rawTextAvailable ? 'pdf-text' : 'empty',
     };
+
+    logParserAudit(
+      {
+        fileName: file.name,
+        source: result.textSource,
+        extractedTextLength: rawText.length,
+        rawTextSample: createAuditSample(rawText),
+      },
+      result
+    );
+
+    return result;
   }
 
   return {

@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import test from 'node:test';
 import {
   buildMascotGuidance,
@@ -6,7 +8,7 @@ import {
   getScoreEventPoints,
   getScoreState,
 } from '@/lib/mvpCoreFlow';
-import { parseInvoiceText } from '@/lib/invoiceParser';
+import { parseInvoiceFile, parseInvoiceText } from '@/lib/invoiceParser';
 import {
   buildActionResultLink,
   buildInvoiceComparison,
@@ -42,6 +44,26 @@ const completeProfile: UserProfileData = {
 };
 
 const makeParser = (text = ''): InvoiceParserResult => parseInvoiceText(text);
+
+const makePdfFile = (streamContent: string, fileName = 'fixture-celesc.pdf') => {
+  const pdfContent = `%PDF-1.4
+1 0 obj
+<< /Length ${streamContent.length} >>
+stream
+${streamContent}
+endstream
+endobj
+trailer
+<< /Root 1 0 R >>
+%%EOF`;
+
+  return new File([pdfContent], fileName, { type: 'application/pdf' });
+};
+
+const makeProjectPdfFile = async (fixturePath: string, fileName: string) => {
+  const bytes = await readFile(resolve(process.cwd(), fixturePath));
+  return new File([bytes], fileName, { type: 'application/pdf' });
+};
 
 const invoice: InvoiceData = {
   fingerprint: 'invoice-2026-04',
@@ -1270,6 +1292,65 @@ test('parser extrai referencia, vencimento, total, consumo e leituras com confia
   assert.equal(parsed.fields.currentReading.value, 1250);
   assert.equal(parsed.fields.daysBilled.value, 30);
   assert.equal(parsed.fields.tariffFlag.value, 'VERDE');
+});
+
+test('parser extrai campos essenciais de PDF textual com layout fragmentado', async () => {
+  const parsed = await parseInvoiceFile(
+    makePdfFile(`
+BT
+[(CELESC ) 420 (DISTRIBUICAO S.A.)] TJ
+(UNIDADE) Tj
+(CONSUMIDORA) Tj
+(1234567890) Tj
+(REFERENCIA) Tj
+(04/2026) Tj
+(VENCIMENTO) Tj
+(25/04/2026) Tj
+[(TOTAL) 500 (A) 500 (PAGAR)] TJ
+(R$ 321,45) Tj
+(CONSUMO) Tj
+(FATURADO) Tj
+(250 KWH) Tj
+[(LEITURA ) 300 (ANTERIOR)] TJ
+[(LEITURA ) 300 (ATUAL)] TJ
+(1000 1250) Tj
+(DIAS FATURADOS) Tj
+(30) Tj
+(BANDEIRA TARIFARIA) Tj
+[(VERMELHA ) 350 (PATAMAR 1)] TJ
+ET
+  `)
+  );
+
+  assert.equal(parsed.textSource, 'pdf-text');
+  assert.equal(parsed.fields.providerName.value, 'CELESC DISTRIBUICAO S.A.');
+  assert.equal(parsed.fields.consumerUnit.value, '1234567890');
+  assert.equal(parsed.fields.referenceMonth.value, '04/2026');
+  assert.equal(parsed.fields.dueDate.value, '25/04/2026');
+  assert.equal(parsed.fields.totalValue.value, 321.45);
+  assert.equal(parsed.fields.consumptionKwh.value, 250);
+  assert.equal(parsed.fields.previousReading.value, 1000);
+  assert.equal(parsed.fields.currentReading.value, 1250);
+  assert.equal(parsed.fields.daysBilled.value, 30);
+  assert.equal(parsed.fields.tariffFlag.value, 'VERMELHA PATAMAR 1');
+});
+
+test('parser extrai referencia, vencimento, total e consumo do PDF real da Celesc', async () => {
+  const parsed = await parseInvoiceFile(
+    await makeProjectPdfFile('test-fixtures-invoices/celesc-sample-01.pdf', 'celesc-sample-01.pdf')
+  );
+
+  assert.equal(parsed.textSource, 'pdf-text');
+  assert.equal(parsed.fields.providerName.value, 'CELESC DISTRIBUICAO SA');
+  assert.equal(parsed.fields.consumerUnit.value, '21062553');
+  assert.equal(parsed.fields.referenceMonth.value, '02/2026');
+  assert.equal(parsed.fields.dueDate.value, '28/02/2026');
+  assert.equal(parsed.fields.totalValue.value, 472.3);
+  assert.equal(parsed.fields.consumptionKwh.value, 528);
+  assert.equal(parsed.fields.previousReading.value, 17219);
+  assert.equal(parsed.fields.currentReading.value, 17747);
+  assert.equal(parsed.fields.meterConstant.value, 1);
+  assert.equal(parsed.fields.daysBilled.value, 29);
 });
 
 test('parser preserva ausencia segura quando campo nao existe', () => {
