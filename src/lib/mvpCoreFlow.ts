@@ -5,6 +5,7 @@ import {
   MascotGuidance,
   NextAction,
   ScoreEvent,
+  ScoreEventType,
   ScoreState,
   UserProfileData,
 } from '@/types/mvp';
@@ -15,6 +16,13 @@ const SCORE_EVENT_POINTS = {
   analysis_completed: 100,
   action_viewed: 30,
 } as const;
+
+const SCORE_EVENT_ID_PREFIX: Record<ScoreEventType, string> = {
+  profile_completed: 'profile-completed',
+  invoice_uploaded: 'invoice-uploaded:',
+  analysis_completed: 'analysis-completed:',
+  action_viewed: 'action-viewed:',
+};
 
 const CONSUMER_BASELINE = {
   Residencial: 190,
@@ -400,16 +408,75 @@ export const createScoreEvent = (
   occurredAt: new Date().toISOString(),
 });
 
-export const addScoreEvent = (events: ScoreEvent[], nextEvent: ScoreEvent) => {
-  if (events.some((event) => event.id === nextEvent.id)) {
-    return events;
+export const getScoreEventPoints = (type: ScoreEventType) => SCORE_EVENT_POINTS[type] ?? 0;
+
+export const getScoreEventSubject = (event: Pick<ScoreEvent, 'id' | 'type'>) => {
+  const prefix = SCORE_EVENT_ID_PREFIX[event.type];
+
+  if (!prefix || !event.id.startsWith(prefix)) {
+    return null;
   }
 
-  return [nextEvent, ...events];
+  if (event.type === 'profile_completed') {
+    return event.id === prefix ? event.type : null;
+  }
+
+  const subject = event.id.slice(prefix.length).trim();
+  return subject ? subject : null;
+};
+
+export const getScoreEventDedupeKey = (event: Pick<ScoreEvent, 'id' | 'type'>) => {
+  const subject = getScoreEventSubject(event);
+  return subject ? `${event.type}:${subject}` : null;
+};
+
+export const normalizeScoreEvents = (events?: Partial<ScoreEvent>[]): ScoreEvent[] => {
+  if (!Array.isArray(events)) {
+    return [];
+  }
+
+  const seenKeys = new Set<string>();
+  const normalizedEvents: ScoreEvent[] = [];
+
+  events.forEach((event) => {
+    if (!event?.id || !event.type || !event.label || !event.occurredAt) {
+      return;
+    }
+
+    const points = getScoreEventPoints(event.type);
+    const dedupeKey = getScoreEventDedupeKey({
+      id: event.id,
+      type: event.type,
+    });
+
+    if (!points || !dedupeKey || seenKeys.has(dedupeKey)) {
+      return;
+    }
+
+    const occurredAt = Number.isNaN(new Date(event.occurredAt).getTime())
+      ? '1970-01-01T00:00:00.000Z'
+      : event.occurredAt;
+
+    seenKeys.add(dedupeKey);
+    normalizedEvents.push({
+      id: event.id,
+      type: event.type,
+      label: event.label,
+      points,
+      occurredAt,
+    });
+  });
+
+  return normalizedEvents;
+};
+
+export const addScoreEvent = (events: ScoreEvent[], nextEvent: ScoreEvent) => {
+  return normalizeScoreEvents([nextEvent, ...events]);
 };
 
 export const getScoreState = (events: ScoreEvent[]): ScoreState => {
-  const score = events.reduce((total, event) => total + event.points, 0);
+  const normalizedEvents = normalizeScoreEvents(events);
+  const score = normalizedEvents.reduce((total, event) => total + event.points, 0);
   const level = Math.max(1, Math.floor(score / 200) + 1);
   const currentLevelFloor = (level - 1) * 200;
   const nextLevelScore = level * 200;

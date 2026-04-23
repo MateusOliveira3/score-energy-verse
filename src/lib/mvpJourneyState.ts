@@ -9,8 +9,20 @@ import {
   NextActionsState,
   Profile,
   ScoreEvent,
+  ScoreEventType,
+  ScoreExplanation,
+  ScoreExplanationEvent,
+  ScoreExplanationNextGain,
+  ScoreExplanationSubtotal,
 } from '@/types/mvp';
-import { buildNextActions, isProfileComplete } from '@/lib/mvpCoreFlow';
+import {
+  buildNextActions,
+  getScoreEventPoints,
+  getScoreEventSubject,
+  getScoreState,
+  isProfileComplete,
+  normalizeScoreEvents,
+} from '@/lib/mvpCoreFlow';
 
 const RETURN_VISIT_MS = 1000 * 60 * 30;
 
@@ -19,6 +31,25 @@ const isFiniteNumber = (value: unknown): value is number =>
 
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
+
+const SCORE_EVENT_EXPLANATION: Record<ScoreEventType, { label: string; reason: string }> = {
+  profile_completed: {
+    label: 'Perfil completo',
+    reason: 'Conta porque o perfil tem contexto suficiente para personalizar a jornada.',
+  },
+  invoice_uploaded: {
+    label: 'Fatura enviada',
+    reason: 'Conta porque uma fatura real da jornada foi enviada e ficou registrada no historico.',
+  },
+  analysis_completed: {
+    label: 'Analise concluida',
+    reason: 'Conta porque existe uma analise pronta vinculada a uma fatura valida da jornada.',
+  },
+  action_viewed: {
+    label: 'Acao revisada',
+    reason: 'Conta porque uma proxima acao valida foi revisada pelo usuario.',
+  },
+};
 
 export interface LegacyStoredJourneyState {
   profile?: Partial<Profile>;
@@ -245,15 +276,58 @@ const resolveActionsState = (
   });
 };
 
+const resolveScoreEventsState = (
+  state: Pick<MvpState, 'profile' | 'analysis' | 'actions' | 'scoreEvents'>
+): ScoreEvent[] => {
+  const invoiceFingerprints = new Set(
+    [
+      state.analysis.latestInvoice?.fingerprint,
+      ...state.analysis.invoiceHistory.map((invoice) => invoice.fingerprint),
+    ].filter((fingerprint): fingerprint is string => Boolean(fingerprint))
+  );
+  const viewedActionIds = new Set(state.actions.viewedActionIds);
+
+  return normalizeScoreEvents(state.scoreEvents).filter((event) => {
+    const subject = getScoreEventSubject(event);
+
+    if (!subject) {
+      return false;
+    }
+
+    if (event.type === 'profile_completed') {
+      return isProfileComplete(state.profile);
+    }
+
+    if (event.type === 'invoice_uploaded') {
+      return invoiceFingerprints.has(subject);
+    }
+
+    if (event.type === 'analysis_completed') {
+      return Boolean(state.analysis.summary) && invoiceFingerprints.has(subject);
+    }
+
+    if (event.type === 'action_viewed') {
+      return viewedActionIds.has(subject);
+    }
+
+    return false;
+  });
+};
+
 export const resolveFullJourneyState = (state: MvpState): MvpState => {
   const profile = normalizeProfile(state.profile);
   const mascot = normalizeMascot(state.mascot);
   const analysis = normalizeAnalysisState(state.analysis);
-  const scoreEvents = Array.isArray(state.scoreEvents) ? state.scoreEvents : DEFAULT_MVP_STATE.scoreEvents;
   const actions = resolveActionsState({
     profile,
     analysis,
     actions: state.actions,
+  });
+  const scoreEvents = resolveScoreEventsState({
+    profile,
+    analysis,
+    actions,
+    scoreEvents: state.scoreEvents,
   });
   const lastActiveAt = typeof state.lastActiveAt === 'string' ? state.lastActiveAt : undefined;
 
@@ -271,6 +345,131 @@ export const resolveFullJourneyState = (state: MvpState): MvpState => {
       analysis,
       lastActiveAt,
     }),
+  };
+};
+
+const buildScoreExplanationEvent = (event: ScoreEvent): ScoreExplanationEvent => {
+  const eventExplanation = SCORE_EVENT_EXPLANATION[event.type];
+
+  return {
+    id: event.id,
+    type: event.type,
+    label: event.label,
+    points: getScoreEventPoints(event.type),
+    occurredAt: event.occurredAt,
+    reason: eventExplanation.reason,
+    subject: getScoreEventSubject(event) ?? undefined,
+  };
+};
+
+const buildScoreExplanationSubtotals = (
+  events: ScoreExplanationEvent[]
+): ScoreExplanationSubtotal[] => {
+  const subtotals = new Map<ScoreEventType, ScoreExplanationSubtotal>();
+
+  events.forEach((event) => {
+    const currentSubtotal = subtotals.get(event.type);
+
+    if (currentSubtotal) {
+      currentSubtotal.points += event.points;
+      currentSubtotal.count += 1;
+      return;
+    }
+
+    subtotals.set(event.type, {
+      type: event.type,
+      label: SCORE_EVENT_EXPLANATION[event.type].label,
+      points: event.points,
+      count: 1,
+    });
+  });
+
+  return Array.from(subtotals.values());
+};
+
+const buildScoreAchievements = (events: ScoreExplanationEvent[]) =>
+  buildScoreExplanationSubtotals(events).map((subtotal) =>
+    subtotal.count === 1
+      ? `${subtotal.label}: ${subtotal.points} pontos`
+      : `${subtotal.label}: ${subtotal.points} pontos em ${subtotal.count} eventos`
+  );
+
+const getFirstUnviewedAction = (state: MvpState) =>
+  state.actions.items.find((action) => !state.actions.viewedActionIds.includes(action.id));
+
+const buildScoreNextGain = (state: MvpState): ScoreExplanationNextGain | undefined => {
+  if (state.journeyStage === 'onboarding') {
+    return {
+      title: 'Completar o perfil',
+      description: 'Finalize o contexto minimo para liberar uma analise mais justa.',
+      reason: 'O proximo ganho claro e o evento de perfil completo.',
+      potentialPoints: getScoreEventPoints('profile_completed'),
+      relatedActionId: state.actions.items[0]?.id,
+    };
+  }
+
+  if (state.journeyStage === 'before-upload') {
+    return {
+      title: 'Enviar a primeira fatura',
+      description: 'Use a fatura mais recente para gerar envio e analise da jornada.',
+      reason: 'O envio da fatura pode gerar os eventos de fatura enviada e analise concluida.',
+      potentialPoints:
+        getScoreEventPoints('invoice_uploaded') + getScoreEventPoints('analysis_completed'),
+      relatedActionId: state.actions.items[0]?.id,
+    };
+  }
+
+  if (state.journeyStage === 'invoice-uploaded') {
+    return {
+      title: 'Continuar apos a analise',
+      description: 'Revise o resumo assim que a analise da fatura estiver pronta.',
+      reason: 'A proxima evolucao esperada e concluir a analise da fatura enviada.',
+      potentialPoints: getScoreEventPoints('analysis_completed'),
+      relatedActionId: state.actions.items[0]?.id,
+    };
+  }
+
+  const nextAction = getFirstUnviewedAction(state);
+
+  if (nextAction) {
+    return {
+      title: nextAction.title,
+      description: nextAction.description,
+      reason: 'A proxima evolucao vem de revisar uma acao sugerida ainda nao vista.',
+      potentialPoints: getScoreEventPoints('action_viewed'),
+      relatedActionId: nextAction.id,
+    };
+  }
+
+  return {
+    title: 'Voltar com uma nova fatura',
+    description: 'Traga a proxima conta de luz para comparar a evolucao com o ciclo atual.',
+    reason: 'Com as acoes atuais ja revisadas, o proximo ganho claro vem de um novo ciclo de fatura.',
+    potentialPoints:
+      getScoreEventPoints('invoice_uploaded') + getScoreEventPoints('analysis_completed'),
+  };
+};
+
+export const getScoreExplanation = (state: MvpState): ScoreExplanation => {
+  const resolvedState = resolveFullJourneyState(state);
+  const scoreState = getScoreState(resolvedState.scoreEvents);
+  const events = resolvedState.scoreEvents.map(buildScoreExplanationEvent);
+  const achievements = buildScoreAchievements(events);
+
+  return {
+    score: scoreState.score,
+    level: scoreState.level,
+    nextLevelScore: scoreState.nextLevelScore,
+    progressToNextLevel: scoreState.progressToNextLevel,
+    journeyStage: resolvedState.journeyStage,
+    events,
+    subtotals: buildScoreExplanationSubtotals(events),
+    achievements,
+    summary:
+      events.length > 0
+        ? `Score explicado por ${events.length} evento(s) valido(s) da jornada.`
+        : 'O score ainda nao tem eventos validos contabilizados.',
+    nextGain: buildScoreNextGain(resolvedState),
   };
 };
 
@@ -294,11 +493,13 @@ export const normalizeState = (
     profile: normalizeProfile(state?.profile ?? legacyState?.profile),
     mascot: normalizeMascot(state?.mascot ?? legacyState?.mascotCustomization),
     analysis,
-    scoreEvents: Array.isArray(state?.scoreEvents)
-      ? state.scoreEvents
-      : Array.isArray(legacyState?.scoreEvents)
-        ? legacyState.scoreEvents
-        : DEFAULT_MVP_STATE.scoreEvents,
+    scoreEvents: normalizeScoreEvents(
+      Array.isArray(state?.scoreEvents)
+        ? state.scoreEvents
+        : Array.isArray(legacyState?.scoreEvents)
+          ? legacyState.scoreEvents
+          : DEFAULT_MVP_STATE.scoreEvents
+    ),
     actions,
     lastActiveAt:
       typeof state?.lastActiveAt === 'string'
@@ -400,13 +601,19 @@ export const updateActions = (
 });
 
 export const addScoreEvent = (state: MvpState, nextEvent: ScoreEvent): MvpState => {
-  if (state.scoreEvents.some((event) => event.id === nextEvent.id)) {
+  const currentScoreEvents = normalizeScoreEvents(state.scoreEvents);
+  const scoreEvents = normalizeScoreEvents([nextEvent, ...currentScoreEvents]);
+
+  if (
+    scoreEvents.length === currentScoreEvents.length &&
+    scoreEvents.every((event, index) => event.id === currentScoreEvents[index]?.id)
+  ) {
     return state;
   }
 
   return {
     ...state,
-    scoreEvents: [nextEvent, ...state.scoreEvents],
+    scoreEvents,
   };
 };
 

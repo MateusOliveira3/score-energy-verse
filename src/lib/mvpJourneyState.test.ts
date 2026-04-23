@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildMascotGuidance } from '@/lib/mvpCoreFlow';
-import { DEFAULT_MVP_STATE, resolveFullJourneyState } from '@/lib/mvpJourneyState';
+import { buildMascotGuidance, getScoreState } from '@/lib/mvpCoreFlow';
+import {
+  DEFAULT_MVP_STATE,
+  getScoreExplanation,
+  resolveFullJourneyState,
+} from '@/lib/mvpJourneyState';
+import {
+  buildRankingEntryFromSnapshot,
+  buildRankingSnapshotFromState,
+} from '@/services/ranking/helpers';
 import { AnalysisSummary, InvoiceData, MvpState, UserProfileData } from '@/types/mvp';
 
 const completeProfile: UserProfileData = {
@@ -196,4 +204,347 @@ test('resolveFullJourneyState e idempotente', () => {
   const twice = resolveFullJourneyState(once);
 
   assert.deepEqual(twice, once);
+});
+
+test('scoreEvents adulterados sao normalizados antes do calculo', () => {
+  const resolved = resolveFullJourneyState(
+    makeState({
+      profile: completeProfile,
+      analysis: {
+        status: 'ready',
+        latestInvoice: invoice,
+        invoiceHistory: [invoice],
+        summary: analysis,
+      },
+      scoreEvents: [
+        {
+          id: 'invoice-uploaded:invoice-2026-04',
+          type: 'invoice_uploaded',
+          label: 'Fatura adulterada',
+          points: 999999,
+          occurredAt: '2026-04-22T12:00:00.000Z',
+        },
+        {
+          id: 'invoice-uploaded:invoice-2026-04',
+          type: 'invoice_uploaded',
+          label: 'Fatura duplicada',
+          points: 120,
+          occurredAt: '2026-04-22T12:01:00.000Z',
+        },
+        {
+          id: 'profile-completed',
+          type: 'profile_completed',
+          label: 'Perfil concluido',
+          points: -500,
+          occurredAt: '2026-04-22T11:00:00.000Z',
+        },
+      ],
+    })
+  );
+  const scoreState = getScoreState(resolved.scoreEvents);
+
+  assert.equal(resolved.scoreEvents.length, 2);
+  assert.equal(
+    resolved.scoreEvents.find((event) => event.type === 'invoice_uploaded')?.points,
+    120
+  );
+  assert.equal(scoreState.score, 200);
+});
+
+test('scoreEvents inconsistentes com a jornada resolvida nao entram no score', () => {
+  const resolved = resolveFullJourneyState(
+    makeState({
+      scoreEvents: [
+        {
+          id: 'profile-completed',
+          type: 'profile_completed',
+          label: 'Perfil concluido sem perfil real',
+          points: 80,
+          occurredAt: '2026-04-22T11:00:00.000Z',
+        },
+        {
+          id: 'analysis-completed:invoice-fantasma',
+          type: 'analysis_completed',
+          label: 'Analise sem fatura real',
+          points: 100,
+          occurredAt: '2026-04-22T12:00:00.000Z',
+        },
+      ],
+    })
+  );
+
+  assert.equal(resolved.scoreEvents.length, 0);
+  assert.equal(getScoreState(resolved.scoreEvents).score, 0);
+});
+
+test('snapshot de ranking usa score canonico derivado dos eventos validos', () => {
+  const snapshot = buildRankingSnapshotFromState({
+    userId: 'user-123456',
+    rawState: makeState({
+      profile: completeProfile,
+      analysis: {
+        status: 'ready',
+        latestInvoice: invoice,
+        invoiceHistory: [invoice],
+        summary: analysis,
+      },
+      scoreEvents: [
+        {
+          id: 'profile-completed',
+          type: 'profile_completed',
+          label: 'Perfil concluido',
+          points: 8000,
+          occurredAt: '2026-04-22T11:00:00.000Z',
+        },
+        {
+          id: 'invoice-uploaded:invoice-2026-04',
+          type: 'invoice_uploaded',
+          label: 'Fatura enviada',
+          points: 12000,
+          occurredAt: '2026-04-22T12:00:00.000Z',
+        },
+        {
+          id: 'analysis-completed:invoice-2026-04',
+          type: 'analysis_completed',
+          label: 'Analise concluida',
+          points: 10000,
+          occurredAt: '2026-04-22T12:05:00.000Z',
+        },
+      ],
+    }),
+    updatedAt: '2026-04-22T13:00:00.000Z',
+  });
+
+  assert.ok(snapshot);
+  assert.equal(snapshot.score, 300);
+  assert.equal(snapshot.level, 2);
+});
+
+test('entrada de ranking deriva level do score recebido', () => {
+  const entry = buildRankingEntryFromSnapshot({
+    snapshot: {
+      userId: 'user-123456',
+      displayName: 'Residencial em Sao Paulo',
+      subtitle: 'Residencial - Sao Paulo',
+      score: 300,
+      level: 99,
+      consumerType: 'Residencial',
+      updatedAt: '2026-04-22T13:00:00.000Z',
+    },
+    currentUserId: 'other-user',
+  });
+
+  assert.equal(entry.score, 300);
+  assert.equal(entry.level, 2);
+});
+
+test('score explicado bate com score calculado', () => {
+  const state = makeState({
+    profile: completeProfile,
+    analysis: {
+      status: 'ready',
+      latestInvoice: invoice,
+      invoiceHistory: [invoice],
+      summary: analysis,
+    },
+    scoreEvents: [
+      {
+        id: 'profile-completed',
+        type: 'profile_completed',
+        label: 'Perfil concluido',
+        points: 80,
+        occurredAt: '2026-04-22T11:00:00.000Z',
+      },
+      {
+        id: 'invoice-uploaded:invoice-2026-04',
+        type: 'invoice_uploaded',
+        label: 'Fatura enviada',
+        points: 120,
+        occurredAt: '2026-04-22T12:00:00.000Z',
+      },
+      {
+        id: 'analysis-completed:invoice-2026-04',
+        type: 'analysis_completed',
+        label: 'Analise concluida',
+        points: 100,
+        occurredAt: '2026-04-22T12:05:00.000Z',
+      },
+    ],
+  });
+  const resolved = resolveFullJourneyState(state);
+  const explanation = getScoreExplanation(state);
+  const scoreState = getScoreState(resolved.scoreEvents);
+
+  assert.equal(explanation.score, scoreState.score);
+  assert.equal(explanation.level, scoreState.level);
+  assert.equal(
+    explanation.events.reduce((total, event) => total + event.points, 0),
+    explanation.score
+  );
+});
+
+test('eventos invalidos ou descartados nao aparecem como ganhos validos na explicacao', () => {
+  const explanation = getScoreExplanation(
+    makeState({
+      scoreEvents: [
+        {
+          id: 'profile-completed',
+          type: 'profile_completed',
+          label: 'Perfil concluido sem perfil real',
+          points: 80,
+          occurredAt: '2026-04-22T11:00:00.000Z',
+        },
+        {
+          id: 'invoice-uploaded:invoice-fantasma',
+          type: 'invoice_uploaded',
+          label: 'Fatura sem historico real',
+          points: 120,
+          occurredAt: '2026-04-22T12:00:00.000Z',
+        },
+      ],
+    })
+  );
+
+  assert.equal(explanation.score, 0);
+  assert.equal(explanation.events.length, 0);
+  assert.deepEqual(explanation.achievements, []);
+});
+
+test('explicacao respeita pontos canonicos dos eventos', () => {
+  const explanation = getScoreExplanation(
+    makeState({
+      profile: completeProfile,
+      analysis: {
+        status: 'ready',
+        latestInvoice: invoice,
+        invoiceHistory: [invoice],
+        summary: analysis,
+      },
+      scoreEvents: [
+        {
+          id: 'profile-completed',
+          type: 'profile_completed',
+          label: 'Perfil concluido adulterado',
+          points: 8000,
+          occurredAt: '2026-04-22T11:00:00.000Z',
+        },
+        {
+          id: 'invoice-uploaded:invoice-2026-04',
+          type: 'invoice_uploaded',
+          label: 'Fatura enviada adulterada',
+          points: 12000,
+          occurredAt: '2026-04-22T12:00:00.000Z',
+        },
+      ],
+    })
+  );
+
+  assert.equal(explanation.score, 200);
+  assert.deepEqual(
+    explanation.events.map((event) => event.points),
+    [80, 120]
+  );
+});
+
+test('explicacao fica coerente em jornada nova', () => {
+  const explanation = getScoreExplanation(makeState());
+
+  assert.equal(explanation.journeyStage, 'onboarding');
+  assert.equal(explanation.score, 0);
+  assert.equal(explanation.events.length, 0);
+  assert.equal(explanation.nextGain?.title, 'Completar o perfil');
+  assert.equal(explanation.nextGain?.potentialPoints, 80);
+});
+
+test('explicacao fica coerente com perfil completo sem fatura', () => {
+  const explanation = getScoreExplanation(makeState({ profile: completeProfile }));
+
+  assert.equal(explanation.journeyStage, 'before-upload');
+  assert.equal(explanation.nextGain?.title, 'Enviar a primeira fatura');
+  assert.equal(explanation.nextGain?.potentialPoints, 220);
+});
+
+test('explicacao fica coerente com analise pronta', () => {
+  const explanation = getScoreExplanation(
+    makeState({
+      profile: completeProfile,
+      analysis: {
+        status: 'ready',
+        latestInvoice: invoice,
+        invoiceHistory: [invoice],
+        summary: analysis,
+      },
+      scoreEvents: [
+        {
+          id: 'invoice-uploaded:invoice-2026-04',
+          type: 'invoice_uploaded',
+          label: 'Fatura enviada',
+          points: 120,
+          occurredAt: '2026-04-22T12:00:00.000Z',
+        },
+        {
+          id: 'analysis-completed:invoice-2026-04',
+          type: 'analysis_completed',
+          label: 'Analise concluida',
+          points: 100,
+          occurredAt: '2026-04-22T12:05:00.000Z',
+        },
+      ],
+    })
+  );
+
+  assert.equal(explanation.journeyStage, 'analysis-ready');
+  assert.equal(explanation.score, 220);
+  assert.equal(explanation.nextGain?.potentialPoints, 30);
+  assert.ok(explanation.nextGain?.relatedActionId);
+});
+
+test('explicacao fica coerente em retorno com historico', () => {
+  const explanation = getScoreExplanation(
+    makeState({
+      profile: completeProfile,
+      analysis: {
+        status: 'ready',
+        latestInvoice: invoice,
+        invoiceHistory: [invoice],
+        summary: analysis,
+      },
+      lastActiveAt: '2026-04-21T10:00:00.000Z',
+      scoreEvents: [
+        {
+          id: 'invoice-uploaded:invoice-2026-04',
+          type: 'invoice_uploaded',
+          label: 'Fatura enviada',
+          points: 120,
+          occurredAt: '2026-04-22T12:00:00.000Z',
+        },
+      ],
+    })
+  );
+
+  assert.equal(explanation.journeyStage, 'return-visit');
+  assert.equal(explanation.score, 120);
+  assert.equal(explanation.nextGain?.potentialPoints, 30);
+});
+
+test('proximo ganho possivel nao contradiz a jornada resolvida', () => {
+  const onboardingExplanation = getScoreExplanation(makeState());
+  const beforeUploadExplanation = getScoreExplanation(makeState({ profile: completeProfile }));
+  const invoiceUploadedExplanation = getScoreExplanation(
+    makeState({
+      profile: completeProfile,
+      analysis: {
+        status: 'processing',
+        latestInvoice: invoice,
+        invoiceHistory: [invoice],
+      },
+    })
+  );
+
+  assert.equal(onboardingExplanation.journeyStage, 'onboarding');
+  assert.equal(onboardingExplanation.nextGain?.relatedActionId, 'complete-profile');
+  assert.equal(beforeUploadExplanation.journeyStage, 'before-upload');
+  assert.equal(beforeUploadExplanation.nextGain?.relatedActionId, 'complete-profile');
+  assert.equal(invoiceUploadedExplanation.journeyStage, 'invoice-uploaded');
+  assert.equal(invoiceUploadedExplanation.nextGain?.relatedActionId, 'continue-after-analysis');
 });

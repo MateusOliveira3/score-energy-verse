@@ -93,6 +93,44 @@ export interface ScoreState {
   progressToNextLevel: number;
 }
 
+export interface ScoreExplanationEvent {
+  id: string;
+  type: ScoreEventType;
+  label: string;
+  points: number;
+  occurredAt: string;
+  reason: string;
+  subject?: string;
+}
+
+export interface ScoreExplanationSubtotal {
+  type: ScoreEventType;
+  label: string;
+  points: number;
+  count: number;
+}
+
+export interface ScoreExplanationNextGain {
+  title: string;
+  description: string;
+  reason: string;
+  potentialPoints?: number;
+  relatedActionId?: string;
+}
+
+export interface ScoreExplanation {
+  score: number;
+  level: number;
+  nextLevelScore: number;
+  progressToNextLevel: number;
+  journeyStage: JourneyStage;
+  events: ScoreExplanationEvent[];
+  subtotals: ScoreExplanationSubtotal[];
+  achievements: string[];
+  summary: string;
+  nextGain?: ScoreExplanationNextGain;
+}
+
 export type AnalysisStatus = 'idle' | 'processing' | 'ready';
 
 export interface AnalysisState {

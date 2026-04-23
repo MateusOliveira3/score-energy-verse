@@ -3,6 +3,11 @@ import { normalizeState } from '@/lib/mvpJourneyState';
 import { RankingEntry, RankingSnapshot } from '@/services/ranking/contracts';
 import { MvpState } from '@/types/mvp';
 
+const normalizeRankingScore = (score: number) =>
+  Number.isFinite(score) ? Math.max(0, Math.floor(score)) : 0;
+
+const buildRankingLevelFromScore = (score: number) => Math.max(1, Math.floor(score / 200) + 1);
+
 const getInitials = (value: string) =>
   value
     .split(/\s+/)
@@ -67,13 +72,14 @@ export const buildRankingEntryFromSnapshot = ({
   currentUserId?: string;
 }): Omit<RankingEntry, 'position'> => {
   const isCurrentUser = currentUserId === snapshot.userId;
+  const score = normalizeRankingScore(snapshot.score);
 
   return {
     userId: snapshot.userId,
     displayName: isCurrentUser ? 'Voce' : snapshot.displayName,
     subtitle: snapshot.subtitle,
-    score: snapshot.score,
-    level: snapshot.level,
+    score,
+    level: buildRankingLevelFromScore(score),
     badgeLabel: snapshot.consumerType,
     updatedAt: snapshot.updatedAt,
     isCurrentUser,
