@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { CheckCircle, Clock, Gift, Target, Zap } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -19,7 +20,7 @@ interface Mission {
     badge?: string;
   };
   completed: boolean;
-  icon: React.ComponentType<any>;
+  icon: LucideIcon;
 }
 
 const DailyMissions = () => {

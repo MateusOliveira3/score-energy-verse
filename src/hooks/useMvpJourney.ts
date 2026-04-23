@@ -20,6 +20,7 @@ import {
   setAnalysis,
   setAnalysisProcessing,
   updateActions,
+  updateActionStatus as applyActionStatus,
   updateMascot,
   updateProfile as applyProfileUpdate,
   markActionViewed as applyActionViewed,
@@ -31,6 +32,7 @@ import {
   MascotGuidance,
   MvpState,
   NextAction,
+  NextActionStatus,
   UserProfileData,
   MascotCustomizationData,
 } from '@/types/mvp';
@@ -255,6 +257,30 @@ export const useMvpJourney = () => {
     });
   };
 
+  const updateActionStatus = (
+    action: NextAction,
+    status: Extract<NextActionStatus, 'in_progress' | 'completed'>
+  ) => {
+    handleStateUpdate((currentState) => {
+      const wasAlreadyViewed = currentState.actions.viewedActionIds.includes(action.id);
+      let nextState = applyActionStatus(currentState, action.id, status);
+      const isNowViewed = nextState.actions.viewedActionIds.includes(action.id);
+
+      if (!wasAlreadyViewed && isNowViewed) {
+        nextState = addScoreEvent(
+          nextState,
+          createScoreEvent(
+            'action_viewed',
+            `action-viewed:${action.id}`,
+            `Acao priorizada iniciada: ${action.title}`
+          )
+        );
+      }
+
+      return nextState;
+    });
+  };
+
   const profileCompletion = useMemo(() => getProfileCompletion(state.profile), [state.profile]);
   const scoreState = useMemo(() => getScoreState(state.scoreEvents), [state.scoreEvents]);
   const scoreExplanation = useMemo(() => getScoreExplanation(state), [state]);
@@ -290,5 +316,6 @@ export const useMvpJourney = () => {
     completeInvoiceFlow,
     removeInvoiceFromHistory,
     markActionViewed,
+    updateActionStatus,
   };
 };

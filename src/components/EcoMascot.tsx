@@ -6,16 +6,22 @@ interface EcoMascotProps {
   score: number;
   level: number;
   consumerType?: string;
-  customization?: {
-    name: string;
-    emoji: string;
-    colorPalette: string;
-    borderEffect: string;
-  };
+  customization?: MascotCustomization;
+}
+
+interface MascotCustomization {
+  name: string;
+  emoji: string;
+  colorPalette: string;
+  borderEffect: string;
 }
 
 const EcoMascot = ({ score, level, consumerType = 'Residencial', customization }: EcoMascotProps) => {
-  const getMascotData = (level: number, consumerType: string, customization?: any) => {
+  const getMascotData = (
+    level: number,
+    consumerType: string,
+    customization?: MascotCustomization
+  ) => {
     // Nome baseado no tipo de consumidor
     const getNameByType = (type: string) => {
       const names = {

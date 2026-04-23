@@ -32,6 +32,26 @@ const isFiniteNumber = (value: unknown): value is number =>
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
 
+const normalizeActionStatus = (
+  status: unknown,
+  actionId: string,
+  viewedActionIds: string[]
+): NextAction['status'] => {
+  if (status === 'completed') {
+    return 'completed';
+  }
+
+  if (status === 'in_progress' || status === 'started') {
+    return 'in_progress';
+  }
+
+  if (status === 'viewed') {
+    return 'viewed';
+  }
+
+  return viewedActionIds.includes(actionId) ? 'viewed' : 'new';
+};
+
 const SCORE_EVENT_EXPLANATION: Record<ScoreEventType, { label: string; reason: string }> = {
   profile_completed: {
     label: 'Perfil completo',
@@ -133,12 +153,16 @@ const normalizeAction = (
     return null;
   }
 
-  const status = action.status ?? (viewedActionIds.includes(action.id) ? 'viewed' : 'new');
+  const status = normalizeActionStatus(action.status, action.id, viewedActionIds);
   return {
     id: action.id,
     title: action.title,
     description: action.description,
     value: action.value,
+    context: typeof action.context === 'string' ? action.context : undefined,
+    suggestion: typeof action.suggestion === 'string' ? action.suggestion : undefined,
+    impact: typeof action.impact === 'string' ? action.impact : undefined,
+    validation: typeof action.validation === 'string' ? action.validation : undefined,
     priority: action.priority,
     status,
     source: action.source ?? 'journey',
@@ -244,24 +268,24 @@ const resolveActionsState = (
     state.profile
   );
   const nextItemIds = new Set(nextItems.map((action) => action.id));
-  const viewedActionIds = normalizedActions.viewedActionIds.filter((actionId) =>
-    nextItemIds.has(actionId)
-  );
   const persistedActionMap = new Map(
     normalizedActions.items.map((action) => [action.id, action] as const)
   );
+  const viewedActionIds = Array.from(
+    new Set([
+      ...normalizedActions.viewedActionIds,
+      ...normalizedActions.items
+        .filter((action) => action.status && action.status !== 'new')
+        .map((action) => action.id),
+    ])
+  ).filter((actionId) => nextItemIds.has(actionId));
 
   const items = nextItems
     .map((action) =>
       normalizeAction(
         {
           ...action,
-          status: viewedActionIds.includes(action.id)
-            ? 'viewed'
-            : persistedActionMap.get(action.id)?.status === 'started' ||
-                persistedActionMap.get(action.id)?.status === 'completed'
-              ? persistedActionMap.get(action.id)?.status
-              : action.status,
+          status: persistedActionMap.get(action.id)?.status ?? action.status,
           source: action.source ?? persistedActionMap.get(action.id)?.source,
         },
         viewedActionIds
@@ -625,6 +649,28 @@ export const markActionViewed = (state: MvpState, actionId: string): MvpState =>
   const viewedActionIds = [...state.actions.viewedActionIds, actionId];
   const items = state.actions.items.map((action) =>
     action.id === actionId ? { ...action, status: 'viewed' } : action
+  );
+
+  return updateActions(state, {
+    items,
+    viewedActionIds,
+  });
+};
+
+export const updateActionStatus = (
+  state: MvpState,
+  actionId: string,
+  status: Extract<NextAction['status'], 'in_progress' | 'completed'>
+): MvpState => {
+  if (!state.actions.items.some((action) => action.id === actionId)) {
+    return state;
+  }
+
+  const viewedActionIds = state.actions.viewedActionIds.includes(actionId)
+    ? state.actions.viewedActionIds
+    : [...state.actions.viewedActionIds, actionId];
+  const items = state.actions.items.map((action) =>
+    action.id === actionId ? { ...action, status } : action
   );
 
   return updateActions(state, {

@@ -6,6 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Leaf } from 'lucide-react';
 
+const getErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : 'Erro desconhecido';
+
 const Register = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -34,12 +37,14 @@ const Register = () => {
       setTimeout(() => {
         navigate('/login');
       }, 3000);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err);
+
       console.error('Erro no registro:', err);
-      if (err.message === 'User already registered') {
+      if (errorMessage === 'User already registered') {
         setError('Este email já está cadastrado. Por favor, faça login ou use outro email.');
       } else {
-        setError(`Erro ao criar conta: ${err.message}`);
+        setError(`Erro ao criar conta: ${errorMessage}`);
       }
     } finally {
       setLoading(false);

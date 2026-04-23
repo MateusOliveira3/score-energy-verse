@@ -15,7 +15,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useMvpJourney } from '@/hooks/useMvpJourney';
-import { NextAction } from '@/types/mvp';
+import { NextAction, NextActionStatus } from '@/types/mvp';
 
 const Index = () => {
   const { toast } = useToast();
@@ -37,7 +37,7 @@ const Index = () => {
     startInvoiceProcessing,
     completeInvoiceFlow,
     removeInvoiceFromHistory,
-    markActionViewed,
+    updateActionStatus,
   } = useMvpJourney();
 
   const completedSteps = [
@@ -52,16 +52,19 @@ const Index = () => {
     completeInvoiceFlow(file);
   };
 
-  const handleActionViewed = (action: NextAction) => {
-    const alreadyViewed = viewedActionIds.includes(action.id);
-    markActionViewed(action);
+  const handleActionStatusChange = (
+    action: NextAction,
+    status: Extract<NextActionStatus, 'in_progress' | 'completed'>
+  ) => {
+    updateActionStatus(action, status);
 
-    if (!alreadyViewed) {
-      toast({
-        title: 'Acao revisada',
-        description: `Voce ganhou visibilidade sobre "${action.title}" e registrou esse passo no score.`,
-      });
-    }
+    toast({
+      title: status === 'completed' ? 'Acao testada' : 'Acao iniciada',
+      description:
+        status === 'completed'
+          ? `Voce marcou "${action.title}" como testada na jornada.`
+          : `Voce comecou "${action.title}" e registrou progresso real na jornada.`,
+    });
   };
 
   const handleInvoiceRemoved = (fingerprint: string) => {
@@ -190,7 +193,7 @@ const Index = () => {
               viewedActionIds={viewedActionIds}
               invoice={latestInvoice}
               analysis={latestAnalysis}
-              onActionViewed={handleActionViewed}
+              onActionStatusChange={handleActionStatusChange}
             />
           </div>
         </div>

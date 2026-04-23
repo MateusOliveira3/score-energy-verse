@@ -1,16 +1,22 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildMascotGuidance, getScoreState } from '@/lib/mvpCoreFlow';
+import {
+  buildMascotGuidance,
+  buildNextActions,
+  getScoreEventPoints,
+  getScoreState,
+} from '@/lib/mvpCoreFlow';
 import {
   DEFAULT_MVP_STATE,
   getScoreExplanation,
   resolveFullJourneyState,
+  updateActionStatus,
 } from '@/lib/mvpJourneyState';
 import {
   buildRankingEntryFromSnapshot,
   buildRankingSnapshotFromState,
 } from '@/services/ranking/helpers';
-import { AnalysisSummary, InvoiceData, MvpState, UserProfileData } from '@/types/mvp';
+import { AnalysisSummary, InvoiceData, MvpState, NextAction, UserProfileData } from '@/types/mvp';
 
 const completeProfile: UserProfileData = {
   consumerType: 'Residencial',
@@ -123,6 +129,125 @@ test('analise pronta resolve para analysis-ready', () => {
   assert.equal(resolved.journeyStage, 'analysis-ready');
   assert.ok(resolved.actions.items.length > 0);
   assert.ok(resolved.actions.items.some((action) => action.source === 'analysis'));
+});
+
+test('nextActions de analise pronta incluem contexto, execucao e impacto no score', () => {
+  const actions = buildNextActions(invoice, analysis, completeProfile);
+  const costCutAction = actions.find((action) => action.id === 'choose-one-cost-cut');
+
+  assert.ok(costCutAction);
+  assert.ok(costCutAction.description.includes(invoice.peakHours));
+  assert.ok(costCutAction.context);
+  assert.ok(costCutAction.suggestion);
+  assert.ok(costCutAction.validation);
+  assert.ok(costCutAction.impact?.includes(`+${getScoreEventPoints('action_viewed')}`));
+});
+
+test('normalizacao preserva campos opcionais de nextActions enriquecidas', () => {
+  const resolved = resolveFullJourneyState(
+    makeState({
+      profile: completeProfile,
+      analysis: {
+        status: 'ready',
+        latestInvoice: invoice,
+        invoiceHistory: [invoice],
+        summary: analysis,
+      },
+    })
+  );
+  const firstAction = resolved.actions.items[0];
+
+  assert.ok(firstAction.context);
+  assert.ok(firstAction.suggestion);
+  assert.ok(firstAction.impact);
+  assert.ok(firstAction.validation);
+});
+
+test('status de execucao da acao e preservado pela jornada resolvida', () => {
+  const baseActions = buildNextActions(invoice, analysis, completeProfile);
+  const resolved = resolveFullJourneyState(
+    makeState({
+      profile: completeProfile,
+      analysis: {
+        status: 'ready',
+        latestInvoice: invoice,
+        invoiceHistory: [invoice],
+        summary: analysis,
+      },
+      actions: {
+        items: baseActions.map((action) =>
+          action.id === 'choose-one-cost-cut'
+            ? { ...action, status: 'in_progress' }
+            : action
+        ),
+        viewedActionIds: ['choose-one-cost-cut'],
+      },
+    })
+  );
+
+  assert.equal(
+    resolved.actions.items.find((action) => action.id === 'choose-one-cost-cut')?.status,
+    'in_progress'
+  );
+  assert.ok(resolved.actions.viewedActionIds.includes('choose-one-cost-cut'));
+});
+
+test('status legado started e normalizado como in_progress', () => {
+  const baseActions = buildNextActions(invoice, analysis, completeProfile);
+  const legacyActions = baseActions.map((action) =>
+    action.id === 'choose-one-cost-cut'
+      ? { ...action, status: 'started' as unknown as NextAction['status'] }
+      : action
+  );
+  const resolved = resolveFullJourneyState(
+    makeState({
+      profile: completeProfile,
+      analysis: {
+        status: 'ready',
+        latestInvoice: invoice,
+        invoiceHistory: [invoice],
+        summary: analysis,
+      },
+      actions: {
+        items: legacyActions,
+        viewedActionIds: [],
+      },
+    })
+  );
+
+  assert.equal(
+    resolved.actions.items.find((action) => action.id === 'choose-one-cost-cut')?.status,
+    'in_progress'
+  );
+  assert.ok(resolved.actions.viewedActionIds.includes('choose-one-cost-cut'));
+});
+
+test('updateActionStatus inicia e conclui acao sem criar estrutura paralela', () => {
+  const resolved = resolveFullJourneyState(
+    makeState({
+      profile: completeProfile,
+      analysis: {
+        status: 'ready',
+        latestInvoice: invoice,
+        invoiceHistory: [invoice],
+        summary: analysis,
+      },
+    })
+  );
+  const targetActionId = resolved.actions.items[0].id;
+  const inProgress = updateActionStatus(resolved, targetActionId, 'in_progress');
+  const completed = updateActionStatus(inProgress, targetActionId, 'completed');
+
+  assert.equal(
+    inProgress.actions.items.find((action) => action.id === targetActionId)?.status,
+    'in_progress'
+  );
+  assert.equal(
+    completed.actions.items.find((action) => action.id === targetActionId)?.status,
+    'completed'
+  );
+  assert.deepEqual(completed.actions.viewedActionIds, inProgress.actions.viewedActionIds);
+  assert.ok(completed.actions.viewedActionIds.includes(targetActionId));
 });
 
 test('retorno apos inatividade com contexto retornavel resolve para return-visit', () => {

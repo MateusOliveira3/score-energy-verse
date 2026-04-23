@@ -1,15 +1,17 @@
-import React from 'react';
 import { CheckCircle2, Lightbulb } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AnalysisSummary, InvoiceData, NextAction } from '@/types/mvp';
+import { AnalysisSummary, InvoiceData, NextAction, NextActionStatus } from '@/types/mvp';
 
 interface SmartRecommendationsProps {
   actions: NextAction[];
   viewedActionIds: string[];
   invoice?: InvoiceData;
   analysis?: AnalysisSummary;
-  onActionViewed: (action: NextAction) => void;
+  onActionStatusChange: (
+    action: NextAction,
+    status: Extract<NextActionStatus, 'in_progress' | 'completed'>
+  ) => void;
 }
 
 const priorityClasses = {
@@ -24,12 +26,19 @@ const priorityLabels = {
   low: 'Baixa',
 } as const;
 
+const statusLabels: Record<NextActionStatus, string> = {
+  new: 'Nao iniciada',
+  viewed: 'Revisada',
+  in_progress: 'Em execucao',
+  completed: 'Testada',
+};
+
 const SmartRecommendations = ({
   actions,
   viewedActionIds,
   invoice,
   analysis,
-  onActionViewed,
+  onActionStatusChange,
 }: SmartRecommendationsProps) => {
   return (
     <Card className="border-2 border-blue-100 shadow-lg">
@@ -41,42 +50,97 @@ const SmartRecommendations = ({
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {actions.map((action) => {
-            const isViewed = viewedActionIds.includes(action.id);
+          {actions.map((action, index) => {
+            const status = action.status ?? (viewedActionIds.includes(action.id) ? 'viewed' : 'new');
+            const isCompleted = status === 'completed';
+            const isInProgress = status === 'in_progress';
+            const details = [
+              { label: 'Quando aplicar', value: action.context },
+              { label: 'Como executar', value: action.suggestion },
+              { label: 'Impacto esperado', value: action.impact },
+              { label: 'Como validar', value: action.validation },
+            ].filter((detail) => Boolean(detail.value));
 
             return (
               <div
                 key={action.id}
-                className={`p-4 rounded-lg border-2 transition-all duration-300 ${priorityClasses[action.priority]}`}
+                className={`rounded-lg border-2 p-4 transition-all duration-300 ${
+                  priorityClasses[action.priority]
+                } ${index === 0 ? 'ring-2 ring-emerald-200' : ''}`}
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-semibold text-gray-800">{action.title}</h4>
-                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-white/80 text-gray-700">
-                        Prioridade {priorityLabels[action.priority]}
-                      </span>
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {index === 0 && (
+                          <span className="rounded-full bg-emerald-600 px-2 py-1 text-xs font-semibold text-white">
+                            Acao principal
+                          </span>
+                        )}
+                        <h4 className="font-semibold text-gray-800">{action.title}</h4>
+                        <span className="rounded-full bg-white/80 px-2 py-1 text-xs font-medium text-gray-700">
+                          Prioridade {priorityLabels[action.priority]}
+                        </span>
+                        <span className="rounded-full bg-white/80 px-2 py-1 text-xs font-medium text-slate-700">
+                          {statusLabels[status]}
+                        </span>
+                      </div>
+
+                      <p className="text-sm text-gray-700">{action.description}</p>
+                      <p className="text-sm font-semibold text-emerald-700">
+                        Objetivo: {action.value}
+                      </p>
                     </div>
 
-                    <p className="text-sm text-gray-600">{action.description}</p>
-                    <p className="text-sm font-medium text-emerald-700">{action.value}</p>
+                    <Button
+                      size="sm"
+                      variant={isCompleted ? 'outline' : 'default'}
+                      className={`shrink-0 ${
+                        isCompleted ? 'border-emerald-300 text-emerald-700' : ''
+                      }`}
+                      disabled={isCompleted}
+                      onClick={() =>
+                        onActionStatusChange(action, isInProgress ? 'completed' : 'in_progress')
+                      }
+                    >
+                      {isCompleted ? (
+                        <span className="flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4" />
+                          Testada
+                        </span>
+                      ) : isInProgress ? (
+                        'Marcar testada'
+                      ) : (
+                        'Comecar acao'
+                      )}
+                    </Button>
                   </div>
 
-                  <Button
-                    size="sm"
-                    variant={isViewed ? 'outline' : 'default'}
-                    className={isViewed ? 'border-emerald-300 text-emerald-700' : ''}
-                    onClick={() => onActionViewed(action)}
-                  >
-                    {isViewed ? (
-                      <span className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4" />
-                        Revisada
-                      </span>
-                    ) : (
-                      'Revisar'
-                    )}
-                  </Button>
+                  {details.length > 0 && (
+                    <div className="space-y-3 rounded-md bg-white/75 p-3">
+                      {details.map((detail) => (
+                        <div key={detail.label} className="space-y-1">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            {detail.label}
+                          </span>
+                          <p className="text-sm text-slate-700">{detail.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {isInProgress && (
+                    <div className="rounded-md bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700">
+                      Acao em execucao. Quando testar na rotina, marque como testada.
+                    </div>
+                  )}
+
+                  {isCompleted && (
+                    <div className="flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Acao testada e registrada como progresso da jornada.
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -84,11 +148,11 @@ const SmartRecommendations = ({
         </div>
 
         {invoice && analysis && (
-          <div className="mt-6 p-4 bg-gradient-to-r from-emerald-50 to-blue-50 rounded-lg">
-            <div className="text-sm text-center">
+          <div className="mt-6 rounded-lg bg-gradient-to-r from-emerald-50 to-blue-50 p-4">
+            <div className="text-center text-sm">
               <p className="font-medium text-gray-700">Baseado na sua fatura de {invoice.month}</p>
               <p className="text-gray-600">
-                {invoice.consumption} kWh • R$ {invoice.totalValue} • {analysis.efficiencyLabel}
+                {invoice.consumption} kWh - R$ {invoice.totalValue} - {analysis.efficiencyLabel}
               </p>
             </div>
           </div>

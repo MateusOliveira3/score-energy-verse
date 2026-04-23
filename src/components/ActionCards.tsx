@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Sun, Lightbulb, Droplets, FileText, Plus, CheckCircle, Sparkles } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -10,7 +11,7 @@ interface Action {
   title: string;
   description: string;
   points: number;
-  icon: React.ComponentType<any>;
+  icon: LucideIcon;
   color: string;
   completed: boolean;
   difficulty: 'easy' | 'medium' | 'hard';

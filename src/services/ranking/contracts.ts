@@ -24,7 +24,7 @@ export interface RankingSnapshot {
   updatedAt?: string;
 }
 
-export interface LoadRankingInput extends JourneyRequestContext {}
+export type LoadRankingInput = JourneyRequestContext;
 
 export interface RankingResult {
   entries: RankingEntry[];

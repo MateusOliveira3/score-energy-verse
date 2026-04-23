@@ -46,7 +46,7 @@ export interface Analysis {
 }
 
 export type NextActionPriority = 'high' | 'medium' | 'low';
-export type NextActionStatus = 'new' | 'viewed' | 'started' | 'completed';
+export type NextActionStatus = 'new' | 'viewed' | 'in_progress' | 'completed';
 export type NextActionSource = 'profile' | 'invoice' | 'analysis' | 'journey';
 
 export interface NextAction {
@@ -54,6 +54,10 @@ export interface NextAction {
   title: string;
   description: string;
   value: string;
+  context?: string;
+  suggestion?: string;
+  impact?: string;
+  validation?: string;
   priority: NextActionPriority;
   status?: NextActionStatus;
   source?: NextActionSource;

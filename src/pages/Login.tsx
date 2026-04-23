@@ -6,6 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Leaf } from 'lucide-react';
 
+const getErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : 'Erro desconhecido';
+
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,14 +25,16 @@ const Login = () => {
     try {
       await signIn(email, password);
       navigate('/perfil');
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err);
+
       console.error('Erro de login:', err);
-      if (err.message === 'Invalid login credentials') {
+      if (errorMessage === 'Invalid login credentials') {
         setError('Email ou senha incorretos. Por favor, verifique suas credenciais.');
-      } else if (err.message === 'Email not confirmed') {
+      } else if (errorMessage === 'Email not confirmed') {
         setError('Por favor, confirme seu email antes de fazer login.');
       } else {
-        setError(`Erro ao fazer login: ${err.message}`);
+        setError(`Erro ao fazer login: ${errorMessage}`);
       }
     } finally {
       setLoading(false);
