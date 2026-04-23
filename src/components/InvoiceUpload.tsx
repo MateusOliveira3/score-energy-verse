@@ -46,7 +46,7 @@ const InvoiceUpload = ({ profile, onUploadStarted, onInvoiceProcessed }: Invoice
         setSavedInJourney(true);
 
         toast({
-          title: 'Fatura processada!',
+          title: 'Fatura adicionada ao histórico!',
           description: `Resumo gerado para ${extractedInvoice.month} com ${extractedInvoice.consumption} kWh estimados.`,
         });
       } catch (error) {
@@ -88,7 +88,7 @@ const InvoiceUpload = ({ profile, onUploadStarted, onInvoiceProcessed }: Invoice
       <CardHeader>
         <CardTitle className="flex items-center space-x-2 text-emerald-700">
           <FileText className="h-5 w-5" />
-          <span>Upload da Fatura de Energia</span>
+          <span>Adicionar fatura ao histórico</span>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -117,7 +117,7 @@ const InvoiceUpload = ({ profile, onUploadStarted, onInvoiceProcessed }: Invoice
                   Lendo a fatura e montando o resumo...
                 </p>
                 <p className="text-sm text-gray-600">
-                  O próximo passo será uma análise simples com score e resumo do momento.
+                  A próxima etapa será uma análise simples com score e resumo do momento.
                 </p>
               </div>
             </div>
@@ -126,7 +126,7 @@ const InvoiceUpload = ({ profile, onUploadStarted, onInvoiceProcessed }: Invoice
               <CheckCircle className="h-8 w-8 text-emerald-500" />
               <div>
                 <p className="text-lg font-medium text-emerald-700">
-                  Fatura recebida e conectada à jornada
+                  Fatura recebida e adicionada à jornada
                 </p>
                 <p className="text-sm text-gray-600">{uploadedFile.name}</p>
                 <div className="flex items-center justify-center mt-2 text-xs text-emerald-600">
@@ -148,7 +148,7 @@ const InvoiceUpload = ({ profile, onUploadStarted, onInvoiceProcessed }: Invoice
                 variant="outline"
                 size="sm"
               >
-                Enviar nova fatura
+                Adicionar outra fatura
               </Button>
             </div>
           ) : (
@@ -156,10 +156,10 @@ const InvoiceUpload = ({ profile, onUploadStarted, onInvoiceProcessed }: Invoice
               <Upload className="h-12 w-12 text-gray-400" />
               <div>
                 <p className="text-lg font-medium text-gray-700 mb-2">
-                  Arraste sua fatura aqui ou clique para selecionar
+                  Arraste sua fatura aqui ou clique para adicionar ao histórico
                 </p>
                 <p className="text-sm text-gray-500">
-                  Suporta PDF, JPG e PNG. O envio gera análise simples, score e próximos passos.
+                  Suporta PDF, JPG e PNG. A adição atualiza a análise, o score e os próximos passos.
                 </p>
               </div>
 

@@ -280,9 +280,9 @@ const InvoiceHistory = ({ invoices, onDeleteInvoice, userContext }: InvoiceHisto
           {invoices.length === 0 ? (
             <div className="text-center py-8">
               <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-700 mb-2">Nenhuma fatura encontrada</h3>
+              <h3 className="text-lg font-medium text-gray-700 mb-2">Seu histórico ainda está vazio</h3>
               <p className="text-gray-500">
-                Envie sua primeira fatura para começar a acompanhar seu consumo.
+                Adicione uma fatura ao histórico para iniciar sua leitura de consumo.
               </p>
             </div>
           ) : (

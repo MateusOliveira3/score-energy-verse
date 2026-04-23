@@ -236,8 +236,8 @@ export const buildAnalysisSummary = (
     consumptionLevel === 'alto'
       ? 'O que mais importa agora é reduzir desperdícios visíveis e observar usos no horário de maior impacto.'
       : costSignal === 'elevado'
-        ? 'O que mais importa agora é controlar o custo da próxima fatura com uma mudança simples e mensurável.'
-        : 'O que mais importa agora é manter consistência e enviar a próxima fatura para comparar evolução.';
+        ? 'O que mais importa agora é controlar o custo no próximo ciclo com uma mudança simples e mensurável.'
+        : 'O que mais importa agora é manter consistência e adicionar a próxima fatura para comparar evolução.';
 
   return {
     consumptionLevel,
@@ -277,7 +277,7 @@ export const buildNextActions = (
       id: 'continue-after-analysis',
       title: 'Continuar quando o resumo estiver pronto',
       description:
-        'Fatura enviada. Revise o resumo antes de mudar a rotina.',
+        'Fatura adicionada ao histórico. Revise o resumo antes de mudar a rotina.',
       value: 'Mantém envio e leitura alinhados',
       context: `Use na fatura de ${invoice.month}, enquanto o resumo ainda não estiver pronto.`,
       suggestion:
@@ -297,18 +297,18 @@ export const buildNextActions = (
 
     actions.push({
       id: 'complete-profile',
-      title: hasCompleteProfile ? 'Enviar a primeira fatura' : 'Completar perfil mínimo',
+      title: hasCompleteProfile ? 'Adicionar fatura ao histórico' : 'Completar perfil mínimo',
       description: hasCompleteProfile
-        ? 'Envie a conta de luz mais recente para gerar uma leitura personalizada.'
+        ? 'Adicione uma fatura para iniciar sua análise de consumo.'
         : 'Preencha local, tipo de consumidor, tamanho do imóvel e pessoas.',
       value: hasCompleteProfile
-        ? 'Libera análise e score inicial'
+        ? 'Inicia a leitura do seu consumo e evolução'
         : 'Personaliza a jornada',
       context: hasCompleteProfile
-        ? `Perfil ${profileLabel} já tem contexto; falta a fatura real.`
-        : 'Use antes da primeira fatura, enquanto o contexto ainda é mínimo.',
+        ? `Perfil ${profileLabel} já tem contexto; falta adicionar uma fatura ao histórico.`
+        : 'Use antes de alimentar o histórico, enquanto o contexto ainda é mínimo.',
       suggestion: hasCompleteProfile
-        ? 'Separe a fatura mais recente em PDF, JPG ou PNG.'
+        ? 'Separe uma fatura em PDF, JPG ou PNG para alimentar o histórico.'
         : 'Priorize cidade, tipo de consumidor, tamanho do imóvel e pessoas.',
       impact: hasCompleteProfile
         ? `Pode somar até ${invoiceCyclePoints} pontos com fatura e análise.`
@@ -393,17 +393,17 @@ export const buildNextActions = (
   if (actions.length < 3) {
     actions.push({
       id: 'return-next-bill',
-      title: 'Enviar a próxima fatura',
+      title: 'Adicionar a próxima fatura',
       description:
-        'No próximo ciclo, envie a nova fatura para comparar consumo e custo.',
+        'No próximo ciclo, adicione a nova fatura para comparar consumo e custo.',
       value: 'Transformar leitura em evolução',
       context: `A leitura atual é da fatura de ${invoice.month}; a comparação melhora com outro ciclo.`,
       suggestion:
         primaryGoal === 'reduce_cost'
-          ? 'Guarde a próxima conta para ver se o custo responde ao ajuste.'
+          ? 'Adicione a próxima fatura para ver se o custo responde ao ajuste.'
           : primaryGoal === 'understand_consumption'
-            ? 'Guarde a próxima conta para observar se o padrão se repete.'
-            : 'Guarde a próxima conta e volte quando ela estiver disponível.',
+            ? 'Adicione a próxima fatura para observar se o padrão se repete.'
+            : 'Adicione a próxima fatura quando ela estiver disponível.',
       impact: `Pode somar até ${invoiceCyclePoints} pontos em novo ciclo de fatura e análise.`,
       validation: 'Próxima fatura aparece no histórico.',
       priority: 'medium',
@@ -440,8 +440,8 @@ export const buildMascotGuidance = ({
       stage,
       title: 'Retomando sua jornada',
       message: analysis
-        ? `Já existe uma leitura recente para o perfil ${profileLabel}. O próximo foco é acompanhar a ação atual e comparar a próxima fatura.`
-        : `Que bom ver você de volta. O passo mais útil agora é enviar uma fatura para gerar um resumo simples do perfil ${profileLabel}.`,
+        ? `Já existe uma leitura recente para o perfil ${profileLabel}. O próximo foco é acompanhar a ação atual e comparar o próximo ciclo.`
+        : `Que bom ver você de volta. O passo mais útil agora é adicionar uma fatura ao histórico para construir um resumo simples do perfil ${profileLabel}.`,
     };
   }
 
@@ -465,7 +465,7 @@ export const buildMascotGuidance = ({
     return {
       stage: 'before-upload',
       title: 'Contexto suficiente',
-      message: `O perfil ${profileLabel} já permite uma leitura mais justa. Envie a fatura mais recente para ver consumo, custo e próximo passo.`,
+      message: `O perfil ${profileLabel} já permite uma leitura mais justa. Adicione uma fatura ao histórico para ver consumo, custo e próximo passo.`,
     };
   }
 
@@ -473,7 +473,7 @@ export const buildMascotGuidance = ({
     stage: 'onboarding',
     title: 'Monte sua base primeiro',
     message:
-      'Complete um perfil simples e depois envie sua conta de luz. Assim a análise fica mais clara, o score fica explicável e os próximos passos deixam de ser genéricos.',
+      'Complete um perfil simples e depois adicione sua conta de luz ao histórico. Assim a análise fica mais clara, o score fica explicável e os próximos passos deixam de ser genéricos.',
   };
 };
 

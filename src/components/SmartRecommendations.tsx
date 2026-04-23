@@ -152,7 +152,7 @@ const SmartRecommendations = ({
         {invoice && analysis && (
           <div className="mt-6 rounded-lg bg-gradient-to-r from-emerald-50 to-blue-50 p-4">
             <div className="text-center text-sm">
-              <p className="font-medium text-gray-700">Baseado na sua fatura de {invoice.month}</p>
+              <p className="font-medium text-gray-700">Leitura atual do histórico: {invoice.month}</p>
               <p className="text-gray-600">
                 {invoice.consumption} kWh - R$ {invoice.totalValue} - {analysis.efficiencyLabel}
               </p>

@@ -536,9 +536,9 @@ const buildScoreNextGain = (state: MvpState): ScoreExplanationNextGain | undefin
 
   if (state.journeyStage === 'before-upload') {
     return {
-      title: 'Enviar a primeira fatura',
-      description: 'Use a fatura mais recente para gerar envio e análise da jornada.',
-      reason: 'O envio da fatura pode gerar os eventos de fatura enviada e análise concluída.',
+      title: 'Adicionar fatura ao histórico',
+      description: 'Adicione uma fatura para iniciar a leitura da jornada.',
+      reason: 'A entrada de uma fatura pode gerar os eventos de fatura enviada e análise concluída.',
       potentialPoints:
         getScoreEventPoints('invoice_uploaded') + getScoreEventPoints('analysis_completed'),
       relatedActionId: state.actions.items[0]?.id,
@@ -568,9 +568,9 @@ const buildScoreNextGain = (state: MvpState): ScoreExplanationNextGain | undefin
   }
 
   return {
-    title: 'Voltar com uma nova fatura',
-    description: 'Traga a proxima conta de luz para comparar a evolucao com o ciclo atual.',
-    reason: 'Com as ações atuais já revisadas, o próximo ganho claro vem de um novo ciclo de fatura.',
+    title: 'Adicionar nova fatura ao histórico',
+    description: 'Adicione a próxima conta de luz ao histórico para comparar a evolução com o ciclo atual.',
+    reason: 'Com as ações atuais já revisadas, o próximo ganho claro vem de continuar o histórico em um novo ciclo de fatura.',
     potentialPoints:
       getScoreEventPoints('invoice_uploaded') + getScoreEventPoints('analysis_completed'),
   };
@@ -866,9 +866,9 @@ export const buildInvoiceComparison = (invoiceHistory: InvoiceData[]): InvoiceCo
     return {
       status: 'insufficient',
       basis: 'history',
-      title: 'Ainda não há comparação entre faturas',
+      title: 'Ainda não há comparação suficiente no histórico',
       summary:
-        'Envie pelo menos duas faturas para observar se consumo e custo melhoraram, pioraram ou ficaram estaveis.',
+        'Adicione pelo menos duas faturas ao histórico para observar se consumo e custo melhoraram, pioraram ou ficaram estaveis.',
       currentInvoice,
     };
   }
@@ -972,7 +972,7 @@ export const buildActionResultLink = (comparison: InvoiceComparison): ActionResu
       message:
         'A ligacao com acoes fica limitada ate existir comparacao entre duas faturas.',
       actions: [],
-      note: 'Use a proxima fatura para observar o contexto com mais seguranca.',
+      note: 'Adicione a proxima fatura ao historico para observar o contexto com mais seguranca.',
       hasObservedComparison: false,
     };
   }
@@ -1017,10 +1017,10 @@ export const buildNextCycleGuidance = (
       message: 'A fatura atual trouxe um sinal melhor que a anterior.',
       suggestion:
         primaryGoal === 'reduce_cost'
-          ? 'Mantenha o ajuste e confirme se o custo responde na proxima fatura.'
+          ? 'Mantenha o ajuste e confirme se o custo responde no proximo ciclo.'
           : primaryGoal === 'understand_consumption'
-            ? 'Mantenha o ajuste e observe se o padrao se repete na proxima fatura.'
-            : 'Mantenha o comportamento observado e confirme na proxima fatura.',
+            ? 'Mantenha o ajuste e observe se o padrao se repete no proximo ciclo.'
+            : 'Mantenha o comportamento observado e confirme no proximo ciclo.',
     };
   }
 
@@ -1071,11 +1071,11 @@ export const buildNextCycleGuidance = (
   }
 
   return {
-    title: 'Criar base de comparacao',
+    title: 'Construir base de comparacao',
     message: 'Ainda falta historico para orientar o proximo ciclo.',
     suggestion: hasCurrentInvoice
-      ? 'Envie mais uma fatura para comparar consumo e custo.'
-      : 'Envie uma fatura para comecar a base de comparacao.',
+      ? 'Adicione mais uma fatura ao historico para comparar consumo e custo.'
+      : 'Adicione uma fatura ao historico para iniciar a base de comparacao.',
   };
 };
 

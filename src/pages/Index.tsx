@@ -1,5 +1,4 @@
 import React from 'react';
-import Header from '../components/Header';
 import ScoreCard from '../components/ScoreCard';
 import LevelProgress from '../components/LevelProgress';
 import ScoreExplanationCard from '../components/ScoreExplanationCard';
@@ -81,7 +80,6 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-cyan-50">
-      <Header />
       <main className="container mx-auto px-4 py-8 space-y-8">
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
           <div className="xl:col-span-2">

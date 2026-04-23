@@ -40,7 +40,7 @@ const AnalysisSummary = ({ invoice, analysis, profile }: AnalysisSummaryProps) =
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-slate-600">
           <p>
-            A análise aparece logo após o envio da fatura. Ela transforma o arquivo em sinais
+            A análise aparece logo após adicionar uma fatura ao histórico. Ela transforma o arquivo em sinais
             simples de consumo, custo e próximo passo.
           </p>
           <p>

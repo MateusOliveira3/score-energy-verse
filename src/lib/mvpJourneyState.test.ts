@@ -111,7 +111,7 @@ test('perfil suficientemente completo sem fatura resolve para before-upload', ()
 
   assert.equal(resolved.journeyStage, 'before-upload');
   assert.ok(resolved.actions.items.length > 0);
-  assert.equal(resolved.actions.items[0].title, 'Enviar a primeira fatura');
+  assert.equal(resolved.actions.items[0].title, 'Adicionar fatura ao histórico');
 });
 
 test('fatura enviada sem analise pronta resolve para invoice-uploaded', () => {
@@ -354,7 +354,7 @@ test('guidance de proximo ciclo para historico insuficiente pede mais uma fatura
   const comparison = buildInvoiceComparison([invoice]);
   const guidance = buildNextCycleGuidance(comparison);
 
-  assert.equal(guidance.title, 'Criar base de comparacao');
+  assert.equal(guidance.title, 'Construir base de comparacao');
   assert.ok(guidance.suggestion.includes('mais uma fatura'));
 });
 
@@ -1132,7 +1132,7 @@ test('explicacao fica coerente com perfil completo sem fatura', () => {
   const explanation = getScoreExplanation(makeState({ profile: completeProfile }));
 
   assert.equal(explanation.journeyStage, 'before-upload');
-  assert.equal(explanation.nextGain?.title, 'Enviar a primeira fatura');
+  assert.equal(explanation.nextGain?.title, 'Adicionar fatura ao histórico');
   assert.equal(explanation.nextGain?.potentialPoints, 220);
 });
 
