@@ -15,6 +15,7 @@ import {
   DEFAULT_MVP_STATE,
   getLatestInvoiceHistoryEntry,
   pruneInvoiceHistory,
+  resolveFullJourneyState,
   setAnalysis,
   setAnalysisProcessing,
   updateActions,
@@ -35,7 +36,7 @@ import {
 
 export const useMvpJourney = () => {
   const { journeyIdentity, loading: identityLoading } = useJourneyIdentity();
-  const [state, setState] = useState<MvpState>(DEFAULT_MVP_STATE);
+  const [state, setState] = useState<MvpState>(() => resolveFullJourneyState(DEFAULT_MVP_STATE));
   const [storageLoaded, setStorageLoaded] = useState(false);
   const journeyService = getMvpJourneyService();
 
@@ -61,7 +62,7 @@ export const useMvpJourney = () => {
           return;
         }
 
-        setState(loadedState);
+        setState(resolveFullJourneyState(loadedState));
       })
       .finally(() => {
         if (isActive) {
@@ -88,7 +89,7 @@ export const useMvpJourney = () => {
   }, [journeyIdentity, journeyService, state, storageLoaded]);
 
   const handleStateUpdate = (updater: (currentState: MvpState) => MvpState) => {
-    setState((currentState) => updater(currentState));
+    setState((currentState) => resolveFullJourneyState(updater(currentState)));
   };
 
   const updateProfile = (profile: UserProfileData) => {

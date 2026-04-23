@@ -244,6 +244,21 @@ export const buildNextActions = (
   const resolvedProfile = getResolvedProfile(profile);
   const actions: NextAction[] = [];
 
+  if (invoice && !analysis) {
+    actions.push({
+      id: 'continue-after-analysis',
+      title: 'Continuar quando o resumo estiver pronto',
+      description:
+        'A fatura ja foi enviada. O proximo passo valido agora e revisar o resumo assim que a analise for concluida.',
+      value: 'Mantem a jornada coerente entre envio e leitura',
+      priority: 'high',
+      status: 'new',
+      source: 'invoice',
+    });
+
+    return actions;
+  }
+
   if (!invoice || !analysis) {
     actions.push({
       id: 'complete-profile',

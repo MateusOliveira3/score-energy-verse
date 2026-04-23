@@ -10,6 +10,7 @@ import {
   Profile,
   ScoreEvent,
 } from '@/types/mvp';
+import { buildNextActions, isProfileComplete } from '@/lib/mvpCoreFlow';
 
 const RETURN_VISIT_MS = 1000 * 60 * 30;
 
@@ -155,28 +156,28 @@ export const normalizeAnalysisState = (
     (invoice): invoice is InvoiceData =>
       Boolean(invoice?.fingerprint && invoice.fileName && invoice.month)
   );
+  const resolvedLatestInvoice = latestInvoice ?? invoiceHistory[0];
   const summary = analysis?.summary ?? legacySummary;
   const status =
     analysis?.status ??
-    (latestInvoice || summary ? 'ready' : DEFAULT_ANALYSIS_STATE.status);
+    (resolvedLatestInvoice || summary ? 'ready' : DEFAULT_ANALYSIS_STATE.status);
 
   return {
     status,
-    latestInvoice,
+    latestInvoice: resolvedLatestInvoice,
     invoiceHistory,
     summary,
     lastCompletedAt:
       typeof analysis?.lastCompletedAt === 'string'
         ? analysis.lastCompletedAt
-        : summary
-          ? new Date().toISOString()
+        : typeof resolvedLatestInvoice?.uploadedAt === 'string'
+          ? resolvedLatestInvoice.uploadedAt
           : undefined,
   };
 };
 
 export const resolveJourneyStage = (
-  requestedStage: JourneyStage | undefined,
-  state: Pick<MvpState, 'analysis' | 'lastActiveAt'>
+  state: Pick<MvpState, 'profile' | 'analysis' | 'lastActiveAt'>
 ): JourneyStage => {
   const hasReturnableJourney =
     Boolean(state.lastActiveAt) &&
@@ -187,7 +188,90 @@ export const resolveJourneyStage = (
     return 'return-visit';
   }
 
-  return requestedStage ?? DEFAULT_MVP_STATE.journeyStage;
+  if (state.analysis.status === 'processing' || (state.analysis.latestInvoice && !state.analysis.summary)) {
+    return 'invoice-uploaded';
+  }
+
+  if (state.analysis.latestInvoice && state.analysis.summary) {
+    return 'analysis-ready';
+  }
+
+  if (isProfileComplete(state.profile)) {
+    return 'before-upload';
+  }
+
+  return DEFAULT_MVP_STATE.journeyStage;
+};
+
+const resolveActionsState = (
+  state: Pick<MvpState, 'profile' | 'analysis' | 'actions'>
+): NextActionsState => {
+  const normalizedActions = normalizeActionsState(state.actions);
+  const nextItems = buildNextActions(
+    state.analysis.latestInvoice,
+    state.analysis.summary,
+    state.profile
+  );
+  const nextItemIds = new Set(nextItems.map((action) => action.id));
+  const viewedActionIds = normalizedActions.viewedActionIds.filter((actionId) =>
+    nextItemIds.has(actionId)
+  );
+  const persistedActionMap = new Map(
+    normalizedActions.items.map((action) => [action.id, action] as const)
+  );
+
+  const items = nextItems
+    .map((action) =>
+      normalizeAction(
+        {
+          ...action,
+          status: viewedActionIds.includes(action.id)
+            ? 'viewed'
+            : persistedActionMap.get(action.id)?.status === 'started' ||
+                persistedActionMap.get(action.id)?.status === 'completed'
+              ? persistedActionMap.get(action.id)?.status
+              : action.status,
+          source: action.source ?? persistedActionMap.get(action.id)?.source,
+        },
+        viewedActionIds
+      )
+    )
+    .filter((action): action is NextAction => Boolean(action));
+
+  return normalizeActionsState({
+    items,
+    viewedActionIds,
+    lastUpdatedAt: normalizedActions.lastUpdatedAt,
+  });
+};
+
+export const resolveFullJourneyState = (state: MvpState): MvpState => {
+  const profile = normalizeProfile(state.profile);
+  const mascot = normalizeMascot(state.mascot);
+  const analysis = normalizeAnalysisState(state.analysis);
+  const scoreEvents = Array.isArray(state.scoreEvents) ? state.scoreEvents : DEFAULT_MVP_STATE.scoreEvents;
+  const actions = resolveActionsState({
+    profile,
+    analysis,
+    actions: state.actions,
+  });
+  const lastActiveAt = typeof state.lastActiveAt === 'string' ? state.lastActiveAt : undefined;
+
+  return {
+    ...DEFAULT_MVP_STATE,
+    ...state,
+    profile,
+    mascot,
+    analysis,
+    scoreEvents,
+    actions,
+    lastActiveAt,
+    journeyStage: resolveJourneyStage({
+      profile,
+      analysis,
+      lastActiveAt,
+    }),
+  };
 };
 
 export const normalizeState = (
@@ -225,12 +309,9 @@ export const normalizeState = (
     journeyStage: DEFAULT_MVP_STATE.journeyStage,
   };
 
-  normalizedState.journeyStage = resolveJourneyStage(
-    state?.journeyStage ?? legacyState?.journeyStage,
-    normalizedState
-  );
+  normalizedState.journeyStage = resolveJourneyStage(normalizedState);
 
-  return normalizedState;
+  return resolveFullJourneyState(normalizedState);
 };
 
 export const updateProfile = (state: MvpState, profile: Profile): MvpState => ({
