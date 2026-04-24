@@ -4,6 +4,8 @@ import { ptBR } from 'date-fns/locale';
 import {
   Calendar,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Clock3,
   DollarSign,
   FileText,
@@ -36,6 +38,8 @@ interface InvoiceHistoryProps {
   onSelectInvoice?: (invoice: InvoiceData) => void;
   onDeleteInvoice: (fingerprint: string) => void;
   userContext?: Partial<UserContextState>;
+  isExpanded?: boolean;
+  onToggle?: () => void;
 }
 
 const getInvoiceStats = (invoices: InvoiceData[]) => {
@@ -343,6 +347,8 @@ const InvoiceHistory = ({
   onSelectInvoice,
   onDeleteInvoice,
   userContext,
+  isExpanded = true,
+  onToggle,
 }: InvoiceHistoryProps) => {
   const stats = getInvoiceStats(invoices);
   const contextualComparisonInvoices = React.useMemo(
@@ -360,17 +366,42 @@ const InvoiceHistory = ({
   const showInvoiceSelector = Boolean(
     focusedInvoice && invoices.length > 1 && onSelectInvoice
   );
+  const ExpansionIcon = isExpanded ? ChevronDown : ChevronRight;
 
   return (
     <div className="space-y-6">
       <Card className="border-emerald-100">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2 text-emerald-700">
-            <FileText className="h-5 w-5" />
-            <span>Historico de Faturas</span>
-          </CardTitle>
+        <CardHeader
+          className="cursor-pointer"
+          role="button"
+          tabIndex={0}
+          onClick={onToggle}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              onToggle?.();
+            }
+          }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-1">
+              <CardTitle className="flex items-center space-x-2 text-emerald-700">
+                <FileText className="h-5 w-5" />
+                <span>Historico de Faturas</span>
+              </CardTitle>
+              <p className="text-sm text-slate-500">
+                {focusedInvoiceLabel
+                  ? `Fatura em foco: ${focusedInvoiceLabel}.`
+                  : 'Comparacao e leitura do historico da jornada.'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+              <span>{isExpanded ? 'Aberto' : 'Fechado'}</span>
+              <ExpansionIcon className="h-4 w-4" />
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
+        {isExpanded && <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="text-center p-4 bg-emerald-50 rounded-lg">
               <div className="text-2xl font-bold text-emerald-600">{stats.totalInvoices}</div>
@@ -422,6 +453,7 @@ const InvoiceHistory = ({
                       aria-label="Selecionar fatura para comparar com a anterior"
                       className="rounded-md border border-white/70 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
                       value={focusedInvoice.fingerprint}
+                      onClick={(event) => event.stopPropagation()}
                       onChange={(event) => {
                         const nextInvoice = invoices.find(
                           (invoice) => invoice.fingerprint === event.target.value
@@ -601,7 +633,7 @@ const InvoiceHistory = ({
               })}
             </div>
           )}
-        </CardContent>
+        </CardContent>}
       </Card>
     </div>
   );

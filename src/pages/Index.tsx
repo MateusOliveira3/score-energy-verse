@@ -18,6 +18,8 @@ import { getInvoiceFlowSnapshot, logInvoiceFlow } from '@/lib/invoiceFlowDebug';
 import { buildAnalysisSummary } from '@/lib/mvpCoreFlow';
 import { InvoiceData, NextAction, NextActionStatus } from '@/types/mvp';
 
+type DashboardSectionKey = 'summary' | 'actions' | 'history';
+
 const Index = () => {
   const { toast } = useToast();
   const {
@@ -45,6 +47,7 @@ const Index = () => {
     ignoreMascotContextQuestion,
   } = useMvpJourney();
   const [selectedInvoice, setSelectedInvoice] = React.useState<InvoiceData | undefined>(latestInvoice);
+  const [activeSection, setActiveSection] = React.useState<DashboardSectionKey>('summary');
 
   React.useEffect(() => {
     logInvoiceFlow('ui-received-invoice-data', {
@@ -123,7 +126,7 @@ const Index = () => {
                 <CardTitle className="text-emerald-700">Perfil e Score Energy</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-1 gap-6 xl:grid-cols-5">
-                <div className="space-y-5 xl:col-span-3">
+                <div id="section-profile" className="space-y-5 xl:col-span-3">
                   <div className="flex flex-wrap items-center gap-3">
                     <Badge variant={isProfileComplete ? 'default' : 'secondary'}>
                       {isProfileComplete ? 'Perfil pronto para personalizar' : 'Perfil ainda parcial'}
@@ -183,7 +186,7 @@ const Index = () => {
                   </div>
                 </div>
 
-                <div className="space-y-4 xl:col-span-2">
+                <div id="section-score" className="space-y-4 xl:col-span-2">
                   <ScoreCard
                     score={scoreState.score}
                     level={scoreState.level}
@@ -206,7 +209,7 @@ const Index = () => {
             </Card>
           </div>
 
-          <div className="space-y-8">
+          <div id="section-mascot" className="space-y-8">
             <MascotGuidanceCard
               guidance={mascotGuidance}
               score={scoreState.score}
@@ -228,15 +231,27 @@ const Index = () => {
           selectedInvoice={selectedInvoice}
           onSelectInvoice={setSelectedInvoice}
           onActionStatusChange={handleActionStatusChange}
+          isExpanded={activeSection === 'actions'}
+          onToggle={() => setActiveSection('actions')}
         />
 
-        <InvoiceUpload
-          profile={profile}
-          onUploadStarted={startInvoiceProcessing}
-          onInvoiceProcessed={handleInvoiceProcessed}
-        />
+        <div id="section-mvp">
+          <InvoiceUpload
+            profile={profile}
+            onUploadStarted={startInvoiceProcessing}
+            onInvoiceProcessed={handleInvoiceProcessed}
+          />
+        </div>
 
-        <AnalysisSummary invoice={selectedInvoice} analysis={selectedAnalysis} profile={profile} />
+        <div id="section-summary">
+          <AnalysisSummary
+            invoice={selectedInvoice}
+            analysis={selectedAnalysis}
+            profile={profile}
+            isExpanded={activeSection === 'summary'}
+            onToggle={() => setActiveSection('summary')}
+          />
+        </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
           <div className="xl:col-span-2">
@@ -246,6 +261,8 @@ const Index = () => {
               onSelectInvoice={setSelectedInvoice}
               onDeleteInvoice={handleInvoiceRemoved}
               userContext={userContext}
+              isExpanded={activeSection === 'history'}
+              onToggle={() => setActiveSection('history')}
             />
           </div>
           <ScoreExplanationCard explanation={scoreExplanation} />
