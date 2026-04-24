@@ -72,11 +72,41 @@ const getConsumptionIcon = (consumption?: number) => {
   return <Zap className="h-4 w-4" />;
 };
 
-const formatInvoiceDate = (invoice: InvoiceData) => {
+const getInvoiceReferenceLabel = (invoice: InvoiceData) => {
+  const month = invoice.month?.trim();
+
+  if (month) {
+    return month;
+  }
+
+  const referenceMonth = invoice.parser.fields.referenceMonth.value?.trim();
+
+  if (referenceMonth) {
+    return referenceMonth;
+  }
+
+  return invoice.month || 'Referencia nao identificada';
+};
+
+const getAverageCostPerKwh = (invoice: InvoiceData) => {
+  if (
+    typeof invoice.totalValue !== 'number' ||
+    !Number.isFinite(invoice.totalValue) ||
+    typeof invoice.consumption !== 'number' ||
+    !Number.isFinite(invoice.consumption) ||
+    invoice.consumption <= 0
+  ) {
+    return undefined;
+  }
+
+  return invoice.totalValue / invoice.consumption;
+};
+
+const formatUploadedAtDate = (invoice: InvoiceData) => {
   const dateValue = invoice.uploadedAt;
 
   if (!dateValue) {
-    return 'Momento nao registrado';
+    return undefined;
   }
 
   return format(new Date(dateValue), 'dd/MM/yyyy', { locale: ptBR });
@@ -87,6 +117,9 @@ const formatCurrency = (value?: number) =>
 
 const formatConsumption = (value?: number) =>
   typeof value === 'number' ? `${value} kWh` : 'Nao identificado';
+
+const formatCurrencyPerKwh = (value?: number) =>
+  typeof value === 'number' ? `R$ ${value.toFixed(2)}/kWh` : undefined;
 
 const comparisonVariant: Record<InvoiceComparison['status'], string> = {
   insufficient: 'border-slate-100 bg-slate-50 text-slate-700',
@@ -299,59 +332,76 @@ const InvoiceHistory = ({ invoices, onDeleteInvoice, userContext }: InvoiceHisto
             </div>
           ) : (
             <div className="space-y-4">
-              {invoices.map((invoice) => (
-                <Card key={invoice.fingerprint} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center space-x-4">
-                        <div className="p-2 bg-emerald-100 rounded-lg">
-                          <FileText className="h-5 w-5 text-emerald-600" />
-                        </div>
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <h3 className="font-medium text-gray-900">Fatura - {invoice.month}</h3>
-                            <Badge variant="secondary" className={getConsumptionColor(invoice.consumption)}>
-                              {getConsumptionIcon(invoice.consumption)}
-                              <span className="ml-1">{formatConsumption(invoice.consumption)}</span>
-                            </Badge>
+              {invoices.map((invoice) => {
+                const referenceLabel = getInvoiceReferenceLabel(invoice);
+                const averageCostPerKwh = getAverageCostPerKwh(invoice);
+                const uploadedAtLabel = formatUploadedAtDate(invoice);
+
+                return (
+                  <Card key={invoice.fingerprint} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center space-x-4">
+                          <div className="p-2 bg-emerald-100 rounded-lg">
+                            <FileText className="h-5 w-5 text-emerald-600" />
                           </div>
-                          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mt-1">
-                            <div className="flex items-center">
-                              <DollarSign className="h-3 w-3 mr-1" />
-                              {formatCurrency(invoice.totalValue)}
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <h3 className="font-medium text-gray-900">Fatura - {referenceLabel}</h3>
+                              <Badge
+                                variant="secondary"
+                                className={getConsumptionColor(invoice.consumption)}
+                              >
+                                {getConsumptionIcon(invoice.consumption)}
+                                <span className="ml-1">{formatConsumption(invoice.consumption)}</span>
+                              </Badge>
                             </div>
-                            <div className="flex items-center">
-                              <Calendar className="h-3 w-3 mr-1" />
-                              {formatInvoiceDate(invoice)}
-                            </div>
-                            {invoice.parser.fields.consumerUnit.value && (
+                            <div className="mt-1 flex flex-wrap items-center gap-4 text-sm text-gray-600">
                               <div className="flex items-center">
-                                <Zap className="h-3 w-3 mr-1" />
-                                UC {invoice.parser.fields.consumerUnit.value}
+                                <DollarSign className="h-3 w-3 mr-1" />
+                                {formatCurrency(invoice.totalValue)}
                               </div>
-                            )}
+                              {averageCostPerKwh !== undefined && (
+                                <div className="flex items-center">
+                                  <Zap className="h-3 w-3 mr-1" />
+                                  {formatCurrencyPerKwh(averageCostPerKwh)}
+                                </div>
+                              )}
+                              {uploadedAtLabel && (
+                                <div className="flex items-center">
+                                  <Calendar className="h-3 w-3 mr-1" />
+                                  Enviada em {uploadedAtLabel}
+                                </div>
+                              )}
+                              {invoice.parser.fields.consumerUnit.value && (
+                                <div className="flex items-center">
+                                  <Zap className="h-3 w-3 mr-1" />
+                                  UC {invoice.parser.fields.consumerUnit.value}
+                                </div>
+                              )}
+                            </div>
+                            <p className="mt-2 text-xs text-slate-500">Arquivo base: {invoice.fileName}</p>
                           </div>
-                          <p className="text-xs text-slate-500 mt-2">Arquivo base: {invoice.fileName}</p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              if (confirm('Tem certeza que deseja excluir esta fatura do historico MVP?')) {
+                                onDeleteInvoice(invoice.fingerprint);
+                              }
+                            }}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            if (confirm('Tem certeza que deseja excluir esta fatura do historico MVP?')) {
-                              onDeleteInvoice(invoice.fingerprint);
-                            }
-                          }}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </CardContent>

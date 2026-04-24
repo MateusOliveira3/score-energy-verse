@@ -34,6 +34,39 @@ const formatCurrency = (value?: number) =>
 const formatConsumption = (value?: number) =>
   typeof value === 'number' ? `${value} kWh` : 'Nao identificado';
 
+const getInvoiceReferenceLabel = (invoice: InvoiceData) => {
+  const month = invoice.month?.trim();
+
+  if (month) {
+    return month;
+  }
+
+  const referenceMonth = invoice.parser.fields.referenceMonth.value?.trim();
+
+  if (referenceMonth) {
+    return referenceMonth;
+  }
+
+  return invoice.month || 'Referencia nao identificada';
+};
+
+const getAverageCostPerKwh = (invoice: InvoiceData) => {
+  if (
+    typeof invoice.totalValue !== 'number' ||
+    !Number.isFinite(invoice.totalValue) ||
+    typeof invoice.consumption !== 'number' ||
+    !Number.isFinite(invoice.consumption) ||
+    invoice.consumption <= 0
+  ) {
+    return undefined;
+  }
+
+  return invoice.totalValue / invoice.consumption;
+};
+
+const formatCurrencyPerKwh = (value?: number) =>
+  typeof value === 'number' ? `R$ ${value.toFixed(2)}/kWh` : undefined;
+
 const AnalysisSummary = ({ invoice, analysis, profile }: AnalysisSummaryProps) => {
   if (!invoice || !analysis) {
     return (
@@ -58,6 +91,9 @@ const AnalysisSummary = ({ invoice, analysis, profile }: AnalysisSummaryProps) =
     );
   }
 
+  const referenceLabel = getInvoiceReferenceLabel(invoice);
+  const averageCostPerKwh = getAverageCostPerKwh(invoice);
+
   return (
     <Card className="border-2 border-slate-100 shadow-lg">
       <CardHeader>
@@ -78,7 +114,7 @@ const AnalysisSummary = ({ invoice, analysis, profile }: AnalysisSummaryProps) =
               Custo {costLabel[analysis.costSignal]}
             </Badge>
           )}
-          <Badge variant="outline">{invoice.month}</Badge>
+          <Badge variant="outline">{referenceLabel}</Badge>
           {invoice.parser.fields.providerName.value && (
             <Badge variant="outline">{invoice.parser.fields.providerName.value}</Badge>
           )}
@@ -105,6 +141,11 @@ const AnalysisSummary = ({ invoice, analysis, profile }: AnalysisSummaryProps) =
                 ? `Vencimento ${invoice.parser.fields.dueDate.value}`
                 : 'Vencimento nao identificado'}
             </div>
+            {averageCostPerKwh !== undefined && (
+              <div className="mt-2 text-sm text-blue-700">
+                Custo medio de {formatCurrencyPerKwh(averageCostPerKwh)}
+              </div>
+            )}
           </div>
         </div>
 
