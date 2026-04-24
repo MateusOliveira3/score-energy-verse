@@ -15,7 +15,8 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useMvpJourney } from '@/hooks/useMvpJourney';
 import { getInvoiceFlowSnapshot, logInvoiceFlow } from '@/lib/invoiceFlowDebug';
-import { NextAction, NextActionStatus } from '@/types/mvp';
+import { buildAnalysisSummary } from '@/lib/mvpCoreFlow';
+import { InvoiceData, NextAction, NextActionStatus } from '@/types/mvp';
 
 const Index = () => {
   const { toast } = useToast();
@@ -43,6 +44,7 @@ const Index = () => {
     answerMascotContextQuestion,
     ignoreMascotContextQuestion,
   } = useMvpJourney();
+  const [selectedInvoice, setSelectedInvoice] = React.useState<InvoiceData | undefined>(latestInvoice);
 
   React.useEffect(() => {
     logInvoiceFlow('ui-received-invoice-data', {
@@ -51,6 +53,24 @@ const Index = () => {
     });
   }, [invoiceHistory.length, latestInvoice]);
 
+  React.useEffect(() => {
+    setSelectedInvoice((currentSelection) => {
+      if (!latestInvoice) {
+        return undefined;
+      }
+
+      if (!currentSelection) {
+        return latestInvoice;
+      }
+
+      const preservedSelection = invoiceHistory.find(
+        (invoice) => invoice.fingerprint === currentSelection.fingerprint
+      );
+
+      return preservedSelection ?? latestInvoice;
+    });
+  }, [invoiceHistory, latestInvoice]);
+
   const completedSteps = [
     isProfileComplete,
     Boolean(latestInvoice),
@@ -58,6 +78,13 @@ const Index = () => {
   ].filter(Boolean).length;
 
   const efficiencyLabel = latestAnalysis?.efficiencyLabel || 'Aguardando primeira leitura';
+  const selectedAnalysis = React.useMemo(() => {
+    if (!selectedInvoice) {
+      return undefined;
+    }
+
+    return buildAnalysisSummary(selectedInvoice, profile, invoiceHistory);
+  }, [invoiceHistory, profile, selectedInvoice]);
 
   const handleInvoiceProcessed = async (file: File) => {
     return completeInvoiceFlow(file);
@@ -196,8 +223,10 @@ const Index = () => {
         <SmartRecommendations
           actions={nextActions}
           viewedActionIds={viewedActionIds}
-          invoice={latestInvoice}
-          analysis={latestAnalysis}
+          analysis={selectedAnalysis}
+          invoiceHistory={invoiceHistory}
+          selectedInvoice={selectedInvoice}
+          onSelectInvoice={setSelectedInvoice}
           onActionStatusChange={handleActionStatusChange}
         />
 
@@ -207,12 +236,14 @@ const Index = () => {
           onInvoiceProcessed={handleInvoiceProcessed}
         />
 
-        <AnalysisSummary invoice={latestInvoice} analysis={latestAnalysis} profile={profile} />
+        <AnalysisSummary invoice={selectedInvoice} analysis={selectedAnalysis} profile={profile} />
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
           <div className="xl:col-span-2">
             <InvoiceHistory
               invoices={invoiceHistory}
+              selectedInvoice={selectedInvoice}
+              onSelectInvoice={setSelectedInvoice}
               onDeleteInvoice={handleInvoiceRemoved}
               userContext={userContext}
             />

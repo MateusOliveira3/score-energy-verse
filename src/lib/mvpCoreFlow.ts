@@ -13,6 +13,14 @@ import {
 import { parseInvoiceFile } from '@/lib/invoiceParser';
 import { getInvoiceFlowSnapshot, logInvoiceFlow } from '@/lib/invoiceFlowDebug';
 
+type InvoiceSignalTrend = 'down' | 'up' | 'stable' | 'unknown';
+
+interface InvoiceComparativeSignals {
+  consumptionTrend: InvoiceSignalTrend;
+  costTrend: InvoiceSignalTrend;
+  costPerKwhTrend: InvoiceSignalTrend;
+}
+
 const SCORE_EVENT_POINTS = {
   profile_completed: 80,
   invoice_uploaded: 120,
@@ -43,11 +51,28 @@ const DEFAULT_PROFILE: UserProfileData = {
   energyPreference: 'Convencional',
 };
 
+const BASIC_SIGNAL_TOLERANCE = 0.05;
+
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
 
 const hasNumericValue = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value);
+
+const PT_BR_MONTH_INDEX: Record<string, number> = {
+  janeiro: 0,
+  fevereiro: 1,
+  marco: 2,
+  abril: 3,
+  maio: 4,
+  junho: 5,
+  julho: 6,
+  agosto: 7,
+  setembro: 8,
+  outubro: 9,
+  novembro: 10,
+  dezembro: 11,
+};
 
 const getResolvedProfile = (profile?: Partial<UserProfileData>): UserProfileData => ({
   ...DEFAULT_PROFILE,
@@ -67,6 +92,32 @@ const getInvoiceMonthLabel = (invoice: Pick<InvoiceData, 'month'>) =>
 
 const getUsageWindowLabel = (invoice: InvoiceData) =>
   invoice.peakHours?.trim() || 'os horarios de maior uso identificados na fatura';
+
+const normalizeDateText = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+const getInvoiceCompetenceTime = (invoice: InvoiceData) => {
+  const normalizedMonth = normalizeDateText(invoice.month);
+  const numericMatch = normalizedMonth.match(/\b(0[1-9]|1[0-2])\/(\d{4})\b/);
+
+  if (numericMatch) {
+    return Date.UTC(Number(numericMatch[2]), Number(numericMatch[1]) - 1, 1);
+  }
+
+  const monthKey = Object.keys(PT_BR_MONTH_INDEX).find((month) =>
+    normalizedMonth.includes(month)
+  );
+  const year = Number(normalizedMonth.match(/\b\d{4}\b/)?.[0]);
+
+  if (!monthKey || !Number.isFinite(year)) {
+    return undefined;
+  }
+
+  return Date.UTC(year, PT_BR_MONTH_INDEX[monthKey], 1);
+};
 
 export const getProfileCompletion = (profile?: Partial<UserProfileData>) => {
   const resolvedProfile = getResolvedProfile(profile);
@@ -126,6 +177,138 @@ export const interpretInvoiceFile = async (
   return invoice;
 };
 
+const getInvoiceCostPerKwh = (invoice: Pick<InvoiceData, 'totalValue' | 'consumption'>) => {
+  if (
+    !hasNumericValue(invoice.totalValue) ||
+    !hasNumericValue(invoice.consumption) ||
+    invoice.consumption <= 0
+  ) {
+    return undefined;
+  }
+
+  return invoice.totalValue / invoice.consumption;
+};
+
+const getBasicTrendSignal = (
+  currentValue: number | undefined,
+  previousValue: number | undefined
+): InvoiceSignalTrend => {
+  if (
+    !hasNumericValue(currentValue) ||
+    !hasNumericValue(previousValue) ||
+    previousValue === 0
+  ) {
+    return 'unknown';
+  }
+
+  const relativeChange = (currentValue - previousValue) / previousValue;
+
+  if (Math.abs(relativeChange) <= BASIC_SIGNAL_TOLERANCE) {
+    return 'stable';
+  }
+
+  return relativeChange > 0 ? 'up' : 'down';
+};
+
+export const buildBasicInvoiceSignals = (
+  currentInvoice: InvoiceData,
+  previousInvoice: InvoiceData
+): InvoiceComparativeSignals => ({
+  consumptionTrend: getBasicTrendSignal(currentInvoice.consumption, previousInvoice.consumption),
+  costTrend: getBasicTrendSignal(currentInvoice.totalValue, previousInvoice.totalValue),
+  costPerKwhTrend: getBasicTrendSignal(
+    getInvoiceCostPerKwh(currentInvoice),
+    getInvoiceCostPerKwh(previousInvoice)
+  ),
+});
+
+export const buildConsultativeInsights = (
+  signals?: Partial<InvoiceComparativeSignals>
+): string[] => {
+  const resolvedSignals: InvoiceComparativeSignals = {
+    consumptionTrend: signals?.consumptionTrend ?? 'unknown',
+    costTrend: signals?.costTrend ?? 'unknown',
+    costPerKwhTrend: signals?.costPerKwhTrend ?? 'unknown',
+  };
+  const insights: string[] = [];
+
+  if (
+    resolvedSignals.consumptionTrend === 'unknown' &&
+    resolvedSignals.costTrend === 'unknown' &&
+    resolvedSignals.costPerKwhTrend === 'unknown'
+  ) {
+    return ['Dados insuficientes para comparacao segura.'];
+  }
+
+  if (
+    resolvedSignals.consumptionTrend === 'down' &&
+    resolvedSignals.costTrend === 'up'
+  ) {
+    insights.push('Consumo caiu, mas o custo subiu. Sinal de atencao.');
+  } else if (resolvedSignals.consumptionTrend === 'up') {
+    insights.push('Consumo subiu. Vale observar o proximo ciclo.');
+  } else if (resolvedSignals.consumptionTrend === 'down') {
+    insights.push('Consumo caiu. Pode indicar um uso mais contido.');
+  }
+
+  if (resolvedSignals.costTrend === 'up') {
+    insights.push('Custo subiu. Vale observar o proximo ciclo.');
+  }
+
+  if (resolvedSignals.costPerKwhTrend === 'up') {
+    insights.push('Custo por kWh subiu. Sinal de atencao.');
+  }
+
+  return insights.length > 0 ? insights.slice(0, 3) : ['Dados insuficientes para comparacao segura.'];
+};
+
+const sortInvoicesByCompetence = (invoiceHistory: InvoiceData[]) =>
+  [...invoiceHistory]
+    .map((invoice, index) => ({
+      index,
+      invoice,
+      competenceTime: getInvoiceCompetenceTime(invoice),
+    }))
+    .sort((left, right) => {
+      if (left.competenceTime === undefined && right.competenceTime === undefined) {
+        return left.index - right.index;
+      }
+
+      if (left.competenceTime === undefined) {
+        return 1;
+      }
+
+      if (right.competenceTime === undefined) {
+        return -1;
+      }
+
+      return left.competenceTime - right.competenceTime;
+    })
+    .map(({ invoice }) => invoice);
+
+const upsertInvoiceInHistory = (invoice: InvoiceData, invoiceHistory: InvoiceData[]) => [
+  invoice,
+  ...invoiceHistory.filter((historyInvoice) => historyInvoice.fingerprint !== invoice.fingerprint),
+];
+
+export const getPreviousInvoice = (
+  currentInvoice: InvoiceData,
+  invoiceHistory: InvoiceData[]
+) => {
+  const orderedHistory = sortInvoicesByCompetence(
+    upsertInvoiceInHistory(currentInvoice, invoiceHistory)
+  );
+  const currentInvoiceIndex = orderedHistory.findIndex(
+    (invoice) => invoice.fingerprint === currentInvoice.fingerprint
+  );
+
+  if (currentInvoiceIndex <= 0) {
+    return undefined;
+  }
+
+  return orderedHistory[currentInvoiceIndex - 1];
+};
+
 const getConsumptionLevel = (
   consumption: number,
   consumerType: string
@@ -159,8 +342,13 @@ const getCostSignal = (totalValue: number): AnalysisSummary['costSignal'] => {
 
 export const buildAnalysisSummary = (
   invoice: InvoiceData,
-  profile?: Partial<UserProfileData>
+  profile?: Partial<UserProfileData>,
+  invoiceHistory: InvoiceData[] = []
 ): AnalysisSummary => {
+  const previousInvoiceForInsights = getPreviousInvoice(invoice, invoiceHistory);
+  const consultativeInsights = previousInvoiceForInsights
+    ? buildConsultativeInsights(buildBasicInvoiceSignals(invoice, previousInvoiceForInsights))
+    : buildConsultativeInsights();
   const resolvedProfile = getResolvedProfile(profile);
   const consumptionLevel = hasNumericValue(invoice.consumption)
     ? getConsumptionLevel(invoice.consumption, resolvedProfile.consumerType)
@@ -234,6 +422,7 @@ export const buildAnalysisSummary = (
   return {
     consumptionLevel,
     costSignal,
+    consultativeInsights,
     headline:
       hasConsumption && hasCost
         ? `Leitura real da fatura ${monthLabel}: consumo ${consumptionLevel} e sinal de custo ${costSignal}.`

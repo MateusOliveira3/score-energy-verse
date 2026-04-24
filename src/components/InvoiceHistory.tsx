@@ -32,6 +32,8 @@ import {
 
 interface InvoiceHistoryProps {
   invoices: InvoiceData[];
+  selectedInvoice?: InvoiceData;
+  onSelectInvoice?: (invoice: InvoiceData) => void;
   onDeleteInvoice: (fingerprint: string) => void;
   userContext?: Partial<UserContextState>;
 }
@@ -121,6 +123,145 @@ const formatConsumption = (value?: number) =>
 const formatCurrencyPerKwh = (value?: number) =>
   typeof value === 'number' ? `R$ ${value.toFixed(2)}/kWh` : undefined;
 
+const PT_BR_MONTH_INDEX: Record<string, number> = {
+  janeiro: 0,
+  fevereiro: 1,
+  marco: 2,
+  abril: 3,
+  maio: 4,
+  junho: 5,
+  julho: 6,
+  agosto: 7,
+  setembro: 8,
+  outubro: 9,
+  novembro: 10,
+  dezembro: 11,
+};
+
+const normalizeDateText = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+const getInvoiceCompetenceTime = (invoice: InvoiceData) => {
+  const normalizedMonth = normalizeDateText(getInvoiceReferenceLabel(invoice));
+  const numericMatch = normalizedMonth.match(/\b(0[1-9]|1[0-2])\/(\d{4})\b/);
+
+  if (numericMatch) {
+    return Date.UTC(Number(numericMatch[2]), Number(numericMatch[1]) - 1, 1);
+  }
+
+  const monthKey = Object.keys(PT_BR_MONTH_INDEX).find((month) =>
+    normalizedMonth.includes(month)
+  );
+  const year = Number(normalizedMonth.match(/\b\d{4}\b/)?.[0]);
+
+  if (!monthKey || !Number.isFinite(year)) {
+    return undefined;
+  }
+
+  return Date.UTC(year, PT_BR_MONTH_INDEX[monthKey], 1);
+};
+
+const getInvoiceUploadTime = (invoice: InvoiceData) => {
+  if (!invoice.uploadedAt) {
+    return undefined;
+  }
+
+  const time = new Date(invoice.uploadedAt).getTime();
+  return Number.isNaN(time) ? undefined : time;
+};
+
+const getInvoiceComparisonReference = (invoice: InvoiceData) => {
+  const competenceTime = getInvoiceCompetenceTime(invoice);
+
+  if (competenceTime !== undefined) {
+    return {
+      basis: 'competence' as const,
+      time: competenceTime,
+    };
+  }
+
+  const uploadTime = getInvoiceUploadTime(invoice);
+
+  if (uploadTime !== undefined) {
+    return {
+      basis: 'upload' as const,
+      time: uploadTime,
+    };
+  }
+
+  return {
+    basis: 'history' as const,
+    time: undefined,
+  };
+};
+
+const COMPARISON_REFERENCE_PRIORITY: Record<
+  ReturnType<typeof getInvoiceComparisonReference>['basis'],
+  number
+> = {
+  competence: 0,
+  upload: 1,
+  history: 2,
+};
+
+const sortInvoicesForUiComparison = (invoiceHistory: InvoiceData[]) =>
+  [...invoiceHistory]
+    .map((invoice, index) => ({
+      index,
+      invoice,
+      reference: getInvoiceComparisonReference(invoice),
+    }))
+    .sort((left, right) => {
+      const priorityDifference =
+        COMPARISON_REFERENCE_PRIORITY[left.reference.basis] -
+        COMPARISON_REFERENCE_PRIORITY[right.reference.basis];
+
+      if (priorityDifference !== 0) {
+        return priorityDifference;
+      }
+
+      if (left.reference.time === undefined && right.reference.time === undefined) {
+        return left.index - right.index;
+      }
+
+      if (left.reference.time === undefined) {
+        return 1;
+      }
+
+      if (right.reference.time === undefined) {
+        return -1;
+      }
+
+      return right.reference.time - left.reference.time;
+    })
+    .map(({ invoice }) => invoice);
+
+const getContextualComparisonInvoices = (
+  invoices: InvoiceData[],
+  selectedInvoice?: InvoiceData
+) => {
+  if (!selectedInvoice) {
+    return invoices;
+  }
+
+  const sortedInvoices = sortInvoicesForUiComparison(invoices);
+  const currentIndex = sortedInvoices.findIndex(
+    (invoice) => invoice.fingerprint === selectedInvoice.fingerprint
+  );
+
+  if (currentIndex === -1) {
+    return invoices;
+  }
+
+  const currentInvoice = sortedInvoices[currentIndex];
+  const previousInvoice = sortedInvoices[currentIndex + 1];
+
+  return previousInvoice ? [currentInvoice, previousInvoice] : [currentInvoice];
+};
+
 const comparisonVariant: Record<InvoiceComparison['status'], string> = {
   insufficient: 'border-slate-100 bg-slate-50 text-slate-700',
   improved: 'border-emerald-100 bg-emerald-50 text-emerald-800',
@@ -196,11 +337,29 @@ const ComparisonMetric = ({
   </div>
 );
 
-const InvoiceHistory = ({ invoices, onDeleteInvoice, userContext }: InvoiceHistoryProps) => {
+const InvoiceHistory = ({
+  invoices,
+  selectedInvoice,
+  onSelectInvoice,
+  onDeleteInvoice,
+  userContext,
+}: InvoiceHistoryProps) => {
   const stats = getInvoiceStats(invoices);
-  const comparison = buildInvoiceComparison(invoices);
+  const contextualComparisonInvoices = React.useMemo(
+    () => getContextualComparisonInvoices(invoices, selectedInvoice),
+    [invoices, selectedInvoice]
+  );
+  const comparison = React.useMemo(
+    () => buildInvoiceComparison(contextualComparisonInvoices),
+    [contextualComparisonInvoices]
+  );
   const actionResultLink = buildActionResultLink(comparison);
   const guidance = buildNextCycleGuidance(comparison, userContext);
+  const focusedInvoice = selectedInvoice ?? comparison.currentInvoice;
+  const focusedInvoiceLabel = focusedInvoice ? getInvoiceReferenceLabel(focusedInvoice) : undefined;
+  const showInvoiceSelector = Boolean(
+    focusedInvoice && invoices.length > 1 && onSelectInvoice
+  );
 
   return (
     <div className="space-y-6">
@@ -241,23 +400,56 @@ const InvoiceHistory = ({ invoices, onDeleteInvoice, userContext }: InvoiceHisto
                 <div className="text-sm font-semibold uppercase tracking-wide">
                   Comparacao com a fatura anterior
                 </div>
+                {focusedInvoiceLabel && (
+                  <p className="mt-1 text-sm font-medium opacity-90">
+                    Fatura em foco: {focusedInvoiceLabel}
+                  </p>
+                )}
                 <h3 className="mt-1 text-lg font-bold">{comparison.title}</h3>
                 <p className="mt-1 text-sm">{comparison.summary}</p>
                 {comparison.currentInvoice && comparison.previousInvoice && (
                   <p className="mt-2 text-xs opacity-80">
-                    Comparando {comparison.currentInvoice.month} com {comparison.previousInvoice.month}.
+                    Comparando {getInvoiceReferenceLabel(comparison.currentInvoice)} com{' '}
+                    {getInvoiceReferenceLabel(comparison.previousInvoice)}.
                   </p>
                 )}
               </div>
-              <div className="flex flex-wrap gap-2 md:justify-end">
-                <Badge variant="outline" className="w-fit bg-white/70">
-                  {comparisonBasisLabel[comparison.basis]}
-                </Badge>
-                {comparison.status !== 'insufficient' && (
-                  <Badge variant="outline" className="w-fit bg-white/70">
-                    Leitura observada
-                  </Badge>
+              <div className="flex flex-col gap-2 md:items-end">
+                {showInvoiceSelector && focusedInvoice && onSelectInvoice && (
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="font-medium">Fatura em foco</span>
+                    <select
+                      aria-label="Selecionar fatura para comparar com a anterior"
+                      className="rounded-md border border-white/70 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                      value={focusedInvoice.fingerprint}
+                      onChange={(event) => {
+                        const nextInvoice = invoices.find(
+                          (invoice) => invoice.fingerprint === event.target.value
+                        );
+
+                        if (nextInvoice) {
+                          onSelectInvoice(nextInvoice);
+                        }
+                      }}
+                    >
+                      {sortInvoicesForUiComparison(invoices).map((invoice) => (
+                        <option key={invoice.fingerprint} value={invoice.fingerprint}>
+                          {getInvoiceReferenceLabel(invoice)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 )}
+                <div className="flex flex-wrap gap-2 md:justify-end">
+                  <Badge variant="outline" className="w-fit bg-white/70">
+                    {comparisonBasisLabel[comparison.basis]}
+                  </Badge>
+                  {comparison.status !== 'insufficient' && (
+                    <Badge variant="outline" className="w-fit bg-white/70">
+                      Leitura observada
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -355,6 +547,11 @@ const InvoiceHistory = ({ invoices, onDeleteInvoice, userContext }: InvoiceHisto
                                 {getConsumptionIcon(invoice.consumption)}
                                 <span className="ml-1">{formatConsumption(invoice.consumption)}</span>
                               </Badge>
+                              {selectedInvoice?.fingerprint === invoice.fingerprint && (
+                                <Badge variant="outline" className="bg-white">
+                                  Em foco
+                                </Badge>
+                              )}
                             </div>
                             <div className="mt-1 flex flex-wrap items-center gap-4 text-sm text-gray-600">
                               <div className="flex items-center">

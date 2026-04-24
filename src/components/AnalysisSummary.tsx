@@ -10,6 +10,10 @@ interface AnalysisSummaryProps {
   profile: UserProfileData;
 }
 
+type AnalysisSummaryWithInsights = AnalysisSummaryType & {
+  consultativeInsights?: string[];
+};
+
 const consumptionVariant = {
   baixo: 'bg-emerald-100 text-emerald-700',
   moderado: 'bg-yellow-100 text-yellow-700',
@@ -93,6 +97,7 @@ const AnalysisSummary = ({ invoice, analysis, profile }: AnalysisSummaryProps) =
 
   const referenceLabel = getInvoiceReferenceLabel(invoice);
   const averageCostPerKwh = getAverageCostPerKwh(invoice);
+  const consultativeInsights = (analysis as AnalysisSummaryWithInsights).consultativeInsights ?? [];
 
   return (
     <Card className="border-2 border-slate-100 shadow-lg">
@@ -161,6 +166,21 @@ const AnalysisSummary = ({ invoice, analysis, profile }: AnalysisSummaryProps) =
               </div>
             ))}
           </div>
+          {consultativeInsights.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Sinais consultivos
+              </div>
+              {consultativeInsights.map((insight) => (
+                <div
+                  key={insight}
+                  className="rounded-lg border border-slate-100 bg-white px-3 py-2 text-xs text-slate-600"
+                >
+                  {insight}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="rounded-xl border border-amber-100 bg-amber-50 p-4">

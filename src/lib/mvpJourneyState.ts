@@ -894,17 +894,46 @@ const getComparisonBasis = (
   return 'history';
 };
 
+const COMPARISON_REFERENCE_PRIORITY: Record<
+  ReturnType<typeof getInvoiceReference>['basis'],
+  number
+> = {
+  competence: 0,
+  upload: 1,
+  history: 2,
+};
+
 const sortInvoicesForComparison = (invoiceHistory: InvoiceData[]) =>
-  [...invoiceHistory].sort((left, right) => {
-    const leftReference = getInvoiceReference(left);
-    const rightReference = getInvoiceReference(right);
+  [...invoiceHistory]
+    .map((invoice, index) => ({
+      index,
+      invoice,
+      reference: getInvoiceReference(invoice),
+    }))
+    .sort((left, right) => {
+      const priorityDifference =
+        COMPARISON_REFERENCE_PRIORITY[left.reference.basis] -
+        COMPARISON_REFERENCE_PRIORITY[right.reference.basis];
 
-    if (leftReference.time === undefined || rightReference.time === undefined) {
-      return 0;
-    }
+      if (priorityDifference !== 0) {
+        return priorityDifference;
+      }
 
-    return rightReference.time - leftReference.time;
-  });
+      if (left.reference.time === undefined && right.reference.time === undefined) {
+        return left.index - right.index;
+      }
+
+      if (left.reference.time === undefined) {
+        return 1;
+      }
+
+      if (right.reference.time === undefined) {
+        return -1;
+      }
+
+      return right.reference.time - left.reference.time;
+    })
+    .map(({ invoice }) => invoice);
 
 const getMetricTrend = (
   change: number,

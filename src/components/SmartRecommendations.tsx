@@ -6,8 +6,10 @@ import { AnalysisSummary, InvoiceData, NextAction, NextActionStatus } from '@/ty
 interface SmartRecommendationsProps {
   actions: NextAction[];
   viewedActionIds: string[];
-  invoice?: InvoiceData;
   analysis?: AnalysisSummary;
+  invoiceHistory?: InvoiceData[];
+  selectedInvoice?: InvoiceData;
+  onSelectInvoice?: (invoice: InvoiceData) => void;
   onActionStatusChange: (
     action: NextAction,
     status: Extract<NextActionStatus, 'in_progress' | 'completed'>
@@ -39,20 +41,80 @@ const formatCurrency = (value?: number) =>
 const formatConsumption = (value?: number) =>
   typeof value === 'number' ? `${value} kWh` : 'consumo nao identificado';
 
+const getInvoiceReferenceLabel = (invoice: InvoiceData) => {
+  const month = invoice.month?.trim();
+
+  if (month) {
+    return month;
+  }
+
+  const referenceMonth = invoice.parser.fields.referenceMonth.value?.trim();
+
+  if (referenceMonth) {
+    return referenceMonth;
+  }
+
+  return invoice.month || 'Referencia nao identificada';
+};
+
 const SmartRecommendations = ({
   actions,
   viewedActionIds,
-  invoice,
   analysis,
+  invoiceHistory,
+  selectedInvoice,
+  onSelectInvoice,
   onActionStatusChange,
 }: SmartRecommendationsProps) => {
+  const contextInvoice = selectedInvoice;
+  const contextInvoiceLabel = contextInvoice ? getInvoiceReferenceLabel(contextInvoice) : undefined;
+  const showInvoiceSelector = Boolean(contextInvoice && invoiceHistory && invoiceHistory.length > 1 && onSelectInvoice);
+
   return (
     <Card className="border-2 border-blue-100 shadow-lg">
       <CardHeader>
-        <CardTitle className="flex items-center space-x-2 text-blue-700">
-          <Lightbulb className="h-5 w-5" />
-          <span>Proximas acoes</span>
-        </CardTitle>
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div className="space-y-1">
+            <CardTitle className="flex items-center space-x-2 text-blue-700">
+              <Lightbulb className="h-5 w-5" />
+              <span>
+                {contextInvoiceLabel
+                  ? `Acoes recomendadas para ${contextInvoiceLabel}`
+                  : 'Proximas acoes'}
+              </span>
+            </CardTitle>
+            <p className="text-sm text-slate-600">
+              {contextInvoiceLabel
+                ? 'Baseado na fatura selecionada.'
+                : 'As acoes seguem a lista global da jornada, sem recalculo local.'}
+            </p>
+          </div>
+          {showInvoiceSelector && contextInvoice && invoiceHistory && onSelectInvoice && (
+            <label className="flex flex-col gap-1 text-sm text-slate-600">
+              <span className="font-medium text-slate-700">Fatura em foco</span>
+              <select
+                aria-label="Selecionar fatura para contextualizar as acoes"
+                className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                value={contextInvoice.fingerprint}
+                onChange={(event) => {
+                  const nextInvoice = invoiceHistory.find(
+                    (historyInvoice) => historyInvoice.fingerprint === event.target.value
+                  );
+
+                  if (nextInvoice) {
+                    onSelectInvoice(nextInvoice);
+                  }
+                }}
+              >
+                {invoiceHistory.map((historyInvoice) => (
+                  <option key={historyInvoice.fingerprint} value={historyInvoice.fingerprint}>
+                    {getInvoiceReferenceLabel(historyInvoice)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
@@ -149,12 +211,15 @@ const SmartRecommendations = ({
           })}
         </div>
 
-        {invoice && analysis && (
+        {contextInvoice && analysis && (
           <div className="mt-6 rounded-lg bg-gradient-to-r from-emerald-50 to-blue-50 p-4">
             <div className="text-center text-sm">
-              <p className="font-medium text-gray-700">Leitura atual do historico: {invoice.month}</p>
+              <p className="font-medium text-gray-700">
+                Contexto visual atual: {contextInvoiceLabel}
+              </p>
               <p className="text-gray-600">
-                {formatConsumption(invoice.consumption)} - {formatCurrency(invoice.totalValue)} -{' '}
+                {formatConsumption(contextInvoice.consumption)} -{' '}
+                {formatCurrency(contextInvoice.totalValue)} -{' '}
                 {analysis.efficiencyLabel}
               </p>
             </div>

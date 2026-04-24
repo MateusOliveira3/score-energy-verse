@@ -4,8 +4,11 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 import {
   buildAnalysisSummary,
+  buildBasicInvoiceSignals,
+  buildConsultativeInsights,
   buildMascotGuidance,
   buildNextActions,
+  getPreviousInvoice,
   getScoreEventPoints,
   getScoreState,
   interpretInvoiceFile,
@@ -447,6 +450,182 @@ test('comparacao identifica melhora observada entre duas faturas', () => {
   assert.equal(comparison.totalValue?.trend, 'down');
 });
 
+test('sinais basicos identificam consumo subindo', () => {
+  const currentInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-05-up',
+    month: 'maio de 2026',
+    consumption: 390,
+    totalValue: 430,
+  });
+  const signals = buildBasicInvoiceSignals(currentInvoice, invoice);
+
+  assert.equal(signals.consumptionTrend, 'up');
+});
+
+test('sinais basicos identificam custo por kWh subindo', () => {
+  const previousInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-04-cost-per-kwh',
+    month: 'abril de 2026',
+    consumption: 360,
+    totalValue: 360,
+  });
+  const currentInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-05-cost-per-kwh',
+    month: 'maio de 2026',
+    consumption: 300,
+    totalValue: 450,
+  });
+  const signals = buildBasicInvoiceSignals(currentInvoice, previousInvoice);
+
+  assert.equal(signals.costPerKwhTrend, 'up');
+});
+
+test('getPreviousInvoice usa a competencia real e atravessa a virada de ano', () => {
+  const novemberInvoice = makeInvoice({
+    fingerprint: 'invoice-2025-11',
+    month: '11/2025',
+    consumption: 290,
+    totalValue: 380,
+  });
+  const decemberInvoice = makeInvoice({
+    fingerprint: 'invoice-2025-12',
+    month: '12/2025',
+    consumption: 300,
+    totalValue: 430,
+  });
+  const januaryInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-01',
+    month: '01/2026',
+    consumption: 340,
+    totalValue: 470,
+  });
+
+  const previousInvoice = getPreviousInvoice(januaryInvoice, [
+    novemberInvoice,
+    januaryInvoice,
+    decemberInvoice,
+  ]);
+
+  assert.equal(previousInvoice?.fingerprint, decemberInvoice.fingerprint);
+});
+
+test('getPreviousInvoice encontra a fatura imediatamente anterior por competencia', () => {
+  const novemberInvoice = makeInvoice({
+    fingerprint: 'invoice-2025-11',
+    month: '11/2025',
+    consumption: 290,
+    totalValue: 380,
+  });
+  const decemberInvoice = makeInvoice({
+    fingerprint: 'invoice-2025-12',
+    month: '12/2025',
+    consumption: 300,
+    totalValue: 430,
+  });
+  const januaryInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-01',
+    month: '01/2026',
+    consumption: 340,
+    totalValue: 470,
+  });
+
+  const previousInvoice = getPreviousInvoice(decemberInvoice, [
+    novemberInvoice,
+    januaryInvoice,
+    decemberInvoice,
+  ]);
+
+  assert.equal(previousInvoice?.fingerprint, novemberInvoice.fingerprint);
+});
+
+test('buildAnalysisSummary compara sinais com a competencia anterior em historico fora de ordem', () => {
+  const novemberInvoice = makeInvoice({
+    fingerprint: 'invoice-2025-11-analysis',
+    month: '11/2025',
+    consumption: 360,
+    totalValue: 410,
+  });
+  const decemberInvoice = makeInvoice({
+    fingerprint: 'invoice-2025-12-analysis',
+    month: '12/2025',
+    consumption: 300,
+    totalValue: 430,
+  });
+  const januaryInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-01-analysis',
+    month: '01/2026',
+    consumption: 340,
+    totalValue: 470,
+  });
+
+  const summary = buildAnalysisSummary(januaryInvoice, completeProfile, [
+    novemberInvoice,
+    januaryInvoice,
+    decemberInvoice,
+  ]) as AnalysisSummary & { consultativeInsights?: string[] };
+
+  assert.equal(summary.consultativeInsights?.[0], 'Consumo subiu. Vale observar o proximo ciclo.');
+  assert.equal(summary.consultativeInsights?.[1], 'Custo subiu. Vale observar o proximo ciclo.');
+});
+
+test('buildAnalysisSummary usa o historico explicito ao selecionar fatura antiga', () => {
+  const novemberInvoice = makeInvoice({
+    fingerprint: 'invoice-2025-11-selected',
+    month: '11/2025',
+    consumption: 360,
+    totalValue: 390,
+  });
+  const decemberInvoice = makeInvoice({
+    fingerprint: 'invoice-2025-12-selected',
+    month: '12/2025',
+    consumption: 300,
+    totalValue: 430,
+  });
+  const januaryInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-01-selected',
+    month: '01/2026',
+    consumption: 340,
+    totalValue: 470,
+  });
+
+  buildAnalysisSummary(januaryInvoice, completeProfile, [
+    novemberInvoice,
+    januaryInvoice,
+    decemberInvoice,
+  ]);
+
+  const selectedSummary = buildAnalysisSummary(decemberInvoice, completeProfile, [
+    novemberInvoice,
+    januaryInvoice,
+    decemberInvoice,
+  ]) as AnalysisSummary & { consultativeInsights?: string[] };
+
+  assert.equal(
+    selectedSummary.consultativeInsights?.[0],
+    'Consumo caiu, mas o custo subiu. Sinal de atencao.'
+  );
+  assert.equal(selectedSummary.consultativeInsights?.[1], 'Custo subiu. Vale observar o proximo ciclo.');
+});
+
+test('insights consultivos priorizam consumo caindo com custo subindo', () => {
+  const insights = buildConsultativeInsights({
+    consumptionTrend: 'down',
+    costTrend: 'up',
+    costPerKwhTrend: 'up',
+  });
+
+  assert.equal(insights.length, 3);
+  assert.equal(insights[0], 'Consumo caiu, mas o custo subiu. Sinal de atencao.');
+  assert.equal(insights[1], 'Custo subiu. Vale observar o proximo ciclo.');
+  assert.equal(insights[2], 'Custo por kWh subiu. Sinal de atencao.');
+});
+
+test('insights consultivos retornam dados insuficientes quando faltam sinais validos', () => {
+  const insights = buildConsultativeInsights();
+
+  assert.deepEqual(insights, ['Dados insuficientes para comparacao segura.']);
+});
+
 test('guidance de proximo ciclo para melhora sugere manter e confirmar', () => {
   const currentInvoice = makeInvoice({
     fingerprint: 'invoice-2026-05',
@@ -573,6 +752,33 @@ test('comparacao usa data de envio quando competencia esta ambigua', () => {
   assert.equal(comparison.currentInvoice?.fingerprint, currentInvoice.fingerprint);
   assert.equal(comparison.previousInvoice?.fingerprint, previousInvoice.fingerprint);
   assert.equal(comparison.status, 'improved');
+});
+
+test('comparacao ignora competencia invalida quando existem competencias validas', () => {
+  const invalidInvoice = makeInvoice({
+    fingerprint: 'invoice-invalid-competence',
+    month: 'ciclo especial',
+    consumption: 410,
+    totalValue: 520,
+    uploadedAt: '2026-06-10T12:00:00.000Z',
+  });
+  const decemberInvoice = makeInvoice({
+    fingerprint: 'invoice-2025-12-valid',
+    month: '12/2025',
+    consumption: 300,
+    totalValue: 430,
+  });
+  const januaryInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-01-valid',
+    month: '01/2026',
+    consumption: 340,
+    totalValue: 470,
+  });
+  const comparison = buildInvoiceComparison([invalidInvoice, decemberInvoice, januaryInvoice]);
+
+  assert.equal(comparison.basis, 'competence');
+  assert.equal(comparison.currentInvoice?.fingerprint, januaryInvoice.fingerprint);
+  assert.equal(comparison.previousInvoice?.fingerprint, decemberInvoice.fingerprint);
 });
 
 test('comparacao identifica piora observada entre duas faturas', () => {
