@@ -40,6 +40,7 @@ interface InvoiceHistoryProps {
   userContext?: Partial<UserContextState>;
   isExpanded?: boolean;
   onToggle?: () => void;
+  showHeader?: boolean;
 }
 
 const getInvoiceStats = (invoices: InvoiceData[]) => {
@@ -349,6 +350,7 @@ const InvoiceHistory = ({
   userContext,
   isExpanded = true,
   onToggle,
+  showHeader = true,
 }: InvoiceHistoryProps) => {
   const stats = getInvoiceStats(invoices);
   const contextualComparisonInvoices = React.useMemo(
@@ -371,36 +373,38 @@ const InvoiceHistory = ({
   return (
     <div className="space-y-6">
       <Card className="border-emerald-100">
-        <CardHeader
-          className="cursor-pointer"
-          role="button"
-          tabIndex={0}
-          onClick={onToggle}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              onToggle?.();
-            }
-          }}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="space-y-1">
-              <CardTitle className="flex items-center space-x-2 text-emerald-700">
-                <FileText className="h-5 w-5" />
-                <span>Historico de Faturas</span>
-              </CardTitle>
-              <p className="text-sm text-slate-500">
-                {focusedInvoiceLabel
-                  ? `Fatura em foco: ${focusedInvoiceLabel}.`
-                  : 'Comparacao e leitura do historico da jornada.'}
-              </p>
+        {showHeader && (
+          <CardHeader
+            className="cursor-pointer"
+            role="button"
+            tabIndex={0}
+            onClick={onToggle}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onToggle?.();
+              }
+            }}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <CardTitle className="flex items-center space-x-2 text-emerald-700">
+                  <FileText className="h-5 w-5" />
+                  <span>Historico de Faturas</span>
+                </CardTitle>
+                <p className="text-sm text-slate-500">
+                  {focusedInvoiceLabel
+                    ? `Fatura em foco: ${focusedInvoiceLabel}.`
+                    : 'Comparacao e leitura do historico da jornada.'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+                <span>{isExpanded ? 'Aberto' : 'Fechado'}</span>
+                <ExpansionIcon className="h-4 w-4" />
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-              <span>{isExpanded ? 'Aberto' : 'Fechado'}</span>
-              <ExpansionIcon className="h-4 w-4" />
-            </div>
-          </div>
-        </CardHeader>
+          </CardHeader>
+        )}
         {isExpanded && <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="text-center p-4 bg-emerald-50 rounded-lg">

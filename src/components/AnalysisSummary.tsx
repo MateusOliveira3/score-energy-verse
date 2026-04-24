@@ -10,6 +10,7 @@ interface AnalysisSummaryProps {
   profile: UserProfileData;
   isExpanded?: boolean;
   onToggle?: () => void;
+  showHeader?: boolean;
 }
 
 type AnalysisSummaryWithInsights = AnalysisSummaryType & {
@@ -79,40 +80,43 @@ const AnalysisSummary = ({
   profile,
   isExpanded = true,
   onToggle,
+  showHeader = true,
 }: AnalysisSummaryProps) => {
   const ExpansionIcon = isExpanded ? ChevronDown : ChevronRight;
 
   if (!invoice || !analysis) {
     return (
       <Card className="border-2 border-slate-100 shadow-lg">
-        <CardHeader
-          className="cursor-pointer"
-          role="button"
-          tabIndex={0}
-          onClick={onToggle}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              onToggle?.();
-            }
-          }}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="space-y-1">
-              <CardTitle className="flex items-center space-x-2 text-slate-700">
-                <ScanSearch className="h-5 w-5" />
-                <span>Resumo da analise</span>
-              </CardTitle>
-              <p className="text-sm text-slate-500">
-                Leitura consolidada da fatura em foco.
-              </p>
+        {showHeader && (
+          <CardHeader
+            className="cursor-pointer"
+            role="button"
+            tabIndex={0}
+            onClick={onToggle}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onToggle?.();
+              }
+            }}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <CardTitle className="flex items-center space-x-2 text-slate-700">
+                  <ScanSearch className="h-5 w-5" />
+                  <span>Resumo da analise</span>
+                </CardTitle>
+                <p className="text-sm text-slate-500">
+                  Leitura consolidada da fatura em foco.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+                <span>{isExpanded ? 'Aberto' : 'Fechado'}</span>
+                <ExpansionIcon className="h-4 w-4" />
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-              <span>{isExpanded ? 'Aberto' : 'Fechado'}</span>
-              <ExpansionIcon className="h-4 w-4" />
-            </div>
-          </div>
-        </CardHeader>
+          </CardHeader>
+        )}
         {isExpanded && (
           <CardContent className="space-y-3 text-sm text-slate-600">
             <p>
@@ -135,36 +139,38 @@ const AnalysisSummary = ({
 
   return (
     <Card className="border-2 border-slate-100 shadow-lg">
-      <CardHeader
-        className="cursor-pointer"
-        role="button"
-        tabIndex={0}
-        onClick={onToggle}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            onToggle?.();
-          }
-        }}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1">
-            <CardTitle className="flex items-center space-x-2 text-slate-700">
-              <FileBarChart className="h-5 w-5" />
-              <span>Resumo da analise</span>
-            </CardTitle>
-            <p className="text-sm text-slate-500">
-              {referenceLabel
-                ? `Fatura em foco: ${referenceLabel}.`
-                : 'Leitura consolidada da fatura em foco.'}
-            </p>
+      {showHeader && (
+        <CardHeader
+          className="cursor-pointer"
+          role="button"
+          tabIndex={0}
+          onClick={onToggle}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              onToggle?.();
+            }
+          }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-1">
+              <CardTitle className="flex items-center space-x-2 text-slate-700">
+                <FileBarChart className="h-5 w-5" />
+                <span>Resumo da analise</span>
+              </CardTitle>
+              <p className="text-sm text-slate-500">
+                {referenceLabel
+                  ? `Fatura em foco: ${referenceLabel}.`
+                  : 'Leitura consolidada da fatura em foco.'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+              <span>{isExpanded ? 'Aberto' : 'Fechado'}</span>
+              <ExpansionIcon className="h-4 w-4" />
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-            <span>{isExpanded ? 'Aberto' : 'Fechado'}</span>
-            <ExpansionIcon className="h-4 w-4" />
-          </div>
-        </div>
-      </CardHeader>
+        </CardHeader>
+      )}
       {isExpanded && (
         <CardContent className="space-y-5">
           <div className="flex flex-wrap items-center gap-2">

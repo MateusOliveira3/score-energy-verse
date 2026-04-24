@@ -12,6 +12,7 @@ interface SmartRecommendationsProps {
   onSelectInvoice?: (invoice: InvoiceData) => void;
   isExpanded?: boolean;
   onToggle?: () => void;
+  showHeader?: boolean;
   onActionStatusChange: (
     action: NextAction,
     status: Extract<NextActionStatus, 'in_progress' | 'completed'>
@@ -68,6 +69,7 @@ const SmartRecommendations = ({
   onSelectInvoice,
   isExpanded = true,
   onToggle,
+  showHeader = true,
   onActionStatusChange,
 }: SmartRecommendationsProps) => {
   const contextInvoice = selectedInvoice;
@@ -77,36 +79,38 @@ const SmartRecommendations = ({
 
   return (
     <Card className="border-2 border-blue-100 shadow-lg">
-      <CardHeader
-        className="cursor-pointer"
-        role="button"
-        tabIndex={0}
-        onClick={onToggle}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            onToggle?.();
-          }
-        }}
-      >
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div className="space-y-1">
-            <CardTitle className="flex items-center space-x-2 text-blue-700">
-              <Lightbulb className="h-5 w-5" />
-              <span>Acoes recomendadas</span>
-            </CardTitle>
-            <p className="text-sm text-slate-600">
-              {contextInvoiceLabel
-                ? `Fatura em foco: ${contextInvoiceLabel}.`
-                : 'As acoes seguem a lista global da jornada, sem recalculo local.'}
-            </p>
+      {showHeader && (
+        <CardHeader
+          className="cursor-pointer"
+          role="button"
+          tabIndex={0}
+          onClick={onToggle}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              onToggle?.();
+            }
+          }}
+        >
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div className="space-y-1">
+              <CardTitle className="flex items-center space-x-2 text-blue-700">
+                <Lightbulb className="h-5 w-5" />
+                <span>Acoes recomendadas</span>
+              </CardTitle>
+              <p className="text-sm text-slate-600">
+                {contextInvoiceLabel
+                  ? `Fatura em foco: ${contextInvoiceLabel}.`
+                  : 'As acoes seguem a lista global da jornada, sem recalculo local.'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-500 md:self-center">
+              <span>{isExpanded ? 'Aberto' : 'Fechado'}</span>
+              <ExpansionIcon className="h-4 w-4" />
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-sm font-medium text-slate-500 md:self-center">
-            <span>{isExpanded ? 'Aberto' : 'Fechado'}</span>
-            <ExpansionIcon className="h-4 w-4" />
-          </div>
-        </div>
-      </CardHeader>
+        </CardHeader>
+      )}
       {isExpanded && (
         <CardContent>
           {showInvoiceSelector && contextInvoice && invoiceHistory && onSelectInvoice && (

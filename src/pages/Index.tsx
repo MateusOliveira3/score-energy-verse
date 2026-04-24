@@ -47,7 +47,7 @@ const Index = () => {
     ignoreMascotContextQuestion,
   } = useMvpJourney();
   const [selectedInvoice, setSelectedInvoice] = React.useState<InvoiceData | undefined>(latestInvoice);
-  const [activeSection, setActiveSection] = React.useState<DashboardSectionKey>('summary');
+  const [activeSection, setActiveSection] = React.useState<DashboardSectionKey | null>('summary');
 
   React.useEffect(() => {
     logInvoiceFlow('ui-received-invoice-data', {
@@ -88,6 +88,31 @@ const Index = () => {
 
     return buildAnalysisSummary(selectedInvoice, profile, invoiceHistory);
   }, [invoiceHistory, profile, selectedInvoice]);
+
+  const sectionCards = [
+    {
+      key: 'summary' as const,
+      title: 'Resumo da analise',
+      subtitle: selectedInvoice ? 'Leitura da fatura em foco' : 'Pronto para a primeira leitura',
+    },
+    {
+      key: 'actions' as const,
+      title: 'Acoes recomendadas',
+      subtitle: 'Prioridades da jornada atual',
+    },
+    {
+      key: 'history' as const,
+      title: 'Historico de faturas',
+      subtitle:
+        invoiceHistory.length > 0
+          ? `${invoiceHistory.length} fatura${invoiceHistory.length > 1 ? 's' : ''} na jornada`
+          : 'Comparacao do historico enviado',
+    },
+  ];
+
+  const handleSectionToggle = (section: DashboardSectionKey) => {
+    setActiveSection((currentSection) => (currentSection === section ? null : section));
+  };
 
   const handleInvoiceProcessed = async (file: File) => {
     return completeInvoiceFlow(file);
@@ -223,18 +248,6 @@ const Index = () => {
           </div>
         </div>
 
-        <SmartRecommendations
-          actions={nextActions}
-          viewedActionIds={viewedActionIds}
-          analysis={selectedAnalysis}
-          invoiceHistory={invoiceHistory}
-          selectedInvoice={selectedInvoice}
-          onSelectInvoice={setSelectedInvoice}
-          onActionStatusChange={handleActionStatusChange}
-          isExpanded={activeSection === 'actions'}
-          onToggle={() => setActiveSection('actions')}
-        />
-
         <div id="section-mvp">
           <InvoiceUpload
             profile={profile}
@@ -243,30 +256,86 @@ const Index = () => {
           />
         </div>
 
-        <div id="section-summary">
-          <AnalysisSummary
-            invoice={selectedInvoice}
-            analysis={selectedAnalysis}
-            profile={profile}
-            isExpanded={activeSection === 'summary'}
-            onToggle={() => setActiveSection('summary')}
-          />
-        </div>
+        <section className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {sectionCards.map((section) => {
+              const isOpen = activeSection === section.key;
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-          <div className="xl:col-span-2">
-            <InvoiceHistory
-              invoices={invoiceHistory}
-              selectedInvoice={selectedInvoice}
-              onSelectInvoice={setSelectedInvoice}
-              onDeleteInvoice={handleInvoiceRemoved}
-              userContext={userContext}
-              isExpanded={activeSection === 'history'}
-              onToggle={() => setActiveSection('history')}
-            />
+              return (
+                <button
+                  key={section.key}
+                  type="button"
+                  onClick={() => handleSectionToggle(section.key)}
+                  aria-pressed={isOpen}
+                  aria-expanded={isOpen}
+                  className="h-full text-left"
+                >
+                  <Card
+                    className={`h-full border-2 transition-all duration-200 ${
+                      isOpen
+                        ? 'border-emerald-300 bg-white shadow-lg ring-2 ring-emerald-100'
+                        : 'border-slate-200 bg-white/80 shadow-sm hover:border-emerald-200 hover:shadow-md'
+                    }`}
+                  >
+                    <CardContent className="flex h-full flex-col gap-3 p-5">
+                      <div className="space-y-1">
+                        <h2 className="text-base font-semibold text-slate-900">{section.title}</h2>
+                        <p className="text-sm text-slate-600">{section.subtitle}</p>
+                      </div>
+                      <div className="pt-1 text-sm font-medium text-slate-500">
+                        {isOpen ? 'Aberto' : 'Fechado'}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </button>
+              );
+            })}
           </div>
-          <ScoreExplanationCard explanation={scoreExplanation} />
-        </div>
+
+          {activeSection === 'summary' && (
+            <div id="section-summary">
+              <AnalysisSummary
+                invoice={selectedInvoice}
+                analysis={selectedAnalysis}
+                profile={profile}
+                isExpanded
+                showHeader={false}
+              />
+            </div>
+          )}
+
+          {activeSection === 'actions' && (
+            <div id="section-actions">
+              <SmartRecommendations
+                actions={nextActions}
+                viewedActionIds={viewedActionIds}
+                analysis={selectedAnalysis}
+                invoiceHistory={invoiceHistory}
+                selectedInvoice={selectedInvoice}
+                onSelectInvoice={setSelectedInvoice}
+                onActionStatusChange={handleActionStatusChange}
+                isExpanded
+                showHeader={false}
+              />
+            </div>
+          )}
+
+          {activeSection === 'history' && (
+            <div id="section-history">
+              <InvoiceHistory
+                invoices={invoiceHistory}
+                selectedInvoice={selectedInvoice}
+                onSelectInvoice={setSelectedInvoice}
+                onDeleteInvoice={handleInvoiceRemoved}
+                userContext={userContext}
+                isExpanded
+                showHeader={false}
+              />
+            </div>
+          )}
+        </section>
+
+        <ScoreExplanationCard explanation={scoreExplanation} />
       </main>
     </div>
   );
