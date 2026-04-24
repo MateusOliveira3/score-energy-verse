@@ -11,6 +11,7 @@ import {
   UserProfileData,
 } from '@/types/mvp';
 import { parseInvoiceFile } from '@/lib/invoiceParser';
+import { getInvoiceFlowSnapshot, logInvoiceFlow } from '@/lib/invoiceFlowDebug';
 
 const SCORE_EVENT_POINTS = {
   profile_completed: 80,
@@ -90,6 +91,16 @@ export const interpretInvoiceFile = async (
 ): Promise<InvoiceData> => {
   const fingerprint = `${file.name}-${file.size}-${file.lastModified}-${file.type || 'unknown'}`;
   const parser = await parseInvoiceFile(file);
+  logInvoiceFlow('after-parse', {
+    fingerprint,
+    fileName: file.name,
+    referenceMonth: parser.fields.referenceMonth.value,
+    dueDate: parser.fields.dueDate.value,
+    totalValue: parser.fields.totalValue.value,
+    consumptionKwh: parser.fields.consumptionKwh.value,
+    previousReading: parser.fields.previousReading.value,
+    currentReading: parser.fields.currentReading.value,
+  });
   const totalValue = parser.fields.totalValue.value;
   const taxesTotal = parser.fields.taxesTotal.value;
   const taxPercentage =
@@ -97,7 +108,7 @@ export const interpretInvoiceFile = async (
       ? Math.round((taxesTotal / totalValue) * 100)
       : undefined;
 
-  return {
+  const invoice = {
     fingerprint,
     fileName: file.name,
     fileType: file.type || 'arquivo',
@@ -109,6 +120,10 @@ export const interpretInvoiceFile = async (
     month: parser.fields.referenceMonth.value ?? 'Referencia nao identificada',
     parser,
   };
+
+  logInvoiceFlow('interpret-invoice-file', getInvoiceFlowSnapshot(invoice));
+
+  return invoice;
 };
 
 const getConsumptionLevel = (

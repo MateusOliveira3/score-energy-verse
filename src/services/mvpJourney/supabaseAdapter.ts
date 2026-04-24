@@ -7,6 +7,7 @@ import {
   updateMascot,
   updateProfile,
 } from '@/lib/mvpJourneyState';
+import { getInvoiceFlowSnapshot, logInvoiceFlow } from '@/lib/invoiceFlowDebug';
 import {
   AppendScoreEventInput,
   JourneyStateContract,
@@ -136,6 +137,13 @@ export const createSupabaseMvpJourneyService = (): MvpJourneyService => {
     const normalizedState = normalizeState({
       ...state,
       lastActiveAt: new Date().toISOString(),
+    });
+
+    logInvoiceFlow('persist-supabase-journey-state', {
+      userId: context.userId,
+      identitySource: context.identitySource,
+      invoiceHistoryLength: normalizedState.analysis.invoiceHistory.length,
+      latestInvoice: getInvoiceFlowSnapshot(normalizedState.analysis.latestInvoice),
     });
 
     if (!supabase || !isJourneySupabaseConfigured) {

@@ -4,6 +4,15 @@ import {
   InvoiceParsedFields,
   InvoiceParserResult,
 } from '@/types/mvp';
+import { inflateSync, unzlibSync } from 'fflate';
+
+type InvoiceFileLike = {
+  name?: string;
+  type?: string;
+  size?: number;
+  arrayBuffer?: () => Promise<ArrayBuffer>;
+  text?: () => Promise<string>;
+};
 
 type Candidate<T> = {
   value: T;
@@ -16,6 +25,24 @@ type Rule<T> = {
   confidence: Exclude<InvoiceFieldConfidence, 'missing'>;
   parse: (match: RegExpMatchArray) => T | undefined;
   validate?: (value: T) => boolean;
+};
+
+type PdfExtractionDiagnostics = {
+  streamCount: number;
+  flateStreamCount: number;
+  multiFilterStreamCount: number;
+  decodedStreamCount: number;
+  failedStreamCount: number;
+  compressedByteLength: number;
+  decompressedByteLength: number;
+  toUnicodeCMapCount: number;
+  encodedFontObjectCount: number;
+  tjOperatorCount: number;
+  tjArrayOperatorCount: number;
+  hexTextTokenCount: number;
+  usedPdfJsFallback: boolean;
+  pdfJsPageCount?: number;
+  pdfJsTextLength?: number;
 };
 
 const PT_BR_MONTHS: Record<string, string> = {
@@ -342,6 +369,24 @@ const validateDays = (value: number) => value >= 1 && value <= 90;
 const validateReading = (value: number) => value >= 0 && value < 100_000_000;
 const validateConstant = (value: number) => value > 0 && value <= 1000;
 
+const createPdfExtractionDiagnostics = (binaryText: string): PdfExtractionDiagnostics => ({
+  streamCount: 0,
+  flateStreamCount: 0,
+  multiFilterStreamCount: 0,
+  decodedStreamCount: 0,
+  failedStreamCount: 0,
+  compressedByteLength: 0,
+  decompressedByteLength: 0,
+  toUnicodeCMapCount: binaryText.match(/\/TOUNICODE\b/gi)?.length ?? 0,
+  encodedFontObjectCount:
+    binaryText.match(/\/ENCODING\b(?!\s*\/(?:WINANSIENCODING|MACROMANENCODING|STANDARDENCODING))/gi)
+      ?.length ?? 0,
+  tjOperatorCount: binaryText.match(/\bTj\b/g)?.length ?? 0,
+  tjArrayOperatorCount: binaryText.match(/\bTJ\b/g)?.length ?? 0,
+  hexTextTokenCount: binaryText.match(/<[\dA-F\s]{2,}>\s*(?:Tj|TJ|["'])/gi)?.length ?? 0,
+  usedPdfJsFallback: false,
+});
+
 const decodePdfLiteralString = (value: string) => {
   let result = '';
 
@@ -596,23 +641,29 @@ const decodeAscii85Bytes = (value: Uint8Array) => {
 };
 
 const inflatePdfStream = async (bytes: Uint8Array) => {
-  if (typeof DecompressionStream === 'undefined') {
-    return undefined;
+  if (typeof DecompressionStream !== 'undefined') {
+    for (const format of ['deflate', 'deflate-raw'] as const) {
+      try {
+        const stream = new Response(bytes).body;
+
+        if (!stream) {
+          break;
+        }
+
+        const decompressed = stream.pipeThrough(new DecompressionStream(format));
+        const buffer = await new Response(decompressed).arrayBuffer();
+        return new Uint8Array(buffer);
+      } catch {
+        // Try the next deflate flavor or the JS fallback below.
+      }
+    }
   }
 
-  for (const format of ['deflate', 'deflate-raw'] as const) {
+  for (const inflate of [unzlibSync, inflateSync]) {
     try {
-      const stream = new Response(bytes).body;
-
-      if (!stream) {
-        return undefined;
-      }
-
-      const decompressed = stream.pipeThrough(new DecompressionStream(format));
-      const buffer = await new Response(decompressed).arrayBuffer();
-      return new Uint8Array(buffer);
+      return inflate(bytes);
     } catch {
-      // Try the next deflate flavor.
+      // Try the next inflate strategy.
     }
   }
 
@@ -670,6 +721,7 @@ const decodePdfStreamBytes = async (dictionary: string, streamValue: string) => 
 
 const extractPdfText = async (bytes: Uint8Array) => {
   const binaryText = bytesToLatinText(bytes);
+  const diagnostics = createPdfExtractionDiagnostics(binaryText);
   const textChunks = new Set<string>();
   const directText = extractPdfOperatorText(binaryText);
 
@@ -687,11 +739,28 @@ const extractPdfText = async (bytes: Uint8Array) => {
       continue;
     }
 
+    diagnostics.streamCount += 1;
+    diagnostics.compressedByteLength += streamValue.length;
+
+    const filters = extractPdfFilters(dictionary);
+
+    if (filters.includes('FLATEDECODE')) {
+      diagnostics.flateStreamCount += 1;
+    }
+
+    if (filters.length > 1) {
+      diagnostics.multiFilterStreamCount += 1;
+    }
+
     const decodedBytes = await decodePdfStreamBytes(dictionary, streamValue);
 
     if (!decodedBytes) {
+      diagnostics.failedStreamCount += 1;
       continue;
     }
+
+    diagnostics.decodedStreamCount += 1;
+    diagnostics.decompressedByteLength += decodedBytes.byteLength;
 
     const decodedText = bytesToLatinText(decodedBytes);
     const extracted = extractPdfOperatorText(decodedText);
@@ -701,7 +770,10 @@ const extractPdfText = async (bytes: Uint8Array) => {
     }
   }
 
-  return Array.from(textChunks).join('\n');
+  return {
+    rawText: Array.from(textChunks).join('\n'),
+    diagnostics,
+  };
 };
 
 const extractHeaderProviderName = (normalizedText: string) => {
@@ -1171,7 +1243,22 @@ const createAuditSample = (value: string) =>
     .replace(/[^\x20-\x7E\n]/g, ' ')
     .replace(/[ \t]+/g, ' ')
     .trim()
-    .slice(0, 1000);
+    .slice(0, 500);
+
+const getKeywordPresenceSnapshot = (value: string) => {
+  const normalizedValue = value.toUpperCase();
+
+  return {
+    REFERENCIA: normalizedValue.includes('REFERENCIA'),
+    VENCIMENTO: normalizedValue.includes('VENCIMENTO'),
+    CONSUMO: normalizedValue.includes('CONSUMO'),
+    KWH: normalizedValue.includes('KWH'),
+    'R$': value.includes('R$') || normalizedValue.includes('R$'),
+  };
+};
+
+const hasUsefulInvoiceKeyword = (value: string) =>
+  Object.values(getKeywordPresenceSnapshot(value)).some(Boolean);
 
 const createRelevantAuditLines = (normalizedText: string) =>
   normalizedText
@@ -1198,11 +1285,27 @@ const shouldLogParserAudit = () => {
   return typeof process !== 'undefined' && process.release?.name === 'node' && process.env.NODE_ENV !== 'production';
 };
 
+const hasArrayBufferReader = (file: InvoiceFileLike) => typeof file.arrayBuffer === 'function';
+const hasTextReader = (file: InvoiceFileLike) => typeof file.text === 'function';
+
+const logParserDebugStage = (stage: string, payload: unknown) => {
+  if (!shouldLogParserAudit()) {
+    return;
+  }
+
+  console.debug(`[invoice-parser] ${stage}`, payload);
+};
+
 const logParserAudit = (
   context: {
     source: InvoiceParserResult['textSource'];
     fileName?: string;
-    extractedTextLength: number;
+    fileType?: string;
+    fileSize?: number;
+    hasArrayBuffer: boolean;
+    hasText: boolean;
+    byteLength?: number;
+    rawTextLength: number;
     rawTextSample?: string;
   },
   result: InvoiceParserResult
@@ -1218,10 +1321,15 @@ const logParserAudit = (
     .filter(([, field]) => field.confidence === 'missing' || field.value === undefined)
     .map(([fieldName]) => fieldName);
 
-  console.debug('[invoice-parser]', {
+  logParserDebugStage('audit', {
     fileName: context.fileName,
+    fileType: context.fileType,
+    fileSize: context.fileSize,
     source: context.source,
-    extractedTextLength: context.extractedTextLength,
+    hasArrayBuffer: context.hasArrayBuffer,
+    hasText: context.hasText,
+    byteLength: context.byteLength,
+    rawTextLength: context.rawTextLength,
     normalizedTextLength: result.normalizedText.length,
     rawTextSample: context.rawTextSample,
     relevantLines: createRelevantAuditLines(result.normalizedText),
@@ -1230,8 +1338,110 @@ const logParserAudit = (
   });
 };
 
+let pdfJsModulePromise:
+  | Promise<{
+      getDocument: (src: object) => {
+        promise: Promise<{
+          numPages: number;
+          getPage: (pageNumber: number) => Promise<{
+            getTextContent: () => Promise<{
+              items: Array<{ str?: string }>;
+            }>;
+            cleanup: () => void;
+          }>;
+        }>;
+        destroy: () => Promise<void>;
+      };
+    }>
+  | undefined;
+
+const loadPdfJsModule = async () => {
+  if (!pdfJsModulePromise) {
+    pdfJsModulePromise = (async () => {
+      await import('pdfjs-dist/legacy/build/pdf.worker.mjs');
+      const pdfJsModule = await import('pdfjs-dist/legacy/build/pdf.mjs');
+
+      return {
+        getDocument: pdfJsModule.getDocument,
+      };
+    })();
+  }
+
+  return pdfJsModulePromise;
+};
+
+const extractPdfTextWithPdfJs = async (bytes: Uint8Array) => {
+  const { getDocument } = await loadPdfJsModule();
+  const loadingTask = getDocument({
+    data: new Uint8Array(bytes),
+    useWorkerFetch: false,
+    isEvalSupported: false,
+    disableFontFace: true,
+    stopAtErrors: false,
+  });
+
+  try {
+    const pdfDocument = await loadingTask.promise;
+    const pageTexts: string[] = [];
+
+    for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
+      const page = await pdfDocument.getPage(pageNumber);
+
+      try {
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item) => ('str' in item ? item.str ?? '' : ''))
+          .filter(Boolean)
+          .join('\n');
+
+        if (pageText.trim()) {
+          pageTexts.push(pageText);
+        }
+      } finally {
+        page.cleanup();
+      }
+    }
+
+    return {
+      text: pageTexts.join('\n'),
+      pageCount: pdfDocument.numPages,
+    };
+  } finally {
+    await loadingTask.destroy();
+  }
+};
+
+const shouldUsePdfJsFallback = (rawText: string, diagnostics: PdfExtractionDiagnostics) => {
+  if (!rawText.trim()) {
+    return true;
+  }
+
+  if (!hasUsefulInvoiceKeyword(rawText)) {
+    return true;
+  }
+
+  return (
+    rawText.length < 3000 &&
+    (diagnostics.toUnicodeCMapCount > 0 ||
+      diagnostics.encodedFontObjectCount > 0 ||
+      diagnostics.hexTextTokenCount > 0)
+  );
+};
+
 export const parseInvoiceText = (rawText: string): InvoiceParserResult => {
   const normalizedText = normalizeInvoiceText(rawText);
+
+  logParserDebugStage('raw-text', {
+    rawTextLength: rawText.length,
+    rawTextSample: createAuditSample(rawText),
+    keywordPresence: getKeywordPresenceSnapshot(rawText),
+  });
+
+  logParserDebugStage('normalized-text', {
+    normalizedTextLength: normalizedText.length,
+    normalizedTextSample: createAuditSample(normalizedText),
+    keywordPresence: getKeywordPresenceSnapshot(normalizedText),
+  });
 
   if (!normalizedText) {
     return {
@@ -1250,18 +1460,24 @@ export const parseInvoiceText = (rawText: string): InvoiceParserResult => {
   };
 };
 
-export const parseInvoiceFile = async (file: File): Promise<InvoiceParserResult> => {
+export const parseInvoiceFile = async (file: InvoiceFileLike): Promise<InvoiceParserResult> => {
   const fileType = file.type || '';
-  const fileName = file.name.toLowerCase();
+  const fileName = file.name?.toLowerCase() || '';
+  const canReadAsText = hasTextReader(file);
+  const canReadAsBytes = hasArrayBufferReader(file);
 
-  if (fileType === 'text/plain' || fileName.endsWith('.txt')) {
+  if ((fileType === 'text/plain' || fileName.endsWith('.txt')) && canReadAsText) {
     const rawText = await file.text();
     const parsed = parseInvoiceText(rawText);
     logParserAudit(
       {
         fileName: file.name,
+        fileType,
+        fileSize: file.size,
         source: parsed.textSource,
-        extractedTextLength: rawText.length,
+        hasArrayBuffer: canReadAsBytes,
+        hasText: canReadAsText,
+        rawTextLength: rawText.length,
         rawTextSample: createAuditSample(rawText),
       },
       parsed
@@ -1269,9 +1485,52 @@ export const parseInvoiceFile = async (file: File): Promise<InvoiceParserResult>
     return parsed;
   }
 
-  if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) {
+  if ((fileType === 'application/pdf' || fileName.endsWith('.pdf')) && canReadAsBytes) {
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const rawText = await extractPdfText(bytes);
+
+    logParserDebugStage('file-read', {
+      fileName: file.name,
+      fileType,
+      fileSize: file.size,
+      hasArrayBuffer: canReadAsBytes,
+      byteLength: bytes.byteLength,
+    });
+
+    const extraction = await extractPdfText(bytes);
+    let rawText = extraction.rawText;
+    const diagnostics = extraction.diagnostics;
+
+    logParserDebugStage('pdf-structure', diagnostics);
+
+    if (shouldUsePdfJsFallback(rawText, diagnostics)) {
+      logParserDebugStage('pdfjs-fallback-started', {
+        initialRawTextLength: rawText.length,
+        initialKeywordPresence: getKeywordPresenceSnapshot(rawText),
+        diagnostics,
+      });
+
+      try {
+        const fallback = await extractPdfTextWithPdfJs(bytes);
+
+        if (fallback.text.trim()) {
+          rawText = fallback.text;
+          diagnostics.usedPdfJsFallback = true;
+          diagnostics.pdfJsPageCount = fallback.pageCount;
+          diagnostics.pdfJsTextLength = fallback.text.length;
+
+          logParserDebugStage('pdfjs-fallback-succeeded', {
+            pdfJsPageCount: fallback.pageCount,
+            pdfJsTextLength: fallback.text.length,
+            keywordPresence: getKeywordPresenceSnapshot(fallback.text),
+          });
+        }
+      } catch (error) {
+        logParserDebugStage('pdfjs-fallback-failed', {
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
     const parsed = parseInvoiceText(rawText);
     const result = {
       ...parsed,
@@ -1281,8 +1540,13 @@ export const parseInvoiceFile = async (file: File): Promise<InvoiceParserResult>
     logParserAudit(
       {
         fileName: file.name,
+        fileType,
+        fileSize: file.size,
         source: result.textSource,
-        extractedTextLength: rawText.length,
+        hasArrayBuffer: canReadAsBytes,
+        hasText: canReadAsText,
+        byteLength: bytes.byteLength,
+        rawTextLength: rawText.length,
         rawTextSample: createAuditSample(rawText),
       },
       result

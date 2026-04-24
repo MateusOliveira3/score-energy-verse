@@ -1,4 +1,5 @@
 import { loadState, saveState } from '@/lib/mvpPersistence';
+import { getInvoiceFlowSnapshot, logInvoiceFlow } from '@/lib/invoiceFlowDebug';
 import {
   addScoreEvent,
   normalizeState,
@@ -29,8 +30,16 @@ const resolveAndSave = <TInput extends { userId?: string }>(
 export const createLocalMvpJourneyService = (): MvpJourneyService => ({
   loadJourneyState: async ({ userId }: LoadJourneyStateInput) => loadState(userId),
 
-  saveJourneyState: async ({ userId, state }: SaveJourneyStateInput) =>
-    saveState(userId, normalizeState(state)),
+  saveJourneyState: async ({ userId, state }: SaveJourneyStateInput) => {
+    const normalizedState = normalizeState(state);
+    logInvoiceFlow('persist-local-journey-state', {
+      userId,
+      invoiceHistoryLength: normalizedState.analysis.invoiceHistory.length,
+      latestInvoice: getInvoiceFlowSnapshot(normalizedState.analysis.latestInvoice),
+    });
+
+    return saveState(userId, normalizedState);
+  },
 
   saveProfile: async ({ userId, profile }: SaveProfileInput) =>
     resolveAndSave({ userId }, (currentState) => updateProfile(currentState, profile)),

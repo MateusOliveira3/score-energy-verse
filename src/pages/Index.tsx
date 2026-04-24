@@ -14,6 +14,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useMvpJourney } from '@/hooks/useMvpJourney';
+import { getInvoiceFlowSnapshot, logInvoiceFlow } from '@/lib/invoiceFlowDebug';
 import { NextAction, NextActionStatus } from '@/types/mvp';
 
 const Index = () => {
@@ -42,6 +43,13 @@ const Index = () => {
     answerMascotContextQuestion,
     ignoreMascotContextQuestion,
   } = useMvpJourney();
+
+  React.useEffect(() => {
+    logInvoiceFlow('ui-received-invoice-data', {
+      invoiceHistoryLength: invoiceHistory.length,
+      latestInvoice: getInvoiceFlowSnapshot(latestInvoice),
+    });
+  }, [invoiceHistory.length, latestInvoice]);
 
   const completedSteps = [
     isProfileComplete,

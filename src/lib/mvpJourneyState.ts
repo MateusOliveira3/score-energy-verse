@@ -26,6 +26,7 @@ import {
   UserContextState,
 } from '@/types/mvp';
 import {
+  buildAnalysisSummary,
   buildNextActions,
   getScoreEventPoints,
   getScoreEventSubject,
@@ -33,6 +34,7 @@ import {
   isProfileComplete,
   normalizeScoreEvents,
 } from '@/lib/mvpCoreFlow';
+import { getInvoiceFlowSnapshot, logInvoiceFlow } from '@/lib/invoiceFlowDebug';
 
 const RETURN_VISIT_MS = 1000 * 60 * 30;
 
@@ -67,27 +69,63 @@ const createEmptyParser = (): InvoiceData['parser'] => ({
 });
 
 const normalizeInvoiceData = (invoice?: Partial<InvoiceData>): InvoiceData | null => {
-  if (!invoice?.fingerprint || !invoice.fileName || !invoice.month) {
+  if (!invoice?.fingerprint || !invoice.fileName) {
     return null;
   }
 
-  const hasParser =
-    typeof invoice.parser?.rawTextAvailable === 'boolean' && invoice.parser.fields;
+  const parser =
+    typeof invoice.parser?.rawTextAvailable === 'boolean' && invoice.parser.fields
+      ? invoice.parser
+      : undefined;
+  const parserMonth = parser?.fields.referenceMonth.value;
+  const parserConsumption = parser?.fields.consumptionKwh.value;
+  const parserTotalValue = parser?.fields.totalValue.value;
+  const resolvedMonth =
+    typeof invoice.month === 'string' && invoice.month.trim()
+      ? invoice.month
+      : typeof parserMonth === 'string' && parserMonth.trim()
+        ? parserMonth
+        : 'Referencia nao identificada';
+  const resolvedConsumption = isFiniteNumber(invoice.consumption)
+    ? invoice.consumption
+    : isFiniteNumber(parserConsumption)
+      ? parserConsumption
+      : undefined;
+  const resolvedTotalValue = isFiniteNumber(invoice.totalValue)
+    ? invoice.totalValue
+    : isFiniteNumber(parserTotalValue)
+      ? parserTotalValue
+      : undefined;
+
+  if (
+    parser &&
+    (resolvedMonth !== invoice.month ||
+      resolvedConsumption !== invoice.consumption ||
+      resolvedTotalValue !== invoice.totalValue)
+  ) {
+    logInvoiceFlow('normalize-invoice-data-hydrated-from-parser', {
+      before: getInvoiceFlowSnapshot(invoice),
+      after: {
+        ...getInvoiceFlowSnapshot(invoice),
+        month: resolvedMonth,
+        consumption: resolvedConsumption,
+        totalValue: resolvedTotalValue,
+      },
+    });
+  }
 
   return {
     fingerprint: invoice.fingerprint,
     fileName: invoice.fileName,
     fileType: typeof invoice.fileType === 'string' ? invoice.fileType : 'arquivo',
     fileSize: isFiniteNumber(invoice.fileSize) ? invoice.fileSize : 0,
-    consumption: hasParser && isFiniteNumber(invoice.consumption) ? invoice.consumption : undefined,
-    totalValue: hasParser && isFiniteNumber(invoice.totalValue) ? invoice.totalValue : undefined,
+    consumption: resolvedConsumption,
+    totalValue: resolvedTotalValue,
     taxPercentage:
-      hasParser && isFiniteNumber(invoice.taxPercentage) ? invoice.taxPercentage : undefined,
-    peakHours: hasParser && typeof invoice.peakHours === 'string' ? invoice.peakHours : undefined,
-    month: typeof invoice.month === 'string' && invoice.month.trim()
-      ? invoice.month
-      : 'Referencia nao identificada',
-    parser: hasParser ? invoice.parser : createEmptyParser(),
+      parser && isFiniteNumber(invoice.taxPercentage) ? invoice.taxPercentage : undefined,
+    peakHours: parser && typeof invoice.peakHours === 'string' ? invoice.peakHours : undefined,
+    month: resolvedMonth,
+    parser: parser ?? createEmptyParser(),
     uploadedAt: typeof invoice.uploadedAt === 'string' ? invoice.uploadedAt : undefined,
     actionSnapshots: Array.isArray(invoice.actionSnapshots) ? invoice.actionSnapshots : undefined,
   };
@@ -350,6 +388,7 @@ export const normalizeAnalysisState = (
   legacyLatestInvoice?: AnalysisState['latestInvoice'],
   legacySummary?: AnalysisState['summary']
 ): AnalysisState => {
+  const requestedStatus = analysis?.status;
   const latestInvoice = analysis?.latestInvoice ?? legacyLatestInvoice;
   const rawInvoiceHistory = Array.isArray(analysis?.invoiceHistory)
     ? analysis.invoiceHistory
@@ -360,9 +399,14 @@ export const normalizeAnalysisState = (
     .map((invoice) => normalizeInvoiceData(invoice))
     .filter((invoice): invoice is InvoiceData => Boolean(invoice));
   const resolvedLatestInvoice = normalizeInvoiceData(latestInvoice) ?? invoiceHistory[0];
-  const summary = analysis?.summary ?? legacySummary;
+  const summary =
+    analysis?.summary ??
+    legacySummary ??
+    (requestedStatus === 'processing' || !resolvedLatestInvoice
+      ? undefined
+      : buildAnalysisSummary(resolvedLatestInvoice));
   const status =
-    analysis?.status ??
+    requestedStatus ??
     (resolvedLatestInvoice || summary ? 'ready' : DEFAULT_ANALYSIS_STATE.status);
 
   return {

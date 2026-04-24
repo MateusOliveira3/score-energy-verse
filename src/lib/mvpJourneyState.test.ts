@@ -3,10 +3,12 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import {
+  buildAnalysisSummary,
   buildMascotGuidance,
   buildNextActions,
   getScoreEventPoints,
   getScoreState,
+  interpretInvoiceFile,
 } from '@/lib/mvpCoreFlow';
 import { parseInvoiceFile, parseInvoiceText } from '@/lib/invoiceParser';
 import {
@@ -17,6 +19,7 @@ import {
   captureActionSnapshotsForInvoice,
   DEFAULT_MVP_STATE,
   getScoreExplanation,
+  normalizeState,
   answerMascotContextQuestion,
   ignoreMascotContextQuestion,
   resolveFullJourneyState,
@@ -63,6 +66,17 @@ trailer
 const makeProjectPdfFile = async (fixturePath: string, fileName: string) => {
   const bytes = await readFile(resolve(process.cwd(), fixturePath));
   return new File([bytes], fileName, { type: 'application/pdf' });
+};
+
+const withDecompressionStreamDisabled = async <T>(run: () => Promise<T>) => {
+  const original = globalThis.DecompressionStream;
+
+  try {
+    globalThis.DecompressionStream = undefined as typeof globalThis.DecompressionStream;
+    return await run();
+  } finally {
+    globalThis.DecompressionStream = original;
+  }
 };
 
 const invoice: InvoiceData = {
@@ -189,6 +203,25 @@ test('analise pronta resolve para analysis-ready', () => {
   assert.equal(resolved.journeyStage, 'analysis-ready');
   assert.ok(resolved.actions.items.length > 0);
   assert.ok(resolved.actions.items.some((action) => action.source === 'analysis'));
+});
+
+test('resolveFullJourneyState recompõe summary quando latestInvoice existe e summary está ausente', () => {
+  const resolved = resolveFullJourneyState(
+    makeState({
+      profile: completeProfile,
+      analysis: {
+        status: 'ready',
+        latestInvoice: invoice,
+        invoiceHistory: [invoice],
+        summary: undefined,
+      },
+    })
+  );
+
+  assert.ok(resolved.analysis.latestInvoice);
+  assert.ok(resolved.analysis.summary);
+  assert.equal(resolved.analysis.summary?.headline.includes(invoice.month), true);
+  assert.equal(resolved.analysis.latestInvoice?.fingerprint, invoice.fingerprint);
 });
 
 test('nextActions de analise pronta incluem contexto, execucao e impacto no score', () => {
@@ -1351,6 +1384,115 @@ test('parser extrai referencia, vencimento, total e consumo do PDF real da Celes
   assert.equal(parsed.fields.currentReading.value, 17747);
   assert.equal(parsed.fields.meterConstant.value, 1);
   assert.equal(parsed.fields.daysBilled.value, 29);
+});
+
+test('parser extrai campos essenciais do PDF real mesmo sem DecompressionStream nativo', async () => {
+  const parsed = await withDecompressionStreamDisabled(async () =>
+    parseInvoiceFile(
+      await makeProjectPdfFile('test-fixtures-invoices/celesc-sample-01.pdf', 'celesc-sample-01.pdf')
+    )
+  );
+
+  assert.equal(parsed.textSource, 'pdf-text');
+  assert.equal(parsed.fields.referenceMonth.value, '02/2026');
+  assert.equal(parsed.fields.dueDate.value, '28/02/2026');
+  assert.equal(parsed.fields.totalValue.value, 472.3);
+  assert.equal(parsed.fields.consumptionKwh.value, 528);
+});
+
+test('parseInvoiceFile aceita File-like com arrayBuffer no mesmo formato do upload do navegador', async () => {
+  const browserFile = await makeProjectPdfFile(
+    'test-fixtures-invoices/celesc-sample-01.pdf',
+    'celesc-sample-01.pdf'
+  );
+  const fileLike = {
+    name: browserFile.name,
+    type: browserFile.type,
+    size: browserFile.size,
+    arrayBuffer: () => browserFile.arrayBuffer(),
+  };
+  const parsed = await parseInvoiceFile(fileLike);
+
+  assert.equal(parsed.textSource, 'pdf-text');
+  assert.equal(parsed.fields.referenceMonth.value, '02/2026');
+  assert.equal(parsed.fields.dueDate.value, '28/02/2026');
+  assert.equal(parsed.fields.totalValue.value, 472.3);
+  assert.equal(parsed.fields.consumptionKwh.value, 528);
+});
+
+test('interpretInvoiceFile preserva campos essenciais do PDF real no InvoiceData usado pela jornada', async () => {
+  const interpreted = await interpretInvoiceFile(
+    await makeProjectPdfFile('test-fixtures-invoices/celesc-sample-01.pdf', 'celesc-sample-01.pdf'),
+    completeProfile
+  );
+
+  assert.equal(interpreted.month, '02/2026');
+  assert.equal(interpreted.totalValue, 472.3);
+  assert.equal(interpreted.consumption, 528);
+  assert.equal(interpreted.parser.fields.dueDate.value, '28/02/2026');
+  assert.equal(interpreted.parser.fields.previousReading.value, 17219);
+  assert.equal(interpreted.parser.fields.currentReading.value, 17747);
+});
+
+test('normalizeState reidrata campos do InvoiceData a partir do parser quando o estado persistido chega parcial', async () => {
+  const parser = await parseInvoiceFile(
+    await makeProjectPdfFile('test-fixtures-invoices/celesc-sample-01.pdf', 'celesc-sample-01.pdf')
+  );
+  const persistedInvoice = {
+    fingerprint: 'celesc-sample-01',
+    fileName: 'celesc-sample-01.pdf',
+    fileType: 'application/pdf',
+    fileSize: 1,
+    parser,
+    uploadedAt: '2026-04-23T18:00:00.000Z',
+  };
+  const resolved = normalizeState(
+    makeState({
+      profile: completeProfile,
+      analysis: {
+        status: 'ready',
+        latestInvoice: persistedInvoice as InvoiceData,
+        invoiceHistory: [persistedInvoice as InvoiceData],
+      },
+    })
+  );
+
+  assert.equal(resolved.analysis.latestInvoice?.month, '02/2026');
+  assert.equal(resolved.analysis.latestInvoice?.totalValue, 472.3);
+  assert.equal(resolved.analysis.latestInvoice?.consumption, 528);
+  assert.equal(resolved.analysis.latestInvoice?.parser.fields.dueDate.value, '28/02/2026');
+  assert.equal(resolved.analysis.invoiceHistory[0]?.month, '02/2026');
+  assert.equal(resolved.analysis.invoiceHistory[0]?.totalValue, 472.3);
+  assert.equal(resolved.analysis.invoiceHistory[0]?.consumption, 528);
+});
+
+test('roundtrip de persistencia preserva os campos canonicos que a UI consome', async () => {
+  const interpreted = await interpretInvoiceFile(
+    await makeProjectPdfFile('test-fixtures-invoices/celesc-sample-01.pdf', 'celesc-sample-01.pdf'),
+    completeProfile
+  );
+  const persistedState = JSON.parse(
+    JSON.stringify(
+      makeState({
+        profile: completeProfile,
+        analysis: {
+          status: 'ready',
+          latestInvoice: interpreted,
+          invoiceHistory: [interpreted],
+          summary: buildAnalysisSummary(interpreted, completeProfile),
+        },
+      })
+    )
+  );
+  const resolved = normalizeState(persistedState);
+
+  assert.equal(resolved.analysis.latestInvoice?.month, '02/2026');
+  assert.equal(resolved.analysis.latestInvoice?.consumption, 528);
+  assert.equal(resolved.analysis.latestInvoice?.totalValue, 472.3);
+  assert.equal(resolved.analysis.latestInvoice?.parser.fields.dueDate.value, '28/02/2026');
+  assert.equal(resolved.analysis.invoiceHistory[0]?.month, '02/2026');
+  assert.equal(resolved.analysis.invoiceHistory[0]?.consumption, 528);
+  assert.equal(resolved.analysis.invoiceHistory[0]?.totalValue, 472.3);
 });
 
 test('parser preserva ausencia segura quando campo nao existe', () => {

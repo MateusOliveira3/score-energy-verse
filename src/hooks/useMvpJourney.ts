@@ -29,6 +29,7 @@ import {
   updateProfile as applyProfileUpdate,
   markActionViewed as applyActionViewed,
 } from '@/lib/mvpJourneyState';
+import { getInvoiceFlowSnapshot, logInvoiceFlow } from '@/lib/invoiceFlowDebug';
 import { useJourneyIdentity } from '@/hooks/useJourneyIdentity';
 import { getMvpJourneyService } from '@/services/mvpJourney';
 import {
@@ -89,6 +90,13 @@ export const useMvpJourney = () => {
       return;
     }
 
+    logInvoiceFlow('journey-save-requested', {
+      providerUserId: journeyIdentity.userId,
+      journeyStage: state.journeyStage,
+      invoiceHistoryLength: state.analysis.invoiceHistory.length,
+      latestInvoice: getInvoiceFlowSnapshot(state.analysis.latestInvoice),
+    });
+
     void journeyService.saveJourneyState({
       userId: journeyIdentity.userId,
       identitySource: journeyIdentity.source,
@@ -141,6 +149,11 @@ export const useMvpJourney = () => {
       uploadedAt: completedAt,
       actionSnapshots: actionSnapshots.length > 0 ? actionSnapshots : undefined,
     };
+
+    logInvoiceFlow('final-invoice-before-save', {
+      completedAt,
+      latestInvoice: getInvoiceFlowSnapshot(invoice),
+    });
 
     handleStateUpdate((latestState) => {
       const analysis = buildAnalysisSummary(invoice, latestState.profile);
