@@ -77,6 +77,173 @@ const getAverageCostPerKwh = (invoice: InvoiceData) => {
 const formatCurrencyPerKwh = (value?: number) =>
   typeof value === 'number' ? `R$ ${value.toFixed(2)}/kWh` : undefined;
 
+const PT_BR_MONTH_INDEX: Record<string, number> = {
+  janeiro: 0,
+  fevereiro: 1,
+  marco: 2,
+  abril: 3,
+  maio: 4,
+  junho: 5,
+  julho: 6,
+  agosto: 7,
+  setembro: 8,
+  outubro: 9,
+  novembro: 10,
+  dezembro: 11,
+};
+
+const normalizeDateText = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+const getInvoiceCompetenceTime = (invoice: InvoiceData) => {
+  const normalizedMonth = normalizeDateText(getInvoiceReferenceLabel(invoice));
+  const numericMatch = normalizedMonth.match(/\b(0[1-9]|1[0-2])\/(\d{4})\b/);
+
+  if (numericMatch) {
+    return Date.UTC(Number(numericMatch[2]), Number(numericMatch[1]) - 1, 1);
+  }
+
+  const monthKey = Object.keys(PT_BR_MONTH_INDEX).find((month) =>
+    normalizedMonth.includes(month)
+  );
+  const year = Number(normalizedMonth.match(/\b\d{4}\b/)?.[0]);
+
+  if (!monthKey || !Number.isFinite(year)) {
+    return undefined;
+  }
+
+  return Date.UTC(year, PT_BR_MONTH_INDEX[monthKey], 1);
+};
+
+const getInvoiceUploadTime = (invoice: InvoiceData) => {
+  if (!invoice.uploadedAt) {
+    return undefined;
+  }
+
+  const time = new Date(invoice.uploadedAt).getTime();
+  return Number.isNaN(time) ? undefined : time;
+};
+
+const getInvoiceComparisonReference = (invoice: InvoiceData) => {
+  const competenceTime = getInvoiceCompetenceTime(invoice);
+
+  if (competenceTime !== undefined) {
+    return {
+      basis: 'competence' as const,
+      time: competenceTime,
+    };
+  }
+
+  const uploadTime = getInvoiceUploadTime(invoice);
+
+  if (uploadTime !== undefined) {
+    return {
+      basis: 'upload' as const,
+      time: uploadTime,
+    };
+  }
+
+  return {
+    basis: 'history' as const,
+    time: undefined,
+  };
+};
+
+const COMPARISON_REFERENCE_PRIORITY: Record<
+  ReturnType<typeof getInvoiceComparisonReference>['basis'],
+  number
+> = {
+  competence: 0,
+  upload: 1,
+  history: 2,
+};
+
+const sortInvoicesForUiComparison = (invoiceHistory: InvoiceData[]) =>
+  [...invoiceHistory]
+    .map((invoice, index) => ({
+      index,
+      invoice,
+      reference: getInvoiceComparisonReference(invoice),
+    }))
+    .sort((left, right) => {
+      const priorityDifference =
+        COMPARISON_REFERENCE_PRIORITY[left.reference.basis] -
+        COMPARISON_REFERENCE_PRIORITY[right.reference.basis];
+
+      if (priorityDifference !== 0) {
+        return priorityDifference;
+      }
+
+      if (left.reference.time === undefined && right.reference.time === undefined) {
+        return left.index - right.index;
+      }
+
+      if (left.reference.time === undefined) {
+        return 1;
+      }
+
+      if (right.reference.time === undefined) {
+        return -1;
+      }
+
+      return right.reference.time - left.reference.time;
+    })
+    .map(({ invoice }) => invoice);
+
+const getPreviousChronologicalInvoice = (
+  invoiceHistory: InvoiceData[],
+  currentInvoice?: InvoiceData
+) => {
+  if (!currentInvoice) {
+    return undefined;
+  }
+
+  const sortedInvoices = sortInvoicesForUiComparison(invoiceHistory);
+  const currentIndex = sortedInvoices.findIndex(
+    (invoice) => invoice.fingerprint === currentInvoice.fingerprint
+  );
+
+  if (currentIndex === -1) {
+    return undefined;
+  }
+
+  return sortedInvoices[currentIndex + 1];
+};
+
+const buildConsumptionTrendMessage = (
+  invoiceHistory: InvoiceData[],
+  currentInvoice?: InvoiceData
+) => {
+  if (!currentInvoice || invoiceHistory.length < 2) {
+    return undefined;
+  }
+
+  const previousInvoice = getPreviousChronologicalInvoice(invoiceHistory, currentInvoice);
+
+  if (
+    !previousInvoice ||
+    typeof currentInvoice.consumption !== 'number' ||
+    !Number.isFinite(currentInvoice.consumption) ||
+    typeof previousInvoice.consumption !== 'number' ||
+    !Number.isFinite(previousInvoice.consumption)
+  ) {
+    return 'Ainda não há dados suficientes para tendência segura.';
+  }
+
+  if (currentInvoice.consumption > previousInvoice.consumption) {
+    return 'Seu consumo está em tendência de alta.';
+  }
+
+  if (currentInvoice.consumption < previousInvoice.consumption) {
+    return 'Seu consumo está em tendência de queda.';
+  }
+
+  return 'Seu consumo está estável.';
+};
+
 const AnalysisSummary = ({
   invoice,
   selectedInvoice,
@@ -91,6 +258,7 @@ const AnalysisSummary = ({
   const ExpansionIcon = isExpanded ? ChevronDown : ChevronRight;
   const contextInvoice = selectedInvoice ?? invoice;
   const invoiceCount = invoiceHistory?.length ?? 0;
+  const history = invoiceHistory ?? [];
   const showInvoiceSelector = Boolean(
     contextInvoice && invoiceHistory && invoiceHistory.length > 1 && onSelectInvoice
   );
@@ -175,6 +343,15 @@ const AnalysisSummary = ({
   const referenceLabel = getInvoiceReferenceLabel(invoice);
   const averageCostPerKwh = getAverageCostPerKwh(invoice);
   const consultativeInsights = (analysis as AnalysisSummaryWithInsights).consultativeInsights ?? [];
+  const consumptionTrendMessage = buildConsumptionTrendMessage(history, contextInvoice);
+  const historyContextMessage =
+    invoiceCount >= 3
+      ? `Você já tem ${invoiceCount} meses de histórico. Continue acompanhando para entender seu padrão.`
+      : invoiceCount === 2
+        ? 'No próximo ciclo, vale observar se esse padrão se mantém ou muda.'
+        : invoiceCount === 1
+          ? 'Adicione a próxima fatura para começar a ver evolução.'
+          : undefined;
 
   return (
     <Card className="border-2 border-slate-100 shadow-lg">
@@ -322,16 +499,12 @@ const AnalysisSummary = ({
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-            <p>No próximo ciclo, vale observar se esse padrão se mantém ou muda.</p>
-            {invoiceCount > 1 ? (
-              <p className="mt-2 text-slate-500">
-                Você já tem {invoiceCount} faturas. Continue acompanhando para entender seu padrão.
+            {consumptionTrendMessage && <p>{consumptionTrendMessage}</p>}
+            {historyContextMessage && (
+              <p className={consumptionTrendMessage ? 'mt-2 text-slate-500' : 'text-slate-500'}>
+                {historyContextMessage}
               </p>
-            ) : invoiceCount === 1 ? (
-              <p className="mt-2 text-slate-500">
-                Adicione a próxima fatura para começar a ver evolução.
-              </p>
-            ) : null}
+            )}
           </div>
         </CardContent>
       )}

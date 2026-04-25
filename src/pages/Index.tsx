@@ -88,6 +88,12 @@ const Index = () => {
 
     return buildAnalysisSummary(selectedInvoice, profile, invoiceHistory);
   }, [invoiceHistory, profile, selectedInvoice]);
+  const historyPreviewMessage =
+    invoiceHistory.length >= 3
+      ? `Você já tem ${invoiceHistory.length} meses de histórico. Continue acompanhando para entender seu padrão.`
+      : invoiceHistory.length === 1
+        ? 'Adicione a próxima fatura para começar a ver evolução.'
+        : undefined;
 
   const sectionCards = [
     {
@@ -257,12 +263,10 @@ const Index = () => {
         </div>
 
         <section className="space-y-6">
-          {invoiceHistory.length > 0 && (
+          {historyPreviewMessage && (
             <Card className="border-slate-200 bg-white/80 shadow-sm">
               <CardContent className="p-4 text-sm text-slate-600">
-                {invoiceHistory.length > 1
-                  ? `Você já tem ${invoiceHistory.length} faturas. Continue acompanhando para entender seu padrão.`
-                  : 'Adicione a próxima fatura para começar a ver evolução.'}
+                {historyPreviewMessage}
               </CardContent>
             </Card>
           )}

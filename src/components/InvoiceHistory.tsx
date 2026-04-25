@@ -311,6 +311,40 @@ const formatMetricChange = (change: number, unit: string) => {
   return `${change > 0 ? '+' : ''}${change} ${unit}`;
 };
 
+const getConsumptionExtremes = (invoices: InvoiceData[]) => {
+  const validInvoices = invoices.filter(
+    (invoice) =>
+      typeof invoice.consumption === 'number' &&
+      Number.isFinite(invoice.consumption)
+  );
+
+  if (validInvoices.length < 2) {
+    return {
+      highestFingerprint: undefined,
+      lowestFingerprint: undefined,
+    };
+  }
+
+  const highestInvoice = validInvoices.reduce((highest, invoice) =>
+    (invoice.consumption ?? 0) > (highest.consumption ?? 0) ? invoice : highest
+  );
+  const lowestInvoice = validInvoices.reduce((lowest, invoice) =>
+    (invoice.consumption ?? 0) < (lowest.consumption ?? 0) ? invoice : lowest
+  );
+
+  if (highestInvoice.fingerprint === lowestInvoice.fingerprint) {
+    return {
+      highestFingerprint: undefined,
+      lowestFingerprint: undefined,
+    };
+  }
+
+  return {
+    highestFingerprint: highestInvoice.fingerprint,
+    lowestFingerprint: lowestInvoice.fingerprint,
+  };
+};
+
 const ComparisonMetric = ({
   label,
   unit,
@@ -369,6 +403,10 @@ const InvoiceHistory = ({
     focusedInvoice && invoices.length > 1 && onSelectInvoice
   );
   const ExpansionIcon = isExpanded ? ChevronDown : ChevronRight;
+  const consumptionExtremes = React.useMemo(
+    () => getConsumptionExtremes(invoices),
+    [invoices]
+  );
 
   return (
     <div className="space-y-6">
@@ -574,15 +612,25 @@ const InvoiceHistory = ({
                             <FileText className="h-5 w-5 text-emerald-600" />
                           </div>
                           <div>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <h3 className="font-medium text-gray-900">Fatura: {referenceLabel}</h3>
                               <Badge
                                 variant="secondary"
-                                className={getConsumptionColor(invoice.consumption)}
+                                className={`${getConsumptionColor(invoice.consumption)} gap-1`}
                               >
                                 {getConsumptionIcon(invoice.consumption)}
                                 <span className="ml-1">{formatConsumption(invoice.consumption)}</span>
                               </Badge>
+                              {consumptionExtremes.highestFingerprint === invoice.fingerprint && (
+                                <span className="inline-flex items-center rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[11px] font-medium leading-none text-orange-700">
+                                  Maior consumo
+                                </span>
+                              )}
+                              {consumptionExtremes.lowestFingerprint === invoice.fingerprint && (
+                                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium leading-none text-emerald-700">
+                                  Menor consumo
+                                </span>
+                              )}
                               {selectedInvoice?.fingerprint === invoice.fingerprint && (
                                 <Badge variant="outline" className="bg-white">
                                   Fatura em foco
