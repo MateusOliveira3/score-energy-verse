@@ -1,7 +1,6 @@
 import React from 'react';
 import { CheckCircle2, ChevronDown, ChevronRight, Lightbulb } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import {
   AnalysisSummary,
   InvoiceData,
@@ -29,6 +28,24 @@ interface SmartRecommendationsProps {
   ) => void;
 }
 
+type ActionEngagementChoice = 'start' | 'done' | 'try';
+type ActionCategory = 'habito' | 'equipamento' | 'tarifa' | 'solar' | 'monitoramento';
+
+interface ContextHints {
+  averageCostPerKwh?: number;
+  costPerKwhHigh: boolean;
+  consumptionHigh: boolean;
+  insufficientData: boolean;
+  hasSolarPreference: boolean;
+}
+
+interface FeedbackContext {
+  hints: ContextHints;
+  primaryGoal?: ReturnType<typeof getAnsweredContextValue>;
+  usagePeriod?: ReturnType<typeof getAnsweredContextValue>;
+  electricShowerUsage?: ReturnType<typeof getAnsweredContextValue>;
+}
+
 const priorityClasses = {
   high: 'border-red-200 bg-red-50',
   medium: 'border-yellow-200 bg-yellow-50',
@@ -47,6 +64,15 @@ const statusLabels: Record<NextActionStatus, string> = {
   in_progress: 'Em andamento',
   completed: 'Testada',
 };
+
+const actionEngagementOptions: Array<{
+  value: ActionEngagementChoice;
+  label: string;
+}> = [
+  { value: 'start', label: 'Começar' },
+  { value: 'done', label: 'Já fiz' },
+  { value: 'try', label: 'Vou tentar' },
+];
 
 const formatCurrency = (value?: number) =>
   typeof value === 'number' ? `R$ ${value.toFixed(2)}` : 'Custo não identificado';
@@ -103,6 +129,12 @@ const getAnsweredContextValue = (
   const answer = userContext?.questions?.[questionId];
   return answer?.status === 'answered' ? answer.value : undefined;
 };
+
+const normalizeForMatch = (value?: string) =>
+  (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 
 const hasSolarInterest = (profile: UserProfileData) =>
   profile.energyPreference === 'Solar' || profile.energyPreference === 'Hibrido';
@@ -231,6 +263,166 @@ const buildActionQuickTip = ({
   return undefined;
 };
 
+const buildActionFeedbackMessage = ({
+  choice,
+  action,
+  analysis,
+  invoice,
+  userContext,
+}: {
+  choice: ActionEngagementChoice;
+  action: NextAction;
+  analysis?: AnalysisSummary;
+  invoice?: InvoiceData;
+  userContext?: Partial<UserContextState>;
+}) => {
+  const averageCostPerKwh = getAverageCostPerKwh(invoice);
+  const primaryGoal = getAnsweredContextValue(userContext, 'primary_goal');
+
+  if (choice === 'start') {
+    if (action.priority === 'high') {
+      return 'Boa. Comece por este ponto e acompanhe o reflexo no próximo ciclo.';
+    }
+
+    if (analysis?.costSignal && analysis.costSignal !== 'controlado') {
+      return 'Boa. Vale acompanhar isso na próxima fatura.';
+    }
+
+    return 'Boa. Teste isso agora e veja se o sinal muda no próximo ciclo.';
+  }
+
+  if (choice === 'done') {
+    if (averageCostPerKwh !== undefined) {
+      return 'Perfeito. Veja se isso impacta seu consumo no próximo ciclo.';
+    }
+
+    return 'Perfeito. Compare a próxima fatura para entender se esse ajuste fez diferença.';
+  }
+
+  if (primaryGoal === 'understand_consumption') {
+    return 'Boa escolha. Tente uma mudança por vez para comparar melhor os sinais.';
+  }
+
+  return 'Boa. Vale tentar isso agora e conferir o reflexo na próxima fatura.';
+};
+
+const deriveActionCategory = (action: NextAction): ActionCategory => {
+  const actionWithTags = action as NextAction & { tags?: string[] };
+  const combinedText = normalizeForMatch(
+    [
+      action.title,
+      action.description,
+      action.value,
+      action.context,
+      action.suggestion,
+      action.validation,
+      action.impact,
+      ...(Array.isArray(actionWithTags.tags) ? actionWithTags.tags : []),
+    ]
+      .filter(Boolean)
+      .join(' ')
+  );
+
+  if (/(solar|fotovolta|placa|painel|geracao)/.test(combinedText)) {
+    return 'solar';
+  }
+
+  if (/(tarifa|bandeira|kwh|custo|preco|demanda|contrato)/.test(combinedText)) {
+    return 'tarifa';
+  }
+
+  if (/(chuveiro|banho|rotina|tempo de uso|tempo|habito|uso diario|desligar|horario)/.test(combinedText)) {
+    return 'habito';
+  }
+
+  if (/(equipamento|aparelho|geladeira|ar-condicionado|ar condicionado|lampada|motor|eficiencia|manutencao)/.test(combinedText)) {
+    return 'equipamento';
+  }
+
+  return 'monitoramento';
+};
+
+const getContextHints = (
+  selectedInvoice: InvoiceData | undefined,
+  selectedAnalysis: AnalysisSummary | undefined,
+  profile: UserProfileData
+): ContextHints => {
+  const averageCostPerKwh = getAverageCostPerKwh(selectedInvoice);
+  const costPerKwhHigh =
+    averageCostPerKwh !== undefined &&
+    Boolean(selectedAnalysis?.costSignal && selectedAnalysis.costSignal !== 'controlado');
+  const consumptionHigh = selectedAnalysis?.consumptionLevel === 'alto';
+  const insufficientData =
+    !selectedInvoice || !selectedAnalysis || (!costPerKwhHigh && !consumptionHigh && averageCostPerKwh === undefined);
+
+  return {
+    averageCostPerKwh,
+    costPerKwhHigh,
+    consumptionHigh,
+    insufficientData,
+    hasSolarPreference: hasSolarInterest(profile),
+  };
+};
+
+const buildFeedbackMessage = (
+  action: NextAction,
+  intent: ActionEngagementChoice,
+  context: FeedbackContext
+) => {
+  const category = deriveActionCategory(action);
+
+  const leadByIntent: Record<ActionEngagementChoice, Record<NextAction['priority'], string>> = {
+    start: {
+      high: 'Boa. Comece por este ponto.',
+      medium: 'Boa. Vale começar por aqui.',
+      low: 'Bom passo. Comece quando fizer sentido.',
+    },
+    done: {
+      high: 'Perfeito. Se já aplicou, vale atenção agora.',
+      medium: 'Perfeito. Se já aplicou, acompanhe o próximo ciclo.',
+      low: 'Bom passo. Se já aplicou, acompanhe quando possível.',
+    },
+    try: {
+      high: 'Ótimo começo. Vale testar logo.',
+      medium: 'Ótimo começo. Vale testar por alguns dias.',
+      low: 'Bom caminho. Teste com calma quando puder.',
+    },
+  };
+
+  const habitFollowUp =
+    context.electricShowerUsage === 'daily' || context.usagePeriod === 'night'
+      ? 'Se envolve hábito diário, ajuste tempo e uso antes de comparar.'
+      : 'Se envolve hábito diário, ajuste a rotina e compare no próximo ciclo.';
+
+  const categoryFollowUp: Record<ActionCategory, string> = {
+    habito: habitFollowUp,
+    equipamento: 'Se envolve equipamento, verifique uso e eficiência antes de concluir algo.',
+    tarifa: context.hints.costPerKwhHigh
+      ? 'Olhe o custo por kWh desta fatura antes de concluir qualquer ganho.'
+      : 'Vale acompanhar custo por kWh e bandeira no próximo ciclo.',
+    solar: context.hints.costPerKwhHigh
+      ? 'Antes de investir, observe o custo por kWh desta fatura.'
+      : 'Antes de investir, confirme primeiro o que mais pesa nesta fatura.',
+    monitoramento: 'Acompanhe a próxima fatura para ver se o sinal se repete.',
+  };
+
+  let followUp = categoryFollowUp[category];
+
+  if (context.hints.consumptionHigh && category !== 'solar' && category !== 'tarifa') {
+    followUp = 'Acompanhe os hábitos de maior impacto no próximo ciclo.';
+  } else if (context.hints.costPerKwhHigh && category !== 'solar' && category !== 'tarifa') {
+    followUp = 'Vale olhar o custo por kWh desta fatura antes de tirar conclusões.';
+  } else if (context.hints.insufficientData) {
+    followUp = 'Use esta fatura como referência e compare o próximo ciclo.';
+  } else if (context.primaryGoal === 'understand_consumption' && category === 'monitoramento') {
+    followUp = 'Observe uma mudança por vez para comparar melhor os sinais.';
+  } else if (context.hints.hasSolarPreference && category === 'solar') {
+    followUp = 'Antes de investir, compare este sinal com os usos que mais pesam.';
+  }
+
+  return `${leadByIntent[intent][action.priority]} ${followUp}`;
+};
+
 const buildContextFooter = ({
   analysis,
   invoice,
@@ -276,9 +468,12 @@ const SmartRecommendations = ({
   isExpanded = true,
   onToggle,
   showHeader = true,
-  onActionStatusChange,
+  onActionStatusChange: _onActionStatusChange,
 }: SmartRecommendationsProps) => {
   const [expandedDetailIds, setExpandedDetailIds] = React.useState<string[]>([]);
+  const [actionFeedbackById, setActionFeedbackById] = React.useState<
+    Record<string, { choice: ActionEngagementChoice; message: string }>
+  >({});
   const contextInvoice = selectedInvoice;
   const contextInvoiceLabel = contextInvoice ? getInvoiceReferenceLabel(contextInvoice) : undefined;
   const showInvoiceSelector = Boolean(contextInvoice && invoiceHistory && invoiceHistory.length > 1 && onSelectInvoice);
@@ -295,12 +490,33 @@ const SmartRecommendations = ({
     profile,
     userContext,
   });
+  const contextHints = getContextHints(contextInvoice, analysis, profile);
+  const feedbackContext: FeedbackContext = {
+    hints: contextHints,
+    primaryGoal: getAnsweredContextValue(userContext, 'primary_goal'),
+    usagePeriod: getAnsweredContextValue(userContext, 'usage_period'),
+    electricShowerUsage: getAnsweredContextValue(userContext, 'electric_shower'),
+  };
+
+  React.useEffect(() => {
+    setActionFeedbackById({});
+  }, [contextInvoice?.fingerprint]);
+
   const toggleActionDetails = (actionId: string) => {
     setExpandedDetailIds((currentIds) =>
       currentIds.includes(actionId)
         ? currentIds.filter((id) => id !== actionId)
         : [...currentIds, actionId]
     );
+  };
+  const handleActionFeedback = (action: NextAction, choice: ActionEngagementChoice) => {
+    setActionFeedbackById((currentFeedback) => ({
+      ...currentFeedback,
+      [action.id]: {
+        choice,
+        message: buildFeedbackMessage(action, choice, feedbackContext),
+      },
+    }));
   };
 
   return (
@@ -387,6 +603,7 @@ const SmartRecommendations = ({
                 analysis,
                 userContext,
               });
+              const actionFeedback = actionFeedbackById[action.id];
               const details = [
                 { label: 'Como fazer', value: action.suggestion },
                 { label: 'Como validar', value: action.validation },
@@ -408,7 +625,7 @@ const SmartRecommendations = ({
                   } ${index === 0 ? 'ring-2 ring-emerald-200' : ''}`}
                 >
                   <div className="space-y-4">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-3">
                       <div className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
                           {index === 0 && (
@@ -428,26 +645,32 @@ const SmartRecommendations = ({
                         <p className="text-sm text-gray-700">{compactDescription}</p>
                       </div>
 
-                      <Button
-                        size="sm"
-                        variant={isCompleted ? 'outline' : 'default'}
-                        className={`shrink-0 ${isCompleted ? 'border-emerald-300 text-emerald-700' : ''}`}
-                        disabled={isCompleted}
-                        onClick={() =>
-                          onActionStatusChange(action, isInProgress ? 'completed' : 'in_progress')
-                        }
-                      >
-                        {isCompleted ? (
-                          <span className="flex items-center gap-2">
-                            <CheckCircle2 className="h-4 w-4" />
-                            Testada
-                          </span>
-                        ) : isInProgress ? (
-                          'Marcar como testada'
-                        ) : (
-                          'Começar ação'
-                        )}
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        {actionEngagementOptions.map((option) => {
+                          const isSelected = actionFeedback?.choice === option.value;
+
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                                isSelected
+                                  ? 'border-blue-600 bg-blue-600 text-white'
+                                  : 'border-white/80 bg-white/85 text-slate-700 hover:border-blue-200 hover:text-blue-700'
+                              }`}
+                              onClick={() => handleActionFeedback(action, option.value)}
+                            >
+                              {option.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {actionFeedback && (
+                        <div className="rounded-md border border-emerald-100 bg-emerald-50/90 px-3 py-2 text-sm text-emerald-800">
+                          {actionFeedback.message}
+                        </div>
+                      )}
                     </div>
 
                     {actionQuickTip && (
