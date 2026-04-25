@@ -606,65 +606,69 @@ const InvoiceHistory = ({
                 return (
                   <Card key={invoice.fingerprint} className="hover:shadow-md transition-shadow">
                     <CardContent className="p-4">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center space-x-4">
-                          <div className="p-2 bg-emerald-100 rounded-lg">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+                          <div className="rounded-lg bg-emerald-100 p-2">
                             <FileText className="h-5 w-5 text-emerald-600" />
                           </div>
-                          <div>
+                          <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="font-medium text-gray-900">Fatura: {referenceLabel}</h3>
+                              <h3 className="min-w-0 text-sm font-medium text-gray-900 sm:text-base">
+                                Fatura: {referenceLabel}
+                              </h3>
                               <Badge
                                 variant="secondary"
-                                className={`${getConsumptionColor(invoice.consumption)} gap-1`}
+                                className={`${getConsumptionColor(invoice.consumption)} shrink-0 gap-1`}
                               >
                                 {getConsumptionIcon(invoice.consumption)}
                                 <span className="ml-1">{formatConsumption(invoice.consumption)}</span>
                               </Badge>
                               {consumptionExtremes.highestFingerprint === invoice.fingerprint && (
-                                <span className="inline-flex items-center rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[11px] font-medium leading-none text-orange-700">
+                                <span className="inline-flex shrink-0 items-center rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[11px] font-medium leading-none text-orange-700">
                                   Maior consumo
                                 </span>
                               )}
                               {consumptionExtremes.lowestFingerprint === invoice.fingerprint && (
-                                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium leading-none text-emerald-700">
+                                <span className="inline-flex shrink-0 items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium leading-none text-emerald-700">
                                   Menor consumo
                                 </span>
                               )}
                               {selectedInvoice?.fingerprint === invoice.fingerprint && (
-                                <Badge variant="outline" className="bg-white">
+                                <Badge variant="outline" className="shrink-0 bg-white">
                                   Fatura em foco
                                 </Badge>
                               )}
                             </div>
-                            <div className="mt-1 flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                              <div className="flex items-center">
+                            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-600">
+                              <div className="flex min-w-0 items-center">
                                 <DollarSign className="h-3 w-3 mr-1" />
                                 {formatCurrency(invoice.totalValue)}
                               </div>
                               {averageCostPerKwh !== undefined && (
-                                <div className="flex items-center">
+                                <div className="flex min-w-0 items-center">
                                   <Zap className="h-3 w-3 mr-1" />
                                   Custo por kWh: {formatCurrencyPerKwh(averageCostPerKwh)}
                                 </div>
                               )}
                               {uploadedAtLabel && (
-                                <div className="flex items-center">
+                                <div className="flex min-w-0 items-center">
                                   <Calendar className="h-3 w-3 mr-1" />
                                   Enviada em {uploadedAtLabel}
                                 </div>
                               )}
                               {invoice.parser.fields.consumerUnit.value && (
-                                <div className="flex items-center">
+                                <div className="flex min-w-0 items-center">
                                   <Zap className="h-3 w-3 mr-1" />
                                   UC {invoice.parser.fields.consumerUnit.value}
                                 </div>
                               )}
                             </div>
-                              <p className="mt-2 text-xs text-slate-500">Arquivo de origem: {invoice.fileName}</p>
+                            <p className="mt-2 break-all text-xs text-slate-500">
+                              Arquivo de origem: {invoice.fileName}
+                            </p>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex self-end sm:self-start">
                           <Button
                             variant="outline"
                             size="sm"
