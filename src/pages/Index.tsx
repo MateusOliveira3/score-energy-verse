@@ -296,8 +296,11 @@ const Index = () => {
             <div id="section-summary">
               <AnalysisSummary
                 invoice={selectedInvoice}
+                selectedInvoice={selectedInvoice}
                 analysis={selectedAnalysis}
                 profile={profile}
+                invoiceHistory={invoiceHistory}
+                onSelectInvoice={setSelectedInvoice}
                 isExpanded
                 showHeader={false}
               />
@@ -312,6 +315,8 @@ const Index = () => {
                 analysis={selectedAnalysis}
                 invoiceHistory={invoiceHistory}
                 selectedInvoice={selectedInvoice}
+                profile={profile}
+                userContext={userContext}
                 onSelectInvoice={setSelectedInvoice}
                 onActionStatusChange={handleActionStatusChange}
                 isExpanded

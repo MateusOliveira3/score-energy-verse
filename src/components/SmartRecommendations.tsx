@@ -1,7 +1,15 @@
+import React from 'react';
 import { CheckCircle2, ChevronDown, ChevronRight, Lightbulb } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AnalysisSummary, InvoiceData, NextAction, NextActionStatus } from '@/types/mvp';
+import {
+  AnalysisSummary,
+  InvoiceData,
+  NextAction,
+  NextActionStatus,
+  UserContextState,
+  UserProfileData,
+} from '@/types/mvp';
 
 interface SmartRecommendationsProps {
   actions: NextAction[];
@@ -9,6 +17,8 @@ interface SmartRecommendationsProps {
   analysis?: AnalysisSummary;
   invoiceHistory?: InvoiceData[];
   selectedInvoice?: InvoiceData;
+  profile: UserProfileData;
+  userContext?: Partial<UserContextState>;
   onSelectInvoice?: (invoice: InvoiceData) => void;
   isExpanded?: boolean;
   onToggle?: () => void;
@@ -44,6 +54,17 @@ const formatCurrency = (value?: number) =>
 const formatConsumption = (value?: number) =>
   typeof value === 'number' ? `${value} kWh` : 'consumo nao identificado';
 
+const formatCurrencyPerKwh = (value?: number) =>
+  typeof value === 'number' ? `R$ ${value.toFixed(2)}/kWh` : undefined;
+
+const getCompactText = (value: string, maxLength = 120) => {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  return `${value.slice(0, maxLength).trimEnd()}...`;
+};
+
 const getInvoiceReferenceLabel = (invoice: InvoiceData) => {
   const month = invoice.month?.trim();
 
@@ -60,22 +81,227 @@ const getInvoiceReferenceLabel = (invoice: InvoiceData) => {
   return invoice.month || 'Referencia nao identificada';
 };
 
+const getAverageCostPerKwh = (invoice?: InvoiceData) => {
+  if (
+    !invoice ||
+    typeof invoice.totalValue !== 'number' ||
+    !Number.isFinite(invoice.totalValue) ||
+    typeof invoice.consumption !== 'number' ||
+    !Number.isFinite(invoice.consumption) ||
+    invoice.consumption <= 0
+  ) {
+    return undefined;
+  }
+
+  return invoice.totalValue / invoice.consumption;
+};
+
+const getAnsweredContextValue = (
+  userContext: Partial<UserContextState> | undefined,
+  questionId: 'usage_period' | 'electric_shower' | 'primary_goal'
+) => {
+  const answer = userContext?.questions?.[questionId];
+  return answer?.status === 'answered' ? answer.value : undefined;
+};
+
+const hasSolarInterest = (profile: UserProfileData) =>
+  profile.energyPreference === 'Solar' || profile.energyPreference === 'Hibrido';
+
+const buildBlockOrientation = ({
+  analysis,
+  invoice,
+  profile,
+  userContext,
+}: {
+  analysis?: AnalysisSummary;
+  invoice?: InvoiceData;
+  profile: UserProfileData;
+  userContext?: Partial<UserContextState>;
+}) => {
+  const averageCostPerKwh = getAverageCostPerKwh(invoice);
+  const primaryGoal = getAnsweredContextValue(userContext, 'primary_goal');
+
+  if (profile.consumerType === 'Residencial' && analysis?.consumptionLevel === 'alto') {
+    return 'Para este perfil residencial, priorize habitos de maior impacto antes de trocar equipamentos.';
+  }
+
+  if (averageCostPerKwh !== undefined && analysis?.costSignal && analysis.costSignal !== 'controlado') {
+    return 'O custo por kWh desta fatura merece atencao antes de avaliar qualquer investimento.';
+  }
+
+  if (hasSolarInterest(profile)) {
+    return 'Antes de simular energia solar, consolide uma leitura confiavel dos usos que mais pesam.';
+  }
+
+  if (primaryGoal === 'reduce_cost') {
+    return 'Priorize mudancas simples e acompanhe o proximo ciclo antes de ampliar a intervencao.';
+  }
+
+  if (primaryGoal === 'understand_consumption') {
+    return 'Use esta fatura como referencia e acompanhe o proximo ciclo antes de concluir uma causa.';
+  }
+
+  if (analysis?.consumptionLevel === 'baixo') {
+    return 'O consumo desta fatura parece mais contido; mantenha uma leitura neutra e acompanhe o proximo ciclo.';
+  }
+
+  return 'Use esta fatura como referencia e valide o proximo ciclo.';
+};
+
+const buildActionContextLine = ({
+  action,
+  analysis,
+  invoice,
+  profile,
+  userContext,
+}: {
+  action: NextAction;
+  analysis?: AnalysisSummary;
+  invoice?: InvoiceData;
+  profile: UserProfileData;
+  userContext?: Partial<UserContextState>;
+}) => {
+  const averageCostPerKwh = getAverageCostPerKwh(invoice);
+  const primaryGoal = getAnsweredContextValue(userContext, 'primary_goal');
+
+  if (analysis?.consumptionLevel === 'alto' && profile.consumerType === 'Residencial') {
+    return action.priority === 'high'
+      ? 'Neste perfil residencial, esta frente ajuda a observar habitos que podem estar puxando o consumo.'
+      : 'Neste perfil residencial, trate esta frente como apoio para reduzir desperdicios mais visiveis.';
+  }
+
+  if (averageCostPerKwh !== undefined && analysis?.costSignal && analysis.costSignal !== 'controlado') {
+    return 'Nesta fatura, vale ligar esta acao ao custo por kWh antes de pensar em novos gastos.';
+  }
+
+  if (hasSolarInterest(profile)) {
+    return 'Mesmo com interesse em energia solar, comece por sinais observaveis da rotina atual.';
+  }
+
+  if (primaryGoal === 'reduce_cost') {
+    return 'Priorize esta acao se ela permitir testar um ajuste simples antes do proximo vencimento.';
+  }
+
+  if (primaryGoal === 'understand_consumption') {
+    return 'Use esta acao para separar percepcao de evidencias da fatura em foco.';
+  }
+
+  if (action.priority === 'high') {
+    return 'Priorize esta frente primeiro e acompanhe um sinal observavel no proximo ciclo.';
+  }
+
+  if (action.priority === 'medium') {
+    return 'Vale observar esta frente depois da principal, sem mudar muitas variaveis ao mesmo tempo.';
+  }
+
+  return 'Trate esta frente como ajuste complementar e acompanhe se o sinal se repete.';
+};
+
+const buildActionQuickTip = ({
+  analysis,
+  userContext,
+}: {
+  analysis?: AnalysisSummary;
+  userContext?: Partial<UserContextState>;
+}) => {
+  const usagePeriod = getAnsweredContextValue(userContext, 'usage_period');
+  const electricShowerUsage = getAnsweredContextValue(userContext, 'electric_shower');
+  const primaryGoal = getAnsweredContextValue(userContext, 'primary_goal');
+
+  if (usagePeriod === 'night') {
+    return 'Se o pico costuma acontecer a noite, observe banho, climatizacao e cargas acumuladas nesse periodo.';
+  }
+
+  if (usagePeriod === 'afternoon') {
+    return 'Se o uso pesa mais a tarde, compare esta acao com equipamentos que ficam ligados por mais tempo nesse periodo.';
+  }
+
+  if (electricShowerUsage === 'daily') {
+    return 'Se o chuveiro entra todos os dias, acompanhe tempo e temperatura antes de investir em troca.';
+  }
+
+  if (primaryGoal === 'both') {
+    return 'Registre uma mudanca por vez para entender consumo e custo sem confundir os sinais.';
+  }
+
+  if (!analysis) {
+    return 'Use esta fatura como referencia e valide o proximo ciclo.';
+  }
+
+  return undefined;
+};
+
+const buildContextFooter = ({
+  analysis,
+  invoice,
+  profile,
+  userContext,
+}: {
+  analysis?: AnalysisSummary;
+  invoice?: InvoiceData;
+  profile: UserProfileData;
+  userContext?: Partial<UserContextState>;
+}) => {
+  const averageCostPerKwh = getAverageCostPerKwh(invoice);
+  const primaryGoal = getAnsweredContextValue(userContext, 'primary_goal');
+
+  if (averageCostPerKwh !== undefined && analysis?.costSignal && analysis.costSignal !== 'controlado') {
+    return `O custo medio observado ficou em ${formatCurrencyPerKwh(averageCostPerKwh)}; acompanhe o proximo ciclo antes de concluir uma causa.`;
+  }
+
+  if (hasSolarInterest(profile)) {
+    return 'Com preferencia por energia solar, vale primeiro confirmar quais usos realmente pesam nesta fatura.';
+  }
+
+  if (primaryGoal === 'both') {
+    return 'Como o objetivo atual mistura custo e consumo, priorize uma mudanca por vez para comparar melhor.';
+  }
+
+  if (analysis?.consumptionLevel === 'baixo') {
+    return 'A leitura atual parece mais neutra; mantenha esta fatura como referencia para a proxima comparacao.';
+  }
+
+  return 'Use esta leitura como base e acompanhe o proximo ciclo antes de ampliar qualquer decisao.';
+};
+
 const SmartRecommendations = ({
   actions,
   viewedActionIds,
   analysis,
   invoiceHistory,
   selectedInvoice,
+  profile,
+  userContext,
   onSelectInvoice,
   isExpanded = true,
   onToggle,
   showHeader = true,
   onActionStatusChange,
 }: SmartRecommendationsProps) => {
+  const [expandedDetailIds, setExpandedDetailIds] = React.useState<string[]>([]);
   const contextInvoice = selectedInvoice;
   const contextInvoiceLabel = contextInvoice ? getInvoiceReferenceLabel(contextInvoice) : undefined;
   const showInvoiceSelector = Boolean(contextInvoice && invoiceHistory && invoiceHistory.length > 1 && onSelectInvoice);
   const ExpansionIcon = isExpanded ? ChevronDown : ChevronRight;
+  const blockOrientation = buildBlockOrientation({
+    analysis,
+    invoice: contextInvoice,
+    profile,
+    userContext,
+  });
+  const footerContext = buildContextFooter({
+    analysis,
+    invoice: contextInvoice,
+    profile,
+    userContext,
+  });
+  const toggleActionDetails = (actionId: string) => {
+    setExpandedDetailIds((currentIds) =>
+      currentIds.includes(actionId)
+        ? currentIds.filter((id) => id !== actionId)
+        : [...currentIds, actionId]
+    );
+  };
 
   return (
     <Card className="border-2 border-blue-100 shadow-lg">
@@ -100,7 +326,7 @@ const SmartRecommendations = ({
               </CardTitle>
               <p className="text-sm text-slate-600">
                 {contextInvoiceLabel
-                  ? `Fatura em foco: ${contextInvoiceLabel}.`
+                  ? `Fatura em foco: ${contextInvoiceLabel}. ${blockOrientation}`
                   : 'As acoes seguem a lista global da jornada, sem recalculo local.'}
               </p>
             </div>
@@ -141,15 +367,38 @@ const SmartRecommendations = ({
               </label>
             </div>
           )}
+          <div className="mb-6 rounded-lg border border-blue-100 bg-blue-50/70 p-4">
+            <p className="text-sm font-medium text-blue-900">{blockOrientation}</p>
+          </div>
           <div className="space-y-4">
             {actions.map((action, index) => {
               const status = action.status ?? (viewedActionIds.includes(action.id) ? 'viewed' : 'new');
               const isCompleted = status === 'completed';
               const isInProgress = status === 'in_progress';
+              const isDetailsExpanded = expandedDetailIds.includes(action.id);
+              const actionContextLine = buildActionContextLine({
+                action,
+                analysis,
+                invoice: contextInvoice,
+                profile,
+                userContext,
+              });
+              const actionQuickTip = buildActionQuickTip({
+                analysis,
+                userContext,
+              });
               const details = [
                 { label: 'Como fazer', value: action.suggestion },
                 { label: 'Como validar', value: action.validation },
               ].filter((detail) => Boolean(detail.value));
+              const compactDescription = getCompactText(action.description, 110);
+              const hasExpandableDetails = Boolean(
+                action.description ||
+                actionContextLine ||
+                action.value ||
+                action.impact ||
+                details.length > 0
+              );
 
               return (
                 <div
@@ -176,8 +425,7 @@ const SmartRecommendations = ({
                           </span>
                         </div>
 
-                        <p className="text-sm text-gray-700">{action.description}</p>
-                        <p className="text-sm font-semibold text-emerald-700">Objetivo: {action.value}</p>
+                        <p className="text-sm text-gray-700">{compactDescription}</p>
                       </div>
 
                       <Button
@@ -202,20 +450,70 @@ const SmartRecommendations = ({
                       </Button>
                     </div>
 
-                    {details.length > 0 && (
-                      <div className="grid grid-cols-1 gap-3 rounded-md bg-white/75 p-3">
-                        {details.map((detail) => (
-                          <div key={detail.label} className="space-y-1">
-                            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                              {detail.label}
-                            </span>
-                            <p className="text-sm text-slate-700">{detail.value}</p>
-                          </div>
-                        ))}
+                    {actionQuickTip && (
+                      <div className="rounded-md border border-blue-100 bg-blue-50/80 px-3 py-2 text-sm text-blue-800">
+                        <span className="font-medium">Dica rapida:</span> {actionQuickTip}
                       </div>
                     )}
 
-                    {action.impact && <p className="text-xs font-medium text-slate-500">{action.impact}</p>}
+                    {hasExpandableDetails && (
+                      <div className="space-y-3">
+                        <button
+                          type="button"
+                          className="text-sm font-medium text-blue-700 transition hover:text-blue-800"
+                          onClick={() => toggleActionDetails(action.id)}
+                        >
+                          {isDetailsExpanded ? 'Ocultar detalhes' : 'Ver detalhes'}
+                        </button>
+
+                        {isDetailsExpanded && (
+                          <div className="space-y-3 rounded-md bg-white/75 p-3">
+                            <div className="space-y-1">
+                              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Descricao completa
+                              </span>
+                              <p className="text-sm text-slate-700">{action.description}</p>
+                            </div>
+
+                            <div className="space-y-1">
+                              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Leitura contextual
+                              </span>
+                              <p className="text-sm text-slate-700">{actionContextLine}</p>
+                            </div>
+
+                            <div className="space-y-1">
+                              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Objetivo
+                              </span>
+                              <p className="text-sm font-semibold text-emerald-700">{action.value}</p>
+                            </div>
+
+                            {details.length > 0 && (
+                              <div className="grid grid-cols-1 gap-3">
+                                {details.map((detail) => (
+                                  <div key={detail.label} className="space-y-1">
+                                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                      {detail.label}
+                                    </span>
+                                    <p className="text-sm text-slate-700">{detail.value}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {action.impact && (
+                              <div className="space-y-1">
+                                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                  Impacto observado
+                                </span>
+                                <p className="text-xs font-medium text-slate-500">{action.impact}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {isInProgress && (
                       <div className="rounded-md bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700">
@@ -235,17 +533,20 @@ const SmartRecommendations = ({
             })}
           </div>
 
-          {contextInvoice && analysis && (
+          {contextInvoice && (
             <div className="mt-6 rounded-lg bg-gradient-to-r from-emerald-50 to-blue-50 p-4">
               <div className="text-center text-sm">
                 <p className="font-medium text-gray-700">
                   Contexto visual atual: {contextInvoiceLabel}
                 </p>
-                <p className="text-gray-600">
-                  {formatConsumption(contextInvoice.consumption)} -{' '}
-                  {formatCurrency(contextInvoice.totalValue)} -{' '}
-                  {analysis.efficiencyLabel}
-                </p>
+                {analysis && (
+                  <p className="text-gray-600">
+                    {formatConsumption(contextInvoice.consumption)} -{' '}
+                    {formatCurrency(contextInvoice.totalValue)} -{' '}
+                    {analysis.efficiencyLabel}
+                  </p>
+                )}
+                <p className="mt-2 text-gray-600">{footerContext}</p>
               </div>
             </div>
           )}

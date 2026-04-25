@@ -6,8 +6,11 @@ import { AnalysisSummary as AnalysisSummaryType, InvoiceData, UserProfileData } 
 
 interface AnalysisSummaryProps {
   invoice?: InvoiceData;
+  selectedInvoice?: InvoiceData;
   analysis?: AnalysisSummaryType;
   profile: UserProfileData;
+  invoiceHistory?: InvoiceData[];
+  onSelectInvoice?: (invoice: InvoiceData) => void;
   isExpanded?: boolean;
   onToggle?: () => void;
   showHeader?: boolean;
@@ -76,13 +79,20 @@ const formatCurrencyPerKwh = (value?: number) =>
 
 const AnalysisSummary = ({
   invoice,
+  selectedInvoice,
   analysis,
   profile,
+  invoiceHistory,
+  onSelectInvoice,
   isExpanded = true,
   onToggle,
   showHeader = true,
 }: AnalysisSummaryProps) => {
   const ExpansionIcon = isExpanded ? ChevronDown : ChevronRight;
+  const contextInvoice = selectedInvoice ?? invoice;
+  const showInvoiceSelector = Boolean(
+    contextInvoice && invoiceHistory && invoiceHistory.length > 1 && onSelectInvoice
+  );
 
   if (!invoice || !analysis) {
     return (
@@ -119,6 +129,34 @@ const AnalysisSummary = ({
         )}
         {isExpanded && (
           <CardContent className="space-y-3 text-sm text-slate-600">
+            {showInvoiceSelector && contextInvoice && invoiceHistory && onSelectInvoice && (
+              <div className="flex justify-end">
+                <label className="flex flex-col gap-1 text-sm text-slate-600">
+                  <span className="font-medium text-slate-700">Fatura em foco</span>
+                  <select
+                    aria-label="Selecionar fatura para resumir a analise"
+                    className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                    value={contextInvoice.fingerprint}
+                    onClick={(event) => event.stopPropagation()}
+                    onChange={(event) => {
+                      const nextInvoice = invoiceHistory.find(
+                        (historyInvoice) => historyInvoice.fingerprint === event.target.value
+                      );
+
+                      if (nextInvoice) {
+                        onSelectInvoice(nextInvoice);
+                      }
+                    }}
+                  >
+                    {invoiceHistory.map((historyInvoice) => (
+                      <option key={historyInvoice.fingerprint} value={historyInvoice.fingerprint}>
+                        {getInvoiceReferenceLabel(historyInvoice)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
             <p>
               A analise aparece logo apos adicionar uma fatura ao historico. Ela transforma o
               arquivo em campos reais quando o texto da conta permitir leitura segura.
@@ -173,20 +211,49 @@ const AnalysisSummary = ({
       )}
       {isExpanded && (
         <CardContent className="space-y-5">
-          <div className="flex flex-wrap items-center gap-2">
-            {analysis.consumptionLevel && (
-              <Badge className={consumptionVariant[analysis.consumptionLevel]}>
-                Consumo {analysis.consumptionLevel}
-              </Badge>
-            )}
-            {analysis.costSignal && (
-              <Badge className={costVariant[analysis.costSignal]}>
-                Custo {costLabel[analysis.costSignal]}
-              </Badge>
-            )}
-            <Badge variant="outline">{referenceLabel}</Badge>
-            {invoice.parser.fields.providerName.value && (
-              <Badge variant="outline">{invoice.parser.fields.providerName.value}</Badge>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              {analysis.consumptionLevel && (
+                <Badge className={consumptionVariant[analysis.consumptionLevel]}>
+                  Consumo {analysis.consumptionLevel}
+                </Badge>
+              )}
+              {analysis.costSignal && (
+                <Badge className={costVariant[analysis.costSignal]}>
+                  Custo {costLabel[analysis.costSignal]}
+                </Badge>
+              )}
+              <Badge variant="outline">{referenceLabel}</Badge>
+              {invoice.parser.fields.providerName.value && (
+                <Badge variant="outline">{invoice.parser.fields.providerName.value}</Badge>
+              )}
+            </div>
+
+            {showInvoiceSelector && contextInvoice && invoiceHistory && onSelectInvoice && (
+              <label className="flex w-full flex-col gap-1 text-sm text-slate-600 lg:w-auto lg:min-w-56">
+                <span className="font-medium text-slate-700">Fatura em foco</span>
+                <select
+                  aria-label="Selecionar fatura para resumir a analise"
+                  className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                  value={contextInvoice.fingerprint}
+                  onClick={(event) => event.stopPropagation()}
+                  onChange={(event) => {
+                    const nextInvoice = invoiceHistory.find(
+                      (historyInvoice) => historyInvoice.fingerprint === event.target.value
+                    );
+
+                    if (nextInvoice) {
+                      onSelectInvoice(nextInvoice);
+                    }
+                  }}
+                >
+                  {invoiceHistory.map((historyInvoice) => (
+                    <option key={historyInvoice.fingerprint} value={historyInvoice.fingerprint}>
+                      {getInvoiceReferenceLabel(historyInvoice)}
+                    </option>
+                  ))}
+                </select>
+              </label>
             )}
           </div>
 
