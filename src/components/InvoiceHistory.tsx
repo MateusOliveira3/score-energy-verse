@@ -92,7 +92,7 @@ const getInvoiceReferenceLabel = (invoice: InvoiceData) => {
     return referenceMonth;
   }
 
-  return invoice.month || 'Referencia nao identificada';
+  return invoice.month || 'Referência não identificada';
 };
 
 const getAverageCostPerKwh = (invoice: InvoiceData) => {
@@ -120,10 +120,10 @@ const formatUploadedAtDate = (invoice: InvoiceData) => {
 };
 
 const formatCurrency = (value?: number) =>
-  typeof value === 'number' ? `R$ ${value.toFixed(2)}` : 'Nao identificado';
+  typeof value === 'number' ? `R$ ${value.toFixed(2)}` : 'Não identificado';
 
 const formatConsumption = (value?: number) =>
-  typeof value === 'number' ? `${value} kWh` : 'Nao identificado';
+  typeof value === 'number' ? `${value} kWh` : 'Não identificado';
 
 const formatCurrencyPerKwh = (value?: number) =>
   typeof value === 'number' ? `R$ ${value.toFixed(2)}/kWh` : undefined;
@@ -276,9 +276,9 @@ const comparisonVariant: Record<InvoiceComparison['status'], string> = {
 };
 
 const comparisonBasisLabel: Record<InvoiceComparison['basis'], string> = {
-  competence: 'Ordem pela competencia da fatura',
-  upload: 'Ordem pela data de envio',
-  history: 'Ordem do historico atual',
+  competence: 'Base: competência da fatura',
+  upload: 'Base: data de envio',
+  history: 'Base: histórico atual',
 };
 
 const trendLabel: Record<InvoiceComparisonTrend, string> = {
@@ -390,12 +390,12 @@ const InvoiceHistory = ({
               <div className="space-y-1">
                 <CardTitle className="flex items-center space-x-2 text-emerald-700">
                   <FileText className="h-5 w-5" />
-                  <span>Historico de Faturas</span>
+                  <span>Histórico de faturas</span>
                 </CardTitle>
                 <p className="text-sm text-slate-500">
                   {focusedInvoiceLabel
                     ? `Fatura em foco: ${focusedInvoiceLabel}.`
-                    : 'Comparacao e leitura do historico da jornada.'}
+                    : 'Comparação e leitura do histórico da jornada.'}
                 </p>
               </div>
               <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
@@ -409,23 +409,23 @@ const InvoiceHistory = ({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="text-center p-4 bg-emerald-50 rounded-lg">
               <div className="text-2xl font-bold text-emerald-600">{stats.totalInvoices}</div>
-              <div className="text-sm text-emerald-700">Total de Faturas</div>
+              <div className="text-sm text-emerald-700">Total de faturas</div>
             </div>
             <div className="text-center p-4 bg-blue-50 rounded-lg">
               <div className="text-2xl font-bold text-blue-600">{stats.totalConsumption}</div>
-              <div className="text-sm text-blue-700">kWh Total</div>
+              <div className="text-sm text-blue-700">Consumo total</div>
             </div>
             <div className="text-center p-4 bg-purple-50 rounded-lg">
               <div className="text-2xl font-bold text-purple-600">
                 {stats.averageConsumption ?? '-'}
               </div>
-              <div className="text-sm text-purple-700">kWh Medio</div>
+              <div className="text-sm text-purple-700">Consumo médio</div>
             </div>
             <div className="text-center p-4 bg-orange-50 rounded-lg">
               <div className="text-2xl font-bold text-orange-600">
                 {stats.averageValue !== undefined ? `R$ ${stats.averageValue}` : '-'}
               </div>
-              <div className="text-sm text-orange-700">Valor Medio</div>
+              <div className="text-sm text-orange-700">Custo médio</div>
             </div>
           </div>
 
@@ -433,7 +433,7 @@ const InvoiceHistory = ({
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
                 <div className="text-sm font-semibold uppercase tracking-wide">
-                  Comparacao com a fatura anterior
+                  Comparação com a fatura anterior
                 </div>
                 {focusedInvoiceLabel && (
                   <p className="mt-1 text-sm font-medium opacity-90">
@@ -500,7 +500,7 @@ const InvoiceHistory = ({
           {actionResultLink.hasObservedComparison && (
             <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-                Acoes antes desta fatura
+                Ações antes da fatura em foco
               </div>
               <h3 className="mt-1 text-base font-bold text-slate-900">{actionResultLink.title}</h3>
               <p className="mt-1 text-sm text-slate-600">{actionResultLink.message}</p>
@@ -539,7 +539,7 @@ const InvoiceHistory = ({
               </div>
               <div>
                 <div className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-                  Proximo passo sugerido
+                  Próximo passo sugerido
                 </div>
                 <h3 className="mt-1 text-lg font-bold text-slate-900">{guidance.title}</h3>
                 <p className="mt-1 text-sm text-slate-600">{guidance.message}</p>
@@ -553,9 +553,9 @@ const InvoiceHistory = ({
           {invoices.length === 0 ? (
             <div className="text-center py-8">
               <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-700 mb-2">Seu historico ainda esta vazio</h3>
+              <h3 className="text-lg font-medium text-gray-700 mb-2">Seu histórico ainda está vazio</h3>
               <p className="text-gray-500">
-                Adicione uma fatura ao historico para iniciar sua leitura de consumo.
+                Adicione uma fatura ao histórico para iniciar a leitura.
               </p>
             </div>
           ) : (
@@ -575,7 +575,7 @@ const InvoiceHistory = ({
                           </div>
                           <div>
                             <div className="flex items-center space-x-2">
-                              <h3 className="font-medium text-gray-900">Fatura - {referenceLabel}</h3>
+                              <h3 className="font-medium text-gray-900">Fatura: {referenceLabel}</h3>
                               <Badge
                                 variant="secondary"
                                 className={getConsumptionColor(invoice.consumption)}
@@ -585,7 +585,7 @@ const InvoiceHistory = ({
                               </Badge>
                               {selectedInvoice?.fingerprint === invoice.fingerprint && (
                                 <Badge variant="outline" className="bg-white">
-                                  Em foco
+                                  Fatura em foco
                                 </Badge>
                               )}
                             </div>
@@ -597,7 +597,7 @@ const InvoiceHistory = ({
                               {averageCostPerKwh !== undefined && (
                                 <div className="flex items-center">
                                   <Zap className="h-3 w-3 mr-1" />
-                                  {formatCurrencyPerKwh(averageCostPerKwh)}
+                                  Custo por kWh: {formatCurrencyPerKwh(averageCostPerKwh)}
                                 </div>
                               )}
                               {uploadedAtLabel && (
@@ -613,7 +613,7 @@ const InvoiceHistory = ({
                                 </div>
                               )}
                             </div>
-                            <p className="mt-2 text-xs text-slate-500">Arquivo base: {invoice.fileName}</p>
+                              <p className="mt-2 text-xs text-slate-500">Arquivo de origem: {invoice.fileName}</p>
                           </div>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -621,7 +621,7 @@ const InvoiceHistory = ({
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              if (confirm('Tem certeza que deseja excluir esta fatura do historico MVP?')) {
+                              if (confirm('Tem certeza de que deseja excluir esta fatura do histórico?')) {
                                 onDeleteInvoice(invoice.fingerprint);
                               }
                             }}

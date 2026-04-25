@@ -34,15 +34,15 @@ const costVariant = {
 
 const costLabel = {
   controlado: 'controlado',
-  atencao: 'atencao',
+  atencao: 'sob atenção',
   elevado: 'elevado',
 } as const;
 
 const formatCurrency = (value?: number) =>
-  typeof value === 'number' ? `R$ ${value.toFixed(2)}` : 'Nao identificado';
+  typeof value === 'number' ? `R$ ${value.toFixed(2)}` : 'Não identificado';
 
 const formatConsumption = (value?: number) =>
-  typeof value === 'number' ? `${value} kWh` : 'Nao identificado';
+  typeof value === 'number' ? `${value} kWh` : 'Não identificado';
 
 const getInvoiceReferenceLabel = (invoice: InvoiceData) => {
   const month = invoice.month?.trim();
@@ -57,7 +57,7 @@ const getInvoiceReferenceLabel = (invoice: InvoiceData) => {
     return referenceMonth;
   }
 
-  return invoice.month || 'Referencia nao identificada';
+  return invoice.month || 'Referência não identificada';
 };
 
 const getAverageCostPerKwh = (invoice: InvoiceData) => {
@@ -90,6 +90,7 @@ const AnalysisSummary = ({
 }: AnalysisSummaryProps) => {
   const ExpansionIcon = isExpanded ? ChevronDown : ChevronRight;
   const contextInvoice = selectedInvoice ?? invoice;
+  const invoiceCount = invoiceHistory?.length ?? 0;
   const showInvoiceSelector = Boolean(
     contextInvoice && invoiceHistory && invoiceHistory.length > 1 && onSelectInvoice
   );
@@ -114,7 +115,7 @@ const AnalysisSummary = ({
               <div className="space-y-1">
                 <CardTitle className="flex items-center space-x-2 text-slate-700">
                   <ScanSearch className="h-5 w-5" />
-                  <span>Resumo da analise</span>
+                  <span>Resumo da análise</span>
                 </CardTitle>
                 <p className="text-sm text-slate-500">
                   Leitura consolidada da fatura em foco.
@@ -134,7 +135,7 @@ const AnalysisSummary = ({
                 <label className="flex flex-col gap-1 text-sm text-slate-600">
                   <span className="font-medium text-slate-700">Fatura em foco</span>
                   <select
-                    aria-label="Selecionar fatura para resumir a analise"
+                    aria-label="Selecionar fatura para resumir a análise"
                     className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
                     value={contextInvoice.fingerprint}
                     onClick={(event) => event.stopPropagation()}
@@ -158,12 +159,12 @@ const AnalysisSummary = ({
               </div>
             )}
             <p>
-              A analise aparece logo apos adicionar uma fatura ao historico. Ela transforma o
-              arquivo em campos reais quando o texto da conta permitir leitura segura.
+              A análise fica disponível após adicionar uma fatura ao histórico. Ela organiza o
+              arquivo em campos reais quando a leitura da conta é confiável.
             </p>
             <p>
-              O contexto do perfil {profile.consumerType.toLowerCase()} continua sendo usado apenas
-              para interpretar a leitura, nao para inventar numeros ausentes.
+              O perfil {profile.consumerType.toLowerCase()} ajuda a interpretar a leitura, sem
+              estimar números ausentes.
             </p>
           </CardContent>
         )}
@@ -194,7 +195,7 @@ const AnalysisSummary = ({
             <div className="space-y-1">
               <CardTitle className="flex items-center space-x-2 text-slate-700">
                 <FileBarChart className="h-5 w-5" />
-                <span>Resumo da analise</span>
+                <span>Resumo da análise</span>
               </CardTitle>
               <p className="text-sm text-slate-500">
                 {referenceLabel
@@ -233,7 +234,7 @@ const AnalysisSummary = ({
               <label className="flex w-full flex-col gap-1 text-sm text-slate-600 lg:w-auto lg:min-w-56">
                 <span className="font-medium text-slate-700">Fatura em foco</span>
                 <select
-                  aria-label="Selecionar fatura para resumir a analise"
+                  aria-label="Selecionar fatura para resumir a análise"
                   className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
                   value={contextInvoice.fingerprint}
                   onClick={(event) => event.stopPropagation()}
@@ -259,7 +260,7 @@ const AnalysisSummary = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="rounded-xl bg-emerald-50 p-4">
-              <div className="text-sm text-emerald-700">Consumo extraido</div>
+              <div className="text-sm text-emerald-700">Consumo</div>
               <div className="text-3xl font-bold text-emerald-900">
                 {formatConsumption(invoice.consumption)}
               </div>
@@ -270,17 +271,17 @@ const AnalysisSummary = ({
             <div className="rounded-xl bg-blue-50 p-4">
               <div className="text-sm text-blue-700 flex items-center gap-2">
                 <Wallet className="h-4 w-4" />
-                Valor total extraido
+                Custo
               </div>
               <div className="text-3xl font-bold text-blue-900">{formatCurrency(invoice.totalValue)}</div>
               <div className="text-sm text-blue-700">
                 {invoice.parser.fields.dueDate.value
                   ? `Vencimento ${invoice.parser.fields.dueDate.value}`
-                  : 'Vencimento nao identificado'}
+                  : 'Vencimento não identificado'}
               </div>
               {averageCostPerKwh !== undefined && (
                 <div className="mt-2 text-sm text-blue-700">
-                  Custo medio de {formatCurrencyPerKwh(averageCostPerKwh)}
+                  Custo por kWh: {formatCurrencyPerKwh(averageCostPerKwh)}
                 </div>
               )}
             </div>
@@ -301,7 +302,7 @@ const AnalysisSummary = ({
             {consultativeInsights.length > 0 && (
               <div className="space-y-2">
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Sinais consultivos
+                  Leitura consultiva
                 </div>
                 {consultativeInsights.map((insight) => (
                   <div
@@ -316,8 +317,21 @@ const AnalysisSummary = ({
           </div>
 
           <div className="rounded-xl border border-amber-100 bg-amber-50 p-4">
-            <div className="text-sm font-semibold text-amber-800">O que importa agora</div>
+            <div className="text-sm font-semibold text-amber-800">O que vale observar agora</div>
             <p className="mt-1 text-sm text-amber-900">{analysis.whatMattersNext}</p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+            <p>No próximo ciclo, vale observar se esse padrão se mantém ou muda.</p>
+            {invoiceCount > 1 ? (
+              <p className="mt-2 text-slate-500">
+                Você já tem {invoiceCount} faturas. Continue acompanhando para entender seu padrão.
+              </p>
+            ) : invoiceCount === 1 ? (
+              <p className="mt-2 text-slate-500">
+                Adicione a próxima fatura para começar a ver evolução.
+              </p>
+            ) : null}
           </div>
         </CardContent>
       )}

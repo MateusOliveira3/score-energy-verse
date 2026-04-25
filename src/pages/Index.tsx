@@ -257,6 +257,16 @@ const Index = () => {
         </div>
 
         <section className="space-y-6">
+          {invoiceHistory.length > 0 && (
+            <Card className="border-slate-200 bg-white/80 shadow-sm">
+              <CardContent className="p-4 text-sm text-slate-600">
+                {invoiceHistory.length > 1
+                  ? `Você já tem ${invoiceHistory.length} faturas. Continue acompanhando para entender seu padrão.`
+                  : 'Adicione a próxima fatura para começar a ver evolução.'}
+              </CardContent>
+            </Card>
+          )}
+
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {sectionCards.map((section) => {
               const isOpen = activeSection === section.key;
