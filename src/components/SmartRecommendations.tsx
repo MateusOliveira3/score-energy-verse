@@ -622,7 +622,7 @@ const SmartRecommendations = ({
                   key={action.id}
                   className={`rounded-lg border-2 p-4 transition-all duration-300 ${
                     priorityClasses[action.priority]
-                  } ${index === 0 ? 'ring-2 ring-emerald-200' : ''}`}
+                  } ${index === 0 ? 'ring-2 ring-emerald-200' : ''} sm:p-5`}
                 >
                   <div className="space-y-4">
                     <div className="space-y-3">
@@ -633,7 +633,9 @@ const SmartRecommendations = ({
                               Ação principal
                             </span>
                           )}
-                          <h4 className="font-semibold text-gray-800">{action.title}</h4>
+                          <h4 className="min-w-0 break-words font-semibold text-gray-800">
+                            {action.title}
+                          </h4>
                           <span className="rounded-full bg-white/80 px-2 py-1 text-xs font-medium text-gray-700">
                             Prioridade {priorityLabels[action.priority]}
                           </span>
@@ -642,10 +644,12 @@ const SmartRecommendations = ({
                           </span>
                         </div>
 
-                        <p className="text-sm text-gray-700">{compactDescription}</p>
+                        <p className="break-words text-sm leading-relaxed text-gray-700">
+                          {compactDescription}
+                        </p>
                       </div>
 
-                      <div className="flex flex-wrap gap-2">
+                      <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
                         {actionEngagementOptions.map((option) => {
                           const isSelected = actionFeedback?.choice === option.value;
 
@@ -653,7 +657,7 @@ const SmartRecommendations = ({
                             <button
                               key={option.value}
                               type="button"
-                              className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                              className={`inline-flex w-full items-center justify-center rounded-full border px-4 py-2 text-sm font-medium leading-snug transition sm:w-auto ${
                                 isSelected
                                   ? 'border-blue-600 bg-blue-600 text-white'
                                   : 'border-white/80 bg-white/85 text-slate-700 hover:border-blue-200 hover:text-blue-700'
@@ -667,14 +671,14 @@ const SmartRecommendations = ({
                       </div>
 
                       {actionFeedback && (
-                        <div className="rounded-md border border-emerald-100 bg-emerald-50/90 px-3 py-2 text-sm text-emerald-800">
+                        <div className="w-full break-words rounded-md border border-emerald-100 bg-emerald-50/90 px-3 py-2 text-sm leading-relaxed text-emerald-800">
                           {actionFeedback.message}
                         </div>
                       )}
                     </div>
 
                     {actionQuickTip && (
-                      <div className="rounded-md border border-blue-100 bg-blue-50/80 px-3 py-2 text-sm text-blue-800">
+                      <div className="break-words rounded-md border border-blue-100 bg-blue-50/80 px-3 py-2 text-sm leading-relaxed text-blue-800">
                         <span className="font-medium">Dica rápida:</span> {actionQuickTip}
                       </div>
                     )}
@@ -695,14 +699,18 @@ const SmartRecommendations = ({
                               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 Descrição completa
                               </span>
-                              <p className="text-sm text-slate-700">{action.description}</p>
+                              <p className="break-words text-sm leading-relaxed text-slate-700">
+                                {action.description}
+                              </p>
                             </div>
 
                             <div className="space-y-1">
                               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 Leitura contextual
                               </span>
-                              <p className="text-sm text-slate-700">{actionContextLine}</p>
+                              <p className="break-words text-sm leading-relaxed text-slate-700">
+                                {actionContextLine}
+                              </p>
                             </div>
 
                             <div className="space-y-1">
@@ -719,7 +727,9 @@ const SmartRecommendations = ({
                                     <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                                       {detail.label}
                                     </span>
-                                    <p className="text-sm text-slate-700">{detail.value}</p>
+                                    <p className="break-words text-sm leading-relaxed text-slate-700">
+                                      {detail.value}
+                                    </p>
                                   </div>
                                 ))}
                               </div>
@@ -739,14 +749,14 @@ const SmartRecommendations = ({
                     )}
 
                     {isInProgress && (
-                      <div className="rounded-md bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700">
+                      <div className="break-words rounded-md bg-blue-50 px-3 py-2 text-sm font-medium leading-relaxed text-blue-700">
                         Ação em andamento. Quando testar na rotina, marque como testada.
                       </div>
                     )}
 
                     {isCompleted && (
-                      <div className="flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
-                        <CheckCircle2 className="h-4 w-4" />
+                      <div className="flex items-start gap-2 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium leading-relaxed text-emerald-700 sm:items-center">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 sm:mt-0" />
                         Ação testada e registrada no progresso da jornada.
                       </div>
                     )}
