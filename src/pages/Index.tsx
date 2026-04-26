@@ -1,6 +1,7 @@
 import React from 'react';
 import ScoreCard from '../components/ScoreCard';
 import LevelProgress from '../components/LevelProgress';
+import EnergyProgressVisual from '../components/EnergyProgressVisual';
 import ScoreExplanationCard from '../components/ScoreExplanationCard';
 import InvoiceUpload from '../components/InvoiceUpload';
 import InvoiceHistory from '../components/InvoiceHistory';
@@ -19,6 +20,12 @@ import { buildAnalysisSummary } from '@/lib/mvpCoreFlow';
 import { InvoiceData, NextAction, NextActionStatus } from '@/types/mvp';
 
 type DashboardSectionKey = 'summary' | 'actions' | 'history';
+type InteractionFeedbackSource = 'action_started' | 'action_completed' | 'observation_saved';
+
+interface InteractionFeedbackEvent {
+  id: number;
+  source: InteractionFeedbackSource;
+}
 
 const Index = () => {
   const { toast } = useToast();
@@ -48,6 +55,36 @@ const Index = () => {
   } = useMvpJourney();
   const [selectedInvoice, setSelectedInvoice] = React.useState<InvoiceData | undefined>(latestInvoice);
   const [activeSection, setActiveSection] = React.useState<DashboardSectionKey | null>('summary');
+  const [interactionFeedback, setInteractionFeedback] = React.useState<InteractionFeedbackEvent | null>(null);
+  const feedbackTimeoutRef = React.useRef<number | null>(null);
+
+  const triggerInteractionFeedback = React.useCallback((source: InteractionFeedbackSource) => {
+    const nextEvent = {
+      id: Date.now(),
+      source,
+    };
+
+    setInteractionFeedback(nextEvent);
+
+    if (feedbackTimeoutRef.current !== null) {
+      window.clearTimeout(feedbackTimeoutRef.current);
+    }
+
+    feedbackTimeoutRef.current = window.setTimeout(() => {
+      setInteractionFeedback((currentEvent) =>
+        currentEvent?.id === nextEvent.id ? null : currentEvent
+      );
+      feedbackTimeoutRef.current = null;
+    }, 1400);
+  }, []);
+
+  React.useEffect(() => {
+    return () => {
+      if (feedbackTimeoutRef.current !== null) {
+        window.clearTimeout(feedbackTimeoutRef.current);
+      }
+    };
+  }, []);
 
   React.useEffect(() => {
     logInvoiceFlow('ui-received-invoice-data', {
@@ -128,6 +165,7 @@ const Index = () => {
     action: NextAction,
     status: Extract<NextActionStatus, 'in_progress' | 'completed'>
   ) => {
+    triggerInteractionFeedback(status === 'completed' ? 'action_completed' : 'action_started');
     updateActionStatus(action, status);
 
     toast({
@@ -137,6 +175,14 @@ const Index = () => {
           ? `Você marcou "${action.title}" como testada na jornada.`
           : `Você começou "${action.title}" e registrou progresso real na jornada.`,
     });
+  };
+
+  const handleContextQuestionAnswer = (
+    questionId: Parameters<typeof answerMascotContextQuestion>[0],
+    value: Parameters<typeof answerMascotContextQuestion>[1]
+  ) => {
+    triggerInteractionFeedback('observation_saved');
+    answerMascotContextQuestion(questionId, value);
   };
 
   const handleInvoiceRemoved = (fingerprint: string) => {
@@ -235,6 +281,10 @@ const Index = () => {
                     nextLevelScore={scoreState.nextLevelScore}
                     progress={scoreState.progressToNextLevel}
                   />
+                  <EnergyProgressVisual
+                    invoiceCount={invoiceHistory.length}
+                    interactionEvent={interactionFeedback}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -248,7 +298,7 @@ const Index = () => {
               profile={profile}
               customization={mascotCustomization}
               contextQuestion={mascotContextQuestion}
-              onContextQuestionAnswer={answerMascotContextQuestion}
+              onContextQuestionAnswer={handleContextQuestionAnswer}
               onContextQuestionIgnore={ignoreMascotContextQuestion}
             />
           </div>
