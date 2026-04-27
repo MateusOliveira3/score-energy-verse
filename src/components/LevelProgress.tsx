@@ -22,33 +22,32 @@ const LevelProgress = ({
 
   if (variant === 'compact') {
     return (
-      <Card className="border border-white/10 bg-slate-950/35 text-white shadow-lg">
-        <CardContent className="p-4">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-emerald-50">
-                <Crown className="h-4 w-4 text-amber-300" />
-                <span className="text-sm font-semibold">Nivel {level}</span>
-              </div>
-              <span className="text-xs font-medium text-emerald-50/70">
-                {pointsToNextLevel} para o proximo marco
-              </span>
-            </div>
-
-            <Progress value={progress} className="h-2.5 bg-white/10" />
-
-            <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-emerald-50/75">
-                {score} / {nextLevelScore}
-              </span>
-              <div className="flex items-center gap-1 text-amber-200">
-                <Star className="h-3.5 w-3.5 fill-current" />
-                <span>{progress}%</span>
-              </div>
-            </div>
+      <div className="border-t border-white/12 px-5 pb-5 pt-4 text-white">
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="font-medium text-emerald-50/90">
+              {score} / {nextLevelScore}
+            </span>
+            <span className="text-emerald-50/70">{pointsToNextLevel} para o proximo nivel</span>
           </div>
-        </CardContent>
-      </Card>
+
+          <Progress
+            value={progress}
+            className="[&>div]:bg-[#bde97b] h-2 bg-emerald-950/35"
+          />
+
+          <div className="flex items-center justify-between gap-3 text-xs text-emerald-50/75">
+            <span className="inline-flex items-center gap-1">
+              <Crown className="h-3.5 w-3.5 text-amber-200" />
+              Nivel {level}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Star className="h-3.5 w-3.5 fill-current text-amber-200" />
+              {progress}%
+            </span>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -76,7 +75,7 @@ const LevelProgress = ({
               <Star className="h-4 w-4 fill-current" />
               <span className="text-sm font-medium">Proximo marco de progresso</span>
             </div>
-            <div className="text-sm text-blue-600 font-medium">+{progress}% completo</div>
+            <div className="text-sm font-medium text-blue-600">+{progress}% completo</div>
           </div>
         </div>
       </CardContent>

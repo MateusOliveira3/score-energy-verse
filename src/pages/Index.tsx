@@ -14,8 +14,7 @@ import DynamicContextPanel, {
   DynamicContextPanelView,
 } from '../components/DynamicContextPanel';
 import LiveMascotJourney, {
-  JourneyShortcut,
-  JourneyShortcutId,
+  JourneyQuickAccessId,
   JourneyTarget,
 } from '../components/LiveMascotJourney';
 import { Button } from '@/components/ui/button';
@@ -39,34 +38,6 @@ interface ContextPanelState {
   tip?: string;
   view: DynamicContextPanelView;
 }
-
-const hubShortcuts: JourneyShortcut[] = [
-  {
-    id: 'score',
-    label: 'Score',
-    hint: 'Ver pontuacao, nivel e proximo marco.',
-  },
-  {
-    id: 'history',
-    label: 'Historico',
-    hint: 'Trocar a leitura para a linha do tempo.',
-  },
-  {
-    id: 'actions',
-    label: 'Acoes',
-    hint: 'Abrir as recomendacoes prioritarias.',
-  },
-  {
-    id: 'summary',
-    label: 'Leitura',
-    hint: 'Retomar o que a ultima fatura mostrou.',
-  },
-  {
-    id: 'profile',
-    label: 'Perfil',
-    hint: 'Revisar o contexto que sustenta o score.',
-  },
-];
 
 const detailSectionMeta: Record<
   DashboardSectionKey,
@@ -97,6 +68,29 @@ const detailSectionMeta: Record<
   },
 };
 
+const panelViewByShortcut: Record<JourneyQuickAccessId, DynamicContextPanelView> = {
+  score: 'score',
+  history: 'history',
+  actions: 'actions',
+  summary: 'summary',
+  profile: 'profile',
+};
+
+const panelViewByTarget: Partial<Record<JourneyTarget, DynamicContextPanelView>> = {
+  profile: 'profile',
+  summary: 'summary',
+  actions: 'actions',
+  history: 'history',
+};
+
+const detailButtons: Array<{ id: DashboardSectionKey; label: string }> = [
+  { id: 'score', label: 'Score' },
+  { id: 'profile', label: 'Perfil' },
+  { id: 'summary', label: 'Leitura' },
+  { id: 'actions', label: 'Acoes' },
+  { id: 'history', label: 'Historico' },
+];
+
 const Index = () => {
   const { toast } = useToast();
   const {
@@ -123,11 +117,19 @@ const Index = () => {
     answerMascotContextQuestion,
     ignoreMascotContextQuestion,
   } = useMvpJourney();
+  const initialPanelView: DynamicContextPanelView = !isProfileComplete
+    ? 'profile'
+    : nextActions.length > 0
+      ? 'actions'
+      : latestAnalysis
+        ? 'summary'
+        : 'score';
   const [selectedInvoice, setSelectedInvoice] = React.useState<InvoiceData | undefined>(latestInvoice);
-  const [activeSection, setActiveSection] = React.useState<DashboardSectionKey | null>(null);
+  const [activeSection, setActiveSection] = React.useState<DashboardSectionKey>('score');
+  const [showLegacyDetails, setShowLegacyDetails] = React.useState(false);
   const [interactionFeedback, setInteractionFeedback] = React.useState<InteractionFeedbackEvent | null>(null);
   const [contextPanel, setContextPanel] = React.useState<ContextPanelState>({
-    view: 'mascot',
+    view: initialPanelView,
   });
   const feedbackTimeoutRef = React.useRef<number | null>(null);
 
@@ -211,76 +213,33 @@ const Index = () => {
     []
   );
 
-  const openDetailedSection = React.useCallback(
-    (section: DashboardSectionKey, view?: DynamicContextPanelView) => {
-      setActiveSection(section);
-
-      if (view) {
-        focusContextPanel(view);
-      }
-
-      window.setTimeout(() => {
-        document.getElementById('section-detail-hub')?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-        });
-      }, 120);
-    },
-    [focusContextPanel]
-  );
-
-  const handleHubShortcutSelect = React.useCallback(
-    (shortcutId: JourneyShortcutId) => {
-      const nextView: Record<JourneyShortcutId, DynamicContextPanelView> = {
-        score: 'score',
-        history: 'history',
-        actions: 'actions',
-        summary: 'summary',
-        profile: 'profile',
-      };
-
-      focusContextPanel(nextView[shortcutId]);
+  const handleQuickAccessSelect = React.useCallback(
+    (shortcutId: JourneyQuickAccessId) => {
+      focusContextPanel(panelViewByShortcut[shortcutId]);
     },
     [focusContextPanel]
   );
 
   const focusJourneyTarget = React.useCallback(
     (target: JourneyTarget) => {
-      const sectionTargets: Record<
-        JourneyTarget,
-        { id: string; section?: DashboardSectionKey; view?: DynamicContextPanelView }
-      > = {
-        profile: { id: 'section-detail-hub', section: 'profile', view: 'profile' },
-        upload: { id: 'section-mvp' },
-        summary: { id: 'section-detail-hub', section: 'summary', view: 'summary' },
-        actions: { id: 'section-detail-hub', section: 'actions', view: 'actions' },
-        history: { id: 'section-detail-hub', section: 'history', view: 'history' },
-      };
-      const nextTarget = sectionTargets[target];
-
-      if (nextTarget.section) {
-        setActiveSection(nextTarget.section);
-      }
-
-      if (nextTarget.view) {
-        focusContextPanel(nextTarget.view);
-      }
-
-      window.setTimeout(() => {
-        document.getElementById(nextTarget.id)?.scrollIntoView({
+      if (target === 'upload') {
+        document.getElementById('section-mvp')?.scrollIntoView({
           behavior: 'smooth',
           block: 'start',
         });
-      }, nextTarget.section ? 140 : 0);
+        return;
+      }
+
+      const nextView = panelViewByTarget[target];
+
+      if (nextView) {
+        focusContextPanel(nextView);
+      }
     },
     [focusContextPanel]
   );
 
-  const activeShortcutId = React.useMemo<JourneyShortcutId | null>(() => {
-    if (contextPanel.view === 'score') {
-      return 'score';
-    }
-
+  const activeQuickAccessId = React.useMemo<JourneyQuickAccessId>(() => {
     if (contextPanel.view === 'history') {
       return 'history';
     }
@@ -297,7 +256,7 @@ const Index = () => {
       return 'profile';
     }
 
-    return null;
+    return 'score';
   }, [contextPanel.view]);
 
   const handleInvoiceProcessed = async (file: File) => {
@@ -337,13 +296,12 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-cyan-50">
-      <main className="container mx-auto space-y-8 px-4 py-8">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#124640_0%,#0c332f_28%,#082c28_58%,#072521_100%)]">
+      <main className="mx-auto flex w-[93vw] max-w-[1460px] flex-col gap-7 px-0 py-8">
         <LiveMascotJourney
           guidance={mascotGuidance}
           nextActions={nextActions}
           invoiceCount={invoiceHistory.length}
-          profileCompletion={profileCompletion}
           isProfileComplete={isProfileComplete}
           latestAnalysis={latestAnalysis}
           customization={mascotCustomization}
@@ -351,11 +309,10 @@ const Index = () => {
           onNavigate={focusJourneyTarget}
           onMascotInteract={() => focusContextPanel('mascot')}
           onCo2Interact={(payload) => focusContextPanel('co2', payload)}
-          shortcuts={hubShortcuts}
-          activeShortcutId={activeShortcutId}
-          onShortcutSelect={handleHubShortcutSelect}
+          activeQuickAccessId={activeQuickAccessId}
+          onQuickAccessChange={handleQuickAccessSelect}
           scorePanel={
-            <div className="space-y-3">
+            <div className="min-h-[430px] overflow-hidden rounded-[28px] border border-[#2a5c56] bg-[#3f7959] text-white shadow-[0_18px_40px_rgba(0,0,0,0.18)]">
               <ScoreCard
                 score={scoreState.score}
                 level={scoreState.level}
@@ -392,11 +349,11 @@ const Index = () => {
               profile={profile}
               scoreState={scoreState}
               scoreExplanation={scoreExplanation}
-              onOpenActions={() => openDetailedSection('actions', 'actions')}
-              onOpenHistory={() => openDetailedSection('history', 'history')}
-              onOpenSummary={() => openDetailedSection('summary', 'summary')}
-              onOpenProfileDetails={() => openDetailedSection('profile', 'profile')}
-              onOpenScoreDetails={() => openDetailedSection('score', 'score')}
+              onOpenActions={() => focusContextPanel('actions')}
+              onOpenHistory={() => focusContextPanel('history')}
+              onOpenSummary={() => focusContextPanel('summary')}
+              onOpenProfileDetails={() => focusContextPanel('profile')}
+              onOpenScoreDetails={() => focusContextPanel('score')}
               onSelectInvoice={(invoice) => {
                 setSelectedInvoice(invoice);
                 focusContextPanel('history');
@@ -408,120 +365,168 @@ const Index = () => {
           }
         />
 
-        <div id="section-mvp">
+        <section
+          id="section-mvp"
+          className="rounded-[24px] border border-[#264c46] bg-[#0d332f]/90 p-5 text-white shadow-[0_14px_34px_rgba(0,0,0,0.16)]"
+        >
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9dbfa6]">
+                Fluxo complementar
+              </p>
+              <h2 className="text-xl font-semibold text-[#f5f8f3]">Enviar fatura</h2>
+            </div>
+            <div className="text-sm text-[#c5d8c8]">
+              O hub continua sendo o destino principal; o upload fica abaixo como etapa operacional.
+            </div>
+          </div>
+
           <InvoiceUpload
             profile={profile}
             onUploadStarted={startInvoiceProcessing}
             onInvoiceProcessed={handleInvoiceProcessed}
           />
-        </div>
+        </section>
 
-        {activeSection && (
-          <section id="section-detail-hub">
-            <Card className="overflow-hidden border border-slate-200 bg-white/85 shadow-lg">
-              <CardHeader className="border-b border-slate-200/80 bg-white/80 backdrop-blur">
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <section className="rounded-[24px] border border-[#264c46] bg-[#0a2c28]/85 p-5 text-white">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9dbfa6]">
+                Ferramentas complementares
+              </p>
+              <h2 className="text-xl font-semibold text-[#f5f8f3]">Detalhes completos abaixo do hub</h2>
+              <p className="mt-1 text-sm text-[#c5d8c8]">
+                Estes paineis continuam disponiveis, mas foram rebaixados para nao competir com a macroestrutura principal.
+              </p>
+            </div>
+
+            <Button
+              variant="outline"
+              onClick={() => setShowLegacyDetails((currentValue) => !currentValue)}
+              className="rounded-[14px] border-[#365f58] bg-[#103a35] text-[#f5f8f3] hover:bg-[#18453f]"
+            >
+              {showLegacyDetails ? 'Ocultar detalhes' : 'Mostrar detalhes'}
+            </Button>
+          </div>
+
+          {showLegacyDetails && (
+            <div className="mt-5 space-y-5">
+              <div className="flex flex-wrap gap-2">
+                {detailButtons.map((button) => (
+                  <Button
+                    key={button.id}
+                    variant={activeSection === button.id ? 'default' : 'outline'}
+                    onClick={() => setActiveSection(button.id)}
+                    className={
+                      activeSection === button.id
+                        ? 'rounded-[12px] bg-[#5f925c] hover:bg-[#517d4f]'
+                        : 'rounded-[12px] border-[#365f58] bg-[#103a35] text-[#f5f8f3] hover:bg-[#18453f]'
+                    }
+                  >
+                    {button.label}
+                  </Button>
+                ))}
+              </div>
+
+              <Card className="overflow-hidden border border-[#365f58] bg-[#0d332f] text-white shadow-none">
+                <CardHeader className="border-b border-[#264c46] bg-[#103a35]">
                   <div className="space-y-1">
-                    <CardTitle className="text-slate-900">
+                    <CardTitle className="text-[#f5f8f3]">
                       {detailSectionMeta[activeSection].title}
                     </CardTitle>
-                    <p className="text-sm text-slate-600">
+                    <p className="text-sm text-[#c5d8c8]">
                       {detailSectionMeta[activeSection].description}
                     </p>
                   </div>
+                </CardHeader>
 
-                  <Button variant="ghost" onClick={() => setActiveSection(null)}>
-                    Fechar painel detalhado
-                  </Button>
-                </div>
-              </CardHeader>
-
-              <CardContent className="p-4 sm:p-6">
-                {activeSection === 'score' && (
-                  <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(280px,0.75fr)_minmax(0,1fr)]">
-                    <div className="space-y-4">
-                      <LevelProgress
-                        score={scoreState.score}
-                        level={scoreState.level}
-                        nextLevelScore={scoreState.nextLevelScore}
-                        progress={scoreState.progressToNextLevel}
-                      />
-                      <EnergyProgressVisual
-                        invoiceCount={invoiceHistory.length}
-                        interactionEvent={interactionFeedback}
-                      />
-                    </div>
-
-                    <ScoreExplanationCard explanation={scoreExplanation} />
-                  </div>
-                )}
-
-                {activeSection === 'profile' && (
-                  <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(260px,0.6fr)]">
-                    <div className="space-y-5">
-                      <div className="flex flex-wrap gap-3">
-                        <UserProfile
-                          value={profile}
-                          completionPercent={profileCompletion}
-                          isComplete={isProfileComplete}
-                          onProfileUpdate={updateProfile}
+                <CardContent className="p-4 sm:p-6">
+                  {activeSection === 'score' && (
+                    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(280px,0.75fr)_minmax(0,1fr)]">
+                      <div className="space-y-4">
+                        <LevelProgress
+                          score={scoreState.score}
+                          level={scoreState.level}
+                          nextLevelScore={scoreState.nextLevelScore}
+                          progress={scoreState.progressToNextLevel}
                         />
-                        <MascotCustomization
-                          value={mascotCustomization}
-                          onCustomizationUpdate={updateMascotCustomization}
-                          currentScore={scoreState.score}
+                        <EnergyProgressVisual
+                          invoiceCount={invoiceHistory.length}
+                          interactionEvent={interactionFeedback}
                         />
                       </div>
+
+                      <ScoreExplanationCard explanation={scoreExplanation} />
                     </div>
+                  )}
 
-                    <ProfileMascotAmbient />
-                  </div>
-                )}
+                  {activeSection === 'profile' && (
+                    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(260px,0.6fr)]">
+                      <div className="space-y-5">
+                        <div className="flex flex-wrap gap-3">
+                          <UserProfile
+                            value={profile}
+                            completionPercent={profileCompletion}
+                            isComplete={isProfileComplete}
+                            onProfileUpdate={updateProfile}
+                          />
+                          <MascotCustomization
+                            value={mascotCustomization}
+                            onCustomizationUpdate={updateMascotCustomization}
+                            currentScore={scoreState.score}
+                          />
+                        </div>
+                      </div>
 
-                {activeSection === 'summary' && (
-                  <AnalysisSummary
-                    invoice={selectedInvoice}
-                    selectedInvoice={selectedInvoice}
-                    analysis={selectedAnalysis}
-                    profile={profile}
-                    invoiceHistory={invoiceHistory}
-                    onSelectInvoice={setSelectedInvoice}
-                    isExpanded
-                    showHeader={false}
-                  />
-                )}
+                      <ProfileMascotAmbient />
+                    </div>
+                  )}
 
-                {activeSection === 'actions' && (
-                  <SmartRecommendations
-                    actions={nextActions}
-                    viewedActionIds={viewedActionIds}
-                    analysis={selectedAnalysis}
-                    invoiceHistory={invoiceHistory}
-                    selectedInvoice={selectedInvoice}
-                    profile={profile}
-                    userContext={userContext}
-                    onSelectInvoice={setSelectedInvoice}
-                    onActionStatusChange={handleActionStatusChange}
-                    isExpanded
-                    showHeader={false}
-                  />
-                )}
+                  {activeSection === 'summary' && (
+                    <AnalysisSummary
+                      invoice={selectedInvoice}
+                      selectedInvoice={selectedInvoice}
+                      analysis={selectedAnalysis}
+                      profile={profile}
+                      invoiceHistory={invoiceHistory}
+                      onSelectInvoice={setSelectedInvoice}
+                      isExpanded
+                      showHeader={false}
+                    />
+                  )}
 
-                {activeSection === 'history' && (
-                  <InvoiceHistory
-                    invoices={invoiceHistory}
-                    selectedInvoice={selectedInvoice}
-                    onSelectInvoice={setSelectedInvoice}
-                    onDeleteInvoice={handleInvoiceRemoved}
-                    userContext={userContext}
-                    isExpanded
-                    showHeader={false}
-                  />
-                )}
-              </CardContent>
-            </Card>
-          </section>
-        )}
+                  {activeSection === 'actions' && (
+                    <SmartRecommendations
+                      actions={nextActions}
+                      viewedActionIds={viewedActionIds}
+                      analysis={selectedAnalysis}
+                      invoiceHistory={invoiceHistory}
+                      selectedInvoice={selectedInvoice}
+                      profile={profile}
+                      userContext={userContext}
+                      onSelectInvoice={setSelectedInvoice}
+                      onActionStatusChange={handleActionStatusChange}
+                      isExpanded
+                      showHeader={false}
+                    />
+                  )}
+
+                  {activeSection === 'history' && (
+                    <InvoiceHistory
+                      invoices={invoiceHistory}
+                      selectedInvoice={selectedInvoice}
+                      onSelectInvoice={setSelectedInvoice}
+                      onDeleteInvoice={handleInvoiceRemoved}
+                      userContext={userContext}
+                      isExpanded
+                      showHeader={false}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </section>
       </main>
     </div>
   );

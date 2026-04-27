@@ -2,15 +2,12 @@ import React from 'react';
 import {
   BarChart3,
   ClipboardList,
-  History,
   Lightbulb,
-  LucideIcon,
   Sparkles,
   Target,
   UserRound,
   Zap,
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -24,19 +21,12 @@ import {
 import EcoMascot from './EcoMascot';
 
 export type JourneyTarget = 'profile' | 'upload' | 'summary' | 'actions' | 'history';
-export type JourneyShortcutId = 'score' | 'history' | 'actions' | 'summary' | 'profile';
-
-export interface JourneyShortcut {
-  id: JourneyShortcutId;
-  hint: string;
-  label: string;
-}
+export type JourneyQuickAccessId = 'score' | 'history' | 'actions' | 'summary' | 'profile';
 
 interface LiveMascotJourneyProps {
   guidance: MascotGuidance;
   nextActions: NextAction[];
   invoiceCount: number;
-  profileCompletion: number;
   isProfileComplete: boolean;
   latestAnalysis?: AnalysisSummary;
   customization?: MascotCustomizationData;
@@ -44,9 +34,8 @@ interface LiveMascotJourneyProps {
   onNavigate: (target: JourneyTarget) => void;
   onMascotInteract?: () => void;
   onCo2Interact?: (payload: { tip: string; objective: string }) => void;
-  shortcuts?: JourneyShortcut[];
-  activeShortcutId?: JourneyShortcutId | null;
-  onShortcutSelect?: (shortcutId: JourneyShortcutId) => void;
+  activeQuickAccessId?: JourneyQuickAccessId;
+  onQuickAccessChange?: (shortcutId: JourneyQuickAccessId) => void;
   scorePanel?: React.ReactNode;
   contextPanel?: React.ReactNode;
 }
@@ -56,6 +45,7 @@ const trailSteps = [
   { id: 'upload', label: 'Fatura' },
   { id: 'summary', label: 'Leitura' },
   { id: 'actions', label: 'Acao' },
+  { id: 'next', label: 'Proximo' },
 ] as const;
 
 const stageLabels = {
@@ -66,71 +56,57 @@ const stageLabels = {
   'return-visit': 'Retomada',
 } as const;
 
-const shortcutIcons: Record<JourneyShortcutId, LucideIcon> = {
-  score: Zap,
-  history: History,
-  actions: Lightbulb,
-  summary: BarChart3,
-  profile: UserRound,
-};
+const heightGuides = [
+  { id: 'high', label: 'ALTO', classes: 'top-[18%]' },
+  { id: 'mid', label: 'MEDIO', classes: 'top-[48%]' },
+  { id: 'low', label: 'BAIXO', classes: 'top-[77%]' },
+] as const;
 
-const visualCo2Tips = [
-  'Comparar ciclos parecidos evita conclusoes apressadas sobre eficiencia.',
-  'Uma mudanca por vez deixa o consumo mais facil de interpretar.',
-  'Equipamentos em espera somam gasto silencioso ao longo da semana.',
-  'Luz natural e ventilacao aliviam consumo sem exigir mudanca brusca.',
-  'Horario de uso costuma revelar desperdicios que o olho nao pega.',
-];
+const cloudBlocks = [
+  { id: 'cloud-1', classes: 'left-[5%] top-[29%]' },
+  { id: 'cloud-2', classes: 'left-[16%] top-[25%]' },
+  { id: 'cloud-3', classes: 'right-[16%] top-[18%]' },
+  { id: 'cloud-4', classes: 'right-[6%] top-[33%]' },
+  { id: 'cloud-5', classes: 'right-[24%] top-[27%]' },
+] as const;
 
 const co2Bubbles = [
   {
-    id: 'bubble-1',
-    label: 'CO2',
-    requiredLevel: 1,
-    zone: 'baixo',
-    classes: 'left-[12%] bottom-24 sm:left-[16%]',
-  },
-  {
-    id: 'bubble-2',
-    label: 'CO2',
-    requiredLevel: 1,
-    zone: 'baixo',
-    classes: 'right-[10%] bottom-28 sm:right-[18%]',
-  },
-  {
-    id: 'bubble-3',
-    label: 'CO2',
-    requiredLevel: 2,
-    zone: 'medio',
-    classes: 'left-[22%] bottom-[43%] sm:left-[28%]',
-  },
-  {
-    id: 'bubble-4',
-    label: 'CO2',
-    requiredLevel: 2,
-    zone: 'medio',
-    classes: 'right-[18%] bottom-[51%] sm:right-[24%]',
-  },
-  {
-    id: 'bubble-5',
-    label: 'CO2',
-    requiredLevel: 3,
-    zone: 'alto',
-    classes: 'left-[38%] bottom-[68%] sm:left-[42%]',
-  },
-  {
-    id: 'bubble-6',
-    label: 'CO2',
+    id: 'bubble-high',
     requiredLevel: 4,
-    zone: 'alto',
-    classes: 'right-[28%] bottom-[78%] sm:right-[34%]',
+    classes: 'right-[3.5%] top-[16%]',
+  },
+  {
+    id: 'bubble-mid',
+    requiredLevel: 2,
+    classes: 'right-[3.5%] top-[47%]',
+  },
+  {
+    id: 'bubble-low',
+    requiredLevel: 1,
+    classes: 'right-[3.5%] top-[79%]',
   },
 ] as const;
 
-const heightGuides = [
-  { id: 'high', classes: 'bottom-[76%]' },
-  { id: 'mid', classes: 'bottom-[50%]' },
-  { id: 'low', classes: 'bottom-[26%]' },
+const quickAccessItems = [
+  { id: 'score', label: 'Score', icon: Zap },
+  { id: 'history', label: 'Historico', icon: BarChart3 },
+  { id: 'actions', label: 'Acoes', icon: Lightbulb },
+  { id: 'summary', label: 'Leitura', icon: ClipboardList },
+  { id: 'profile', label: 'Perfil', icon: UserRound },
+] as const satisfies ReadonlyArray<{
+  id: JourneyQuickAccessId;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}>;
+
+const visualCo2Tips = [
+  'Comparar meses parecidos ajuda a ler o consumo com calma.',
+  'Uma mudanca pequena por vez deixa o resultado mais claro.',
+  'Equipamentos em espera somam gasto silencioso no fim do ciclo.',
+  'Olhar o horario de uso revela padroes que passam despercebidos.',
+  'Pequenos habitos consistentes costumam aparecer na proxima leitura.',
+  'Uma acao observada vale mais quando volta na proxima fatura.',
 ] as const;
 
 const compactSentence = (value: string, maxLength = 108) => {
@@ -221,7 +197,6 @@ const LiveMascotJourney = ({
   guidance,
   nextActions,
   invoiceCount,
-  profileCompletion,
   isProfileComplete,
   latestAnalysis,
   customization,
@@ -229,13 +204,11 @@ const LiveMascotJourney = ({
   onNavigate,
   onMascotInteract,
   onCo2Interact,
-  shortcuts,
-  activeShortcutId,
-  onShortcutSelect,
+  activeQuickAccessId,
+  onQuickAccessChange,
   scorePanel,
   contextPanel,
 }: LiveMascotJourneyProps) => {
-  const initialTip = 'Toque em um CO2 ao alcance.';
   const [capturedBubbleIds, setCapturedBubbleIds] = React.useState<string[]>([]);
   const [tipIndex, setTipIndex] = React.useState(0);
   const [isPlantSwaying, setIsPlantSwaying] = React.useState(false);
@@ -256,15 +229,6 @@ const LiveMascotJourney = ({
     0
   );
   const journeyLevel = Math.max(currentStepIndex + 1, 1);
-  const unlockedBubbleCount = co2Bubbles.filter(
-    (bubble) => bubble.requiredLevel <= journeyLevel
-  ).length;
-  const capturedUnlockedCount = capturedBubbleIds.filter((bubbleId) =>
-    co2Bubbles.some(
-      (bubble) => bubble.id === bubbleId && bubble.requiredLevel <= journeyLevel
-    )
-  ).length;
-  const activeBubbleCount = unlockedBubbleCount - capturedUnlockedCount;
   const journeyState =
     trailTargetId === 'actions'
       ? 'action'
@@ -273,6 +237,8 @@ const LiveMascotJourney = ({
         : trailTargetId === 'upload'
           ? 'observe'
           : 'wake';
+  const reachLabel =
+    journeyLevel >= 4 ? 'ALCANCE MEDIO' : journeyLevel >= 2 ? 'ALCANCE MEDIO' : 'ALCANCE BAIXO';
 
   React.useEffect(() => {
     previousJourneyLevelRef.current = journeyLevel;
@@ -281,11 +247,12 @@ const LiveMascotJourney = ({
   React.useEffect(() => {
     const intervalId = window.setInterval(() => {
       setIsPlantSwaying((currentValue) => !currentValue);
-    }, 1600);
+    }, 1700);
 
     return () => {
       window.clearInterval(intervalId);
       timeoutIdsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+
       if (feedbackTimeoutRef.current !== null) {
         window.clearTimeout(feedbackTimeoutRef.current);
       }
@@ -307,7 +274,7 @@ const LiveMascotJourney = ({
     feedbackTimeoutRef.current = window.setTimeout(() => {
       setIsGrowthHighlighted(false);
       feedbackTimeoutRef.current = null;
-    }, 2600);
+    }, 2200);
 
     previousJourneyLevelRef.current = journeyLevel;
   }, [journeyLevel]);
@@ -331,9 +298,8 @@ const LiveMascotJourney = ({
       return;
     }
 
-    const nextTipIndex = tipIndex % visualCo2Tips.length;
     const nextPayload = {
-      tip: visualCo2Tips[nextTipIndex],
+      tip: visualCo2Tips[tipIndex % visualCo2Tips.length],
       objective: currentTarget.cta,
     };
 
@@ -349,68 +315,73 @@ const LiveMascotJourney = ({
   };
 
   return (
-    <Card className="overflow-hidden border border-emerald-100 bg-gradient-to-br from-slate-950 via-emerald-950 to-teal-950 text-white shadow-xl">
-      <CardContent className="relative overflow-hidden p-5 sm:p-6">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top,rgba(52,211,153,0.28),transparent_58%)]" />
-        <div className="pointer-events-none absolute -right-16 top-10 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl" />
-        <div className="pointer-events-none absolute -left-10 bottom-0 h-36 w-36 rounded-full bg-emerald-300/10 blur-3xl" />
+    <Card className="overflow-hidden border border-[#29554f] bg-transparent shadow-none">
+      <CardContent className="px-0 py-0">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.66fr)_minmax(0,0.82fr)]">
+          <div className="rounded-[28px] border border-[#29554f] bg-[#103a35] p-5 text-white shadow-[0_18px_40px_rgba(0,0,0,0.18)] sm:p-7">
+            <div className="space-y-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-3">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-[#365f58] bg-[#123f39] px-3 py-1.5 text-[12px] font-semibold uppercase tracking-[0.18em] text-[#b8d9bd]">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Jornada
+                  </div>
+                  <div className="space-y-2">
+                    <h1 className="text-3xl font-semibold leading-tight text-[#f5f8f3]">
+                      {currentTarget.title}
+                    </h1>
+                    <p className="max-w-2xl text-base text-[#c5d8c8]">{currentTarget.cue}</p>
+                  </div>
+                </div>
 
-        <div className="relative space-y-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-100">
-                <Sparkles className="h-3.5 w-3.5" />
-                Jornada unificada
+                <div className="flex flex-wrap gap-2">
+                  <div className="rounded-full border border-[#365f58] bg-[#194641] px-3 py-1.5 text-sm text-[#f0f7ef]">
+                    {profile.consumerType}
+                  </div>
+                  <div className="rounded-full border border-[#365f58] bg-[#194641] px-3 py-1.5 text-sm text-[#f0f7ef]">
+                    {invoiceCount} fatura{invoiceCount === 1 ? '' : 's'}
+                  </div>
+                </div>
               </div>
 
-              <h1 className="text-2xl font-semibold text-white sm:text-3xl">{currentTarget.title}</h1>
-              <p className="max-w-2xl text-sm leading-6 text-emerald-50/75">{currentTarget.cue}</p>
-            </div>
+              <div className="rounded-[22px] border border-[#29554f] bg-[#0f342f] p-3">
+                <div className="relative h-[366px] overflow-hidden rounded-[18px] border border-[#bdd6b5]/80 bg-[linear-gradient(180deg,#dff1d4_0%,#e9f5e3_58%,#f8fbf4_100%)]">
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-[#32573c]" />
+                  <div className="pointer-events-none absolute inset-x-[11%] bottom-[6px] h-3 rounded-t-[10px] bg-[#203b2a]/20" />
 
-            <div className="flex flex-wrap gap-2">
-              <Badge className="border-none bg-white/10 text-emerald-50 hover:bg-white/10">
-                {stageLabels[guidance.stage]}
-              </Badge>
-              <Badge className="border-none bg-emerald-400/20 text-emerald-50 hover:bg-emerald-400/20">
-                {profile.consumerType}
-              </Badge>
-              <Badge className="border-none bg-cyan-400/20 text-cyan-50 hover:bg-cyan-400/20">
-                {invoiceCount} fatura{invoiceCount === 1 ? '' : 's'}
-              </Badge>
-            </div>
-          </div>
-
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
-            <div className="space-y-4">
-              <div className="rounded-[30px] border border-white/10 bg-white/5 p-4 backdrop-blur">
-                <div className="relative min-h-[360px] overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/45 px-4 py-6 sm:px-6">
-                  <div className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.18),transparent_62%)]" />
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-emerald-950 via-emerald-950/95 to-transparent" />
-                  <div className="pointer-events-none absolute inset-x-6 bottom-0 h-20 rounded-t-[90px] bg-gradient-to-b from-emerald-800/35 to-emerald-950" />
-
-                  {heightGuides.map((guide) => (
-                    <div
-                      key={guide.id}
-                      className={cn(
-                        'pointer-events-none absolute left-6 right-6',
-                        guide.classes
-                      )}
-                    >
-                      <div className="h-px border-t border-dashed border-white/12" />
+                  {cloudBlocks.map((cloud) => (
+                    <div key={cloud.id} className={cn('pointer-events-none absolute opacity-80', cloud.classes)}>
+                      <div className="relative h-7 w-14">
+                        <div className="absolute bottom-0 left-2 h-4 w-9 rounded-[6px] bg-white/70" />
+                        <div className="absolute left-0 top-2 h-4 w-4 rounded-[4px] bg-white/65" />
+                        <div className="absolute left-4 top-0 h-4 w-4 rounded-[4px] bg-white/75" />
+                        <div className="absolute right-0 top-2 h-4 w-4 rounded-[4px] bg-white/65" />
+                      </div>
                     </div>
                   ))}
 
-                  <div className="absolute right-4 top-4 z-10 rounded-full border border-white/10 bg-slate-950/50 px-3 py-1 text-xs font-medium text-emerald-50/80 backdrop-blur">
-                    {activeBubbleCount}
+                  {heightGuides.map((guide) => (
+                    <div key={guide.id} className={cn('pointer-events-none absolute inset-x-24', guide.classes)}>
+                      <div className="relative">
+                        <div className="border-t border-dashed border-[#7da18d]" />
+                        <span className="absolute -left-[72px] -top-3 text-[11px] font-semibold tracking-[0.08em] text-[#1f3d2e]">
+                          {guide.label}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="absolute left-1/2 top-[34%] z-10 -translate-x-1/2">
+                    <div className="relative rounded-[12px] bg-[#5d9b4d] px-4 py-2 text-center text-sm font-semibold text-white shadow-sm">
+                      {reachLabel}
+                      <span className="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1 rotate-45 bg-[#5d9b4d]" />
+                    </div>
                   </div>
 
                   <div
-                    className={cn(
-                      'absolute bottom-14 left-1/2 z-10 -translate-x-1/2 transition-transform duration-700',
-                      isGrowthHighlighted && 'scale-[1.03]'
-                    )}
+                    className="absolute bottom-[18px] left-1/2 z-10 -translate-x-1/2 transition-transform duration-700"
                     style={{
-                      transform: `translateX(-50%) rotate(${isPlantSwaying ? '-1.5deg' : '1.5deg'})`,
+                      transform: `translateX(-50%) rotate(${isPlantSwaying ? '-1deg' : '1deg'}) scale(${isGrowthHighlighted ? 1.03 : 1})`,
                     }}
                   >
                     <button
@@ -423,28 +394,20 @@ const LiveMascotJourney = ({
 
                         onNavigate(currentTarget.target);
                       }}
-                      className="group flex flex-col items-center gap-3 text-center"
+                      className="rounded-[8px] p-1"
                     >
-                      <div
-                        className={cn(
-                          'relative rounded-[34px] border border-white/15 bg-white/10 px-4 py-4 shadow-2xl shadow-emerald-500/15 backdrop-blur-sm transition-transform duration-300 group-hover:scale-[1.03]',
-                          isGrowthHighlighted && 'border-emerald-200/35 shadow-emerald-300/25'
-                        )}
-                      >
-                        <div className="pointer-events-none absolute inset-0 rounded-[34px] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.28),transparent_60%)]" />
-                        <EcoMascot
-                          score={Math.max(journeyLevel * 200, 200)}
-                          level={journeyLevel}
-                          consumerType={profile.consumerType}
-                          customization={customization}
-                          variant="compact"
-                          journeyState={journeyState}
-                        />
-                      </div>
+                      <EcoMascot
+                        score={Math.max(journeyLevel * 200, 200)}
+                        level={journeyLevel}
+                        consumerType={profile.consumerType}
+                        customization={customization}
+                        variant="scene"
+                        journeyState={journeyState}
+                      />
                     </button>
                   </div>
 
-                  {co2Bubbles.map((bubble, index) => {
+                  {co2Bubbles.map((bubble) => {
                     const isCaptured = capturedBubbleIds.includes(bubble.id);
                     const isUnlocked = bubble.requiredLevel <= journeyLevel;
 
@@ -453,68 +416,84 @@ const LiveMascotJourney = ({
                         key={bubble.id}
                         type="button"
                         onClick={() => handleCaptureBubble(bubble.id)}
-                        aria-label={`Ler CO2 ${bubble.zone} ${index + 1}`}
+                        aria-label={`Ler ${bubble.id}`}
                         className={cn(
-                          'absolute z-10 rounded-full border px-3 py-1 text-xs font-semibold tracking-[0.12em] shadow-lg backdrop-blur transition-all duration-300',
+                          'absolute z-10 transition-all duration-300',
                           bubble.classes,
-                          isUnlocked
-                            ? 'border-emerald-200/40 bg-white/15 text-emerald-50 hover:-translate-y-1 hover:bg-emerald-300/20'
-                            : 'border-white/10 bg-white/5 text-white/35',
-                          isCaptured && 'pointer-events-none scale-75 opacity-0',
-                          isUnlocked && bubble.requiredLevel === journeyLevel && 'animate-pulse'
+                          isCaptured && 'pointer-events-none scale-75 opacity-0'
                         )}
                       >
-                        <span>{bubble.label}</span>
+                        <div
+                          className={cn(
+                            'relative rounded-full border px-4 py-2 text-sm font-semibold shadow-sm',
+                            isUnlocked
+                              ? 'border-[#d5e4cb] bg-white text-[#274036]'
+                              : 'border-[#dce5d6] bg-[#f4f5ef] text-slate-300'
+                          )}
+                        >
+                          CO2
+                        </div>
                       </button>
                     );
                   })}
                 </div>
+              </div>
 
-                <div className="mt-4 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
-                  <div className="grid gap-3 sm:grid-cols-4">
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+                <div className="rounded-[22px] border border-[#29554f] bg-[#123f39] px-4 py-5">
+                  <div className="flex items-start justify-between gap-3">
                     {trailSteps.map((step, index) => {
                       const isReached = index <= currentStepIndex;
                       const isCurrent = step.id === trailTargetId;
+                      const isLocked = step.id === 'next';
 
                       return (
-                        <div
-                          key={step.id}
-                          className={cn(
-                            'rounded-[22px] border px-3 py-3 transition-all duration-300',
-                            isReached
-                              ? 'border-emerald-200/30 bg-emerald-300/12'
-                              : 'border-white/10 bg-white/5',
-                            isCurrent && 'shadow-lg shadow-emerald-900/20'
-                          )}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm font-semibold text-white">{step.label}</span>
-                            <span
+                        <React.Fragment key={step.id}>
+                          <div className="flex flex-col items-center gap-3 text-center">
+                            <div
                               className={cn(
-                                'flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold',
+                                'flex h-12 w-12 items-center justify-center rounded-full border text-base font-semibold',
                                 isReached
-                                  ? 'bg-emerald-300 text-slate-950'
-                                  : 'bg-white/10 text-white/65'
+                                  ? 'border-[#8fd08e] bg-[#174f48] text-[#aaf08c]'
+                                  : 'border-[#3a625b] bg-[#0f342f] text-[#7da18d]',
+                                isCurrent && 'ring-2 ring-[#83c78a]/35',
+                                isLocked && !isReached && 'text-[#9bb7a0]'
                               )}
                             >
-                              {index + 1}
+                              {isLocked ? <span className="text-lg">□</span> : index + 1}
+                            </div>
+                            <span
+                              className={cn(
+                                'text-sm',
+                                isReached ? 'text-[#f0f6ef]' : 'text-[#a8beb0]',
+                                isCurrent && 'font-semibold text-[#9be88d]'
+                              )}
+                            >
+                              {step.label}
                             </span>
                           </div>
-                        </div>
+                          {index < trailSteps.length - 1 && (
+                            <div className="mt-6 h-px flex-1 bg-[#365f58]" />
+                          )}
+                        </React.Fragment>
                       );
                     })}
                   </div>
+                </div>
 
-                  <div className="rounded-[24px] border border-emerald-200/20 bg-slate-950/55 p-4 shadow-lg">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-100/80">
+                <div className="rounded-[22px] border border-[#29554f] bg-[#123f39] p-4">
+                  <div className="space-y-3">
+                    <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#9dbfa6]">
                       Proxima chamada
                     </p>
-                    <p className="mt-1 text-sm font-semibold text-white">{currentTarget.objective}</p>
+                    <p className="text-2xl font-semibold leading-tight text-[#f5f8f3]">
+                      {currentTarget.title}
+                    </p>
+                    <p className="text-sm leading-5 text-[#c5d8c8]">{currentTarget.objective}</p>
                     <Button
                       type="button"
                       onClick={() => onNavigate(currentTarget.target)}
-                      variant="ghost"
-                      className="mt-4 w-full justify-between rounded-[18px] border border-white/10 bg-white/5 text-emerald-50 hover:bg-white/10"
+                      className="w-full justify-between rounded-[14px] border border-[#365f58] bg-[#113731] text-[#f5f8f3] hover:bg-[#18453f]"
                     >
                       {currentTarget.cta}
                       <Target className="h-4 w-4" />
@@ -522,76 +501,45 @@ const LiveMascotJourney = ({
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="space-y-4">
-              {scorePanel}
+              <div className="rounded-[22px] border border-[#29554f] bg-[#123f39] p-4">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                  {quickAccessItems.map((item) => {
+                    const ItemIcon = item.icon;
+                    const isActive = activeQuickAccessId === item.id;
 
-              {shortcuts && shortcuts.length > 0 && (
-                <div className="rounded-[28px] border border-white/10 bg-white/6 p-4 backdrop-blur">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-100/70">
-                        Acessos do hub
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-white">Troque o foco sem sair da jornada</p>
-                    </div>
-                    <div className="rounded-full border border-white/10 bg-slate-950/45 px-3 py-1 text-xs font-medium text-emerald-50/75">
-                      1 painel
-                    </div>
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    {shortcuts.map((shortcut) => {
-                      const ShortcutIcon = shortcutIcons[shortcut.id];
-                      const isActive = activeShortcutId === shortcut.id;
-
-                      return (
-                        <button
-                          key={shortcut.id}
-                          type="button"
-                          onClick={() => onShortcutSelect?.(shortcut.id)}
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => onQuickAccessChange?.(item.id)}
+                        className={cn(
+                          'flex items-center gap-3 rounded-[16px] border px-4 py-4 text-left transition-colors',
+                          isActive
+                            ? 'border-[#7eb77b] bg-[#1a4e47] text-[#f5f8f3]'
+                            : 'border-[#2e5b54] bg-[#143d37] text-[#d0dfd2] hover:bg-[#18453f]'
+                        )}
+                      >
+                        <div
                           className={cn(
-                            'rounded-[22px] border p-3 text-left transition-all duration-200',
-                            isActive
-                              ? 'border-emerald-200/40 bg-emerald-300/18 shadow-lg shadow-emerald-950/20'
-                              : 'border-white/10 bg-white/5 hover:border-emerald-200/20 hover:bg-white/10'
+                            'flex h-10 w-10 items-center justify-center rounded-[12px]',
+                            isActive ? 'bg-[#245a4b]' : 'bg-[#103530]'
                           )}
                         >
-                          <div className="flex items-center gap-2 text-white">
-                            <div
-                              className={cn(
-                                'flex h-8 w-8 items-center justify-center rounded-2xl',
-                                isActive ? 'bg-white/20' : 'bg-white/10'
-                              )}
-                            >
-                              <ShortcutIcon className="h-4 w-4" />
-                            </div>
-                            <span className="text-sm font-semibold">{shortcut.label}</span>
-                          </div>
-                          <p className="mt-2 text-xs leading-5 text-emerald-50/70">{shortcut.hint}</p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {contextPanel}
-
-              <div className="rounded-[24px] border border-white/10 bg-white/6 p-4">
-                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-100/70">
-                  Perfil ativo
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2 text-sm text-white/85">
-                  <span className="rounded-full bg-white/10 px-3 py-1.5">{profileCompletion}% completo</span>
-                  {profile.location && (
-                    <span className="rounded-full bg-white/10 px-3 py-1.5">{profile.location}</span>
-                  )}
-                  <span className="rounded-full bg-white/10 px-3 py-1.5">{profile.energyPreference}</span>
+                          <ItemIcon className="h-5 w-5" />
+                        </div>
+                        <span className="text-base font-medium">{item.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
+          </div>
+
+          <div className="grid gap-5 xl:grid-rows-[minmax(430px,auto)_minmax(425px,1fr)]">
+            {scorePanel}
+            {contextPanel}
           </div>
         </div>
       </CardContent>

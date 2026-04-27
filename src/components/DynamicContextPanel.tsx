@@ -6,14 +6,12 @@ import {
   Lightbulb,
   MessageCircleHeart,
   Sparkles,
-  TrendingUp,
   UserRound,
   Zap,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import {
   AnalysisSummary,
@@ -80,49 +78,44 @@ const priorityLabels = {
 
 const panelMeta = {
   mascot: {
-    title: 'Proximo passo',
+    title: 'Painel ativo',
+    label: 'Proximo passo',
     icon: MessageCircleHeart,
-    tone: 'text-emerald-700 bg-emerald-50 border-emerald-100',
   },
   co2: {
-    title: 'Dica capturada',
+    title: 'Painel ativo',
+    label: 'Dica CO2',
     icon: Zap,
-    tone: 'text-cyan-700 bg-cyan-50 border-cyan-100',
   },
   history: {
-    title: 'Historico em foco',
+    title: 'Painel ativo',
+    label: 'Historico',
     icon: BarChart3,
-    tone: 'text-blue-700 bg-blue-50 border-blue-100',
   },
   actions: {
-    title: 'Recomendacoes',
+    title: 'Painel ativo',
+    label: 'Acao atual',
     icon: Lightbulb,
-    tone: 'text-amber-700 bg-amber-50 border-amber-100',
   },
   score: {
-    title: 'Score atual',
+    title: 'Painel ativo',
+    label: 'Score',
     icon: Crown,
-    tone: 'text-violet-700 bg-violet-50 border-violet-100',
   },
   summary: {
-    title: 'Leitura atual',
+    title: 'Painel ativo',
+    label: 'Leitura',
     icon: Sparkles,
-    tone: 'text-teal-700 bg-teal-50 border-teal-100',
   },
   profile: {
-    title: 'Perfil ativo',
+    title: 'Painel ativo',
+    label: 'Perfil',
     icon: UserRound,
-    tone: 'text-slate-700 bg-slate-50 border-slate-200',
   },
 } as const;
 
-const compactText = (value: string, maxLength = 120) => {
-  if (value.length <= maxLength) {
-    return value;
-  }
-
-  return `${value.slice(0, maxLength).trimEnd()}...`;
-};
+const compactText = (value: string, maxLength = 110) =>
+  value.length <= maxLength ? value : `${value.slice(0, maxLength).trimEnd()}...`;
 
 const getInvoiceReferenceLabel = (invoice: InvoiceData) => {
   const month = invoice.month?.trim();
@@ -221,11 +214,6 @@ const DynamicContextPanel = ({
   const quickActions = actions.slice(0, 2);
   const panelConfig = panelMeta[activeView];
   const PanelIcon = panelConfig.icon;
-  const mascotPrimaryLabel = nextAction
-    ? 'Abrir acao atual'
-    : latestAnalysis
-      ? 'Abrir leitura'
-      : 'Abrir perfil';
 
   React.useEffect(() => {
     setIsVisible(false);
@@ -239,450 +227,383 @@ const DynamicContextPanel = ({
     };
   }, [panelSignature]);
 
-  const handleMascotPrimaryAction = () => {
-    if (nextAction) {
-      onOpenActions();
-      return;
-    }
-
-    if (latestAnalysis) {
-      onOpenSummary();
-      return;
-    }
-
-    onOpenProfileDetails();
-  };
-
-  const renderMascotPanel = () => (
-    <div className="space-y-4">
-      <div className="rounded-[24px] border border-emerald-100 bg-emerald-50/70 p-4">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-emerald-700 shadow-sm">
-            <Sparkles className="h-4 w-4" />
-          </div>
-          <div className="min-w-0 space-y-2">
-            <p className="text-sm font-semibold text-slate-900">
-              {nextAction?.title || guidance.title}
-            </p>
-            <p className="text-sm leading-6 text-slate-600">
-              {compactText(nextAction?.value || nextAction?.description || guidance.message, 132)}
-            </p>
-            {nextAction && (
-              <Badge variant="outline" className="border-emerald-200 bg-white text-emerald-700">
-                Prioridade {priorityLabels[nextAction.priority]}
-              </Badge>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {contextQuestion && (
-        <div className="rounded-[24px] border border-slate-200 bg-white/80 p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-            Pergunta do mascote
-          </p>
-          <p className="mt-2 text-sm font-medium leading-6 text-slate-800">
-            {contextQuestion.question}
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {contextQuestion.options.map((option) => (
-              <Button
-                key={option.value}
-                size="sm"
-                variant="outline"
-                onClick={() => onContextQuestionAnswer?.(contextQuestion.id, option.value)}
-              >
-                {option.label}
-              </Button>
-            ))}
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-slate-500"
-              onClick={() => onContextQuestionIgnore?.(contextQuestion.id)}
-            >
-              Agora nao
-            </Button>
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-[22px] border border-slate-200 bg-white/80 p-3 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-            Perfil
-          </div>
-          <div className="mt-2 text-lg font-semibold text-slate-900">{profileCompletion}%</div>
-        </div>
-        <div className="rounded-[22px] border border-slate-200 bg-white/80 p-3 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-            Etapa
-          </div>
-          <div className="mt-2 text-sm font-semibold text-slate-900">
-            {stageLabels[guidance.stage]}
-          </div>
-        </div>
-      </div>
-
-      <Button onClick={handleMascotPrimaryAction} className="w-full justify-between rounded-[20px]">
-        {mascotPrimaryLabel}
-        <Lightbulb className="h-4 w-4" />
-      </Button>
-    </div>
+  const renderPrimaryAction = (cta: string, onClick: () => void, icon: React.ReactNode) => (
+    <Button
+      onClick={onClick}
+      className="mt-auto w-full justify-between rounded-[16px] border border-[#365f58] bg-[#0f342f] text-[#f5f8f3] hover:bg-[#18453f]"
+    >
+      {cta}
+      {icon}
+    </Button>
   );
 
-  const renderCo2Panel = () => (
-    <div className="space-y-4">
-      <div className="rounded-[24px] border border-cyan-100 bg-cyan-50/75 p-5">
-        <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-cyan-700 shadow-sm">
-            <Zap className="h-4 w-4" />
+  const renderHistoryBars = () => {
+    if (sortedInvoices.length === 0) {
+      return (
+        <div className="rounded-[16px] border border-[#365f58] bg-[#163f39] px-4 py-5 text-sm text-[#c5d8c8]">
+          O historico aparece quando houver mais de uma leitura.
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-end gap-2">
+        {sortedInvoices.map((invoice) => {
+          const height = Math.max(
+            20,
+            Math.round(
+              (((typeof invoice.consumption === 'number' ? invoice.consumption : 0) || 0) /
+                maxConsumption) *
+                82
+            )
+          );
+          const isFocused = focusedInvoice?.fingerprint === invoice.fingerprint;
+
+          return (
+            <button
+              key={invoice.fingerprint}
+              type="button"
+              onClick={() => onSelectInvoice?.(invoice)}
+              className="flex flex-1 flex-col items-center gap-2"
+            >
+              <div className="flex h-24 w-full items-end rounded-[14px] bg-[#163f39] px-1.5 py-1.5">
+                <div
+                  className={cn(
+                    'w-full rounded-[10px] transition-all duration-300',
+                    isFocused ? 'bg-[#8fd08e]' : 'bg-[#5a8f74]'
+                  )}
+                  style={{ height: `${height}px` }}
+                />
+              </div>
+              <span
+                className={cn(
+                  'max-w-full truncate text-[11px] font-medium',
+                  isFocused ? 'text-[#f5f8f3]' : 'text-[#9dbfa6]'
+                )}
+              >
+                {getInvoiceReferenceLabel(invoice)}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderContent = () => {
+    if (activeView === 'mascot') {
+      return (
+        <div className="flex h-full flex-col gap-4">
+          <div className="rounded-[18px] border border-[#365f58] bg-[#163f39] p-5">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[#7bc683] text-[#0f342f]">
+                <MessageCircleHeart className="h-5 w-5" />
+              </div>
+              <div className="space-y-2">
+                <p className="text-xl font-semibold leading-tight text-[#f5f8f3]">
+                  {nextAction?.title || guidance.title}
+                </p>
+                <p className="text-sm leading-6 text-[#c5d8c8]">
+                  {compactText(nextAction?.value || nextAction?.description || guidance.message, 136)}
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="space-y-2">
-            <p className="text-base font-semibold leading-7 text-slate-900">
+
+          {contextQuestion && (
+            <div className="rounded-[18px] border border-[#365f58] bg-[#113731] p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9dbfa6]">
+                Pergunta do mascote
+              </p>
+              <p className="mt-2 text-sm font-medium leading-6 text-[#f5f8f3]">
+                {contextQuestion.question}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {contextQuestion.options.map((option) => (
+                  <Button
+                    key={option.value}
+                    size="sm"
+                    variant="outline"
+                    className="rounded-[12px] border-[#365f58] bg-[#163f39] text-[#f5f8f3] hover:bg-[#1b4a43]"
+                    onClick={() => onContextQuestionAnswer?.(contextQuestion.id, option.value)}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="rounded-[12px] text-[#c5d8c8] hover:bg-[#18453f] hover:text-[#f5f8f3]"
+                  onClick={() => onContextQuestionIgnore?.(contextQuestion.id)}
+                >
+                  Agora nao
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-[16px] border border-[#365f58] bg-[#113731] p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#9dbfa6]">
+                Perfil
+              </div>
+              <div className="mt-2 text-xl font-semibold text-[#f5f8f3]">{profileCompletion}%</div>
+            </div>
+            <div className="rounded-[16px] border border-[#365f58] bg-[#113731] p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#9dbfa6]">
+                Etapa
+              </div>
+              <div className="mt-2 text-base font-semibold text-[#f5f8f3]">
+                {stageLabels[guidance.stage]}
+              </div>
+            </div>
+          </div>
+
+          {renderPrimaryAction(
+            nextAction ? 'Abrir acao atual' : latestAnalysis ? 'Abrir leitura' : 'Abrir perfil',
+            () => {
+              if (nextAction) {
+                onOpenActions();
+                return;
+              }
+
+              if (latestAnalysis) {
+                onOpenSummary();
+                return;
+              }
+
+              onOpenProfileDetails();
+            },
+            <Lightbulb className="h-4 w-4" />
+          )}
+        </div>
+      );
+    }
+
+    if (activeView === 'co2') {
+      return (
+        <div className="flex h-full flex-col gap-4">
+          <div className="rounded-[18px] border border-[#365f58] bg-[#163f39] p-5">
+            <p className="text-xl font-semibold leading-tight text-[#f5f8f3]">
               {activeTip || 'Toque em um CO2 para ver a leitura do momento.'}
             </p>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-700">
+            <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9dbfa6]">
               {activeObjective || 'Acompanhe o proximo passo da jornada'}
             </p>
           </div>
+
+          <div className="rounded-[18px] border border-[#365f58] bg-[#113731] p-5 text-sm leading-6 text-[#c5d8c8]">
+            {compactText(latestAnalysis?.whatMattersNext || guidance.message, 148)}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              className="rounded-[14px] border-[#365f58] bg-[#163f39] text-[#f5f8f3] hover:bg-[#1b4a43]"
+              onClick={onOpenSummary}
+            >
+              Abrir leitura
+            </Button>
+            <Button
+              className="rounded-[14px] bg-[#5f925c] text-white hover:bg-[#517d4f]"
+              onClick={onOpenActions}
+            >
+              Ver acoes
+            </Button>
+          </div>
         </div>
-      </div>
+      );
+    }
 
-      <div className="rounded-[22px] border border-slate-200 bg-white/80 p-4 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-          Leitura atual
-        </p>
-        <p className="mt-2 text-sm leading-6 text-slate-600">
-          {compactText(latestAnalysis?.whatMattersNext || guidance.message, 128)}
-        </p>
-      </div>
+    if (activeView === 'history') {
+      return (
+        <div className="flex h-full flex-col gap-4">
+          <div className="rounded-[18px] border border-[#365f58] bg-[#163f39] p-4">
+            {renderHistoryBars()}
+          </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Button variant="outline" className="rounded-[18px]" onClick={onOpenSummary}>
-          Abrir leitura
-        </Button>
-        <Button className="rounded-[18px]" onClick={onOpenActions}>
-          Ver acoes
-        </Button>
-      </div>
-    </div>
-  );
-
-  const renderHistoryPanel = () => (
-    <div className="space-y-4">
-      <div className="rounded-[24px] border border-blue-100 bg-blue-50/70 p-4">
-        <div className="flex items-end gap-2">
-          {sortedInvoices.length > 0 ? (
-            sortedInvoices.map((invoice) => {
-              const isFocused = focusedInvoice?.fingerprint === invoice.fingerprint;
-              const height = Math.max(
-                22,
-                Math.round(
-                  (((typeof invoice.consumption === 'number' ? invoice.consumption : 0) || 0) /
-                    maxConsumption) *
-                    100
-                )
-              );
-
-              return (
-                <button
-                  key={invoice.fingerprint}
-                  type="button"
-                  onClick={() => onSelectInvoice?.(invoice)}
-                  className="flex min-w-0 flex-1 flex-col items-center gap-2"
-                >
-                  <div className="flex h-28 w-full items-end rounded-[18px] bg-white/70 px-1.5 py-1.5 shadow-inner">
-                    <div
-                      className={cn(
-                        'w-full rounded-[14px] transition-all duration-300',
-                        isFocused ? 'bg-blue-600 shadow-lg shadow-blue-200' : 'bg-blue-300'
-                      )}
-                      style={{ height: `${height}%` }}
-                    />
+          {focusedInvoice && (
+            <div className="rounded-[18px] border border-[#365f58] bg-[#113731] p-4">
+              <p className="text-lg font-semibold text-[#f5f8f3]">
+                {getInvoiceReferenceLabel(focusedInvoice)}
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <div className="text-[#9dbfa6]">Consumo</div>
+                  <div className="font-semibold text-[#f5f8f3]">
+                    {formatConsumption(focusedInvoice.consumption)}
                   </div>
-                  <span
-                    className={cn(
-                      'max-w-full truncate text-[11px] font-semibold',
-                      isFocused ? 'text-blue-700' : 'text-slate-500'
-                    )}
-                  >
-                    {getInvoiceReferenceLabel(invoice)}
-                  </span>
-                </button>
-              );
-            })
-          ) : (
-            <div className="w-full rounded-[22px] bg-white/80 p-4 text-sm text-slate-500">
-              O grafico aparece quando houver historico suficiente.
+                </div>
+                <div>
+                  <div className="text-[#9dbfa6]">Custo</div>
+                  <div className="font-semibold text-[#f5f8f3]">
+                    {formatCurrency(focusedInvoice.totalValue)}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
+
+          {renderPrimaryAction('Abrir historico', onOpenHistory, <BarChart3 className="h-4 w-4" />)}
         </div>
-      </div>
+      );
+    }
 
-      {focusedInvoice && (
-        <div className="rounded-[22px] border border-slate-200 bg-white/80 p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-            <TrendingUp className="h-3.5 w-3.5" />
-            Fatura em foco
-          </div>
-          <p className="mt-2 text-sm font-semibold text-slate-900">
-            {getInvoiceReferenceLabel(focusedInvoice)}
-          </p>
-          <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <div className="text-slate-500">Consumo</div>
-              <div className="font-semibold text-slate-900">
-                {formatConsumption(focusedInvoice.consumption)}
-              </div>
-            </div>
-            <div>
-              <div className="text-slate-500">Custo</div>
-              <div className="font-semibold text-slate-900">
-                {formatCurrency(focusedInvoice.totalValue)}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <Button onClick={onOpenHistory} className="w-full justify-between rounded-[20px]">
-        Abrir historico
-        <BarChart3 className="h-4 w-4" />
-      </Button>
-    </div>
-  );
-
-  const renderActionsPanel = () => (
-    <div className="space-y-4">
-      <div className="space-y-3">
-        {quickActions.map((action, index) => (
-          <div
-            key={action.id}
-            className={cn(
-              'rounded-[24px] border p-4 shadow-sm transition-colors',
-              index === 0 ? 'border-amber-200 bg-amber-50/80' : 'border-slate-200 bg-white/80'
-            )}
-          >
+    if (activeView === 'actions') {
+      return (
+        <div className="flex h-full flex-col gap-4">
+          <div className="rounded-[18px] border border-[#365f58] bg-[#163f39] p-5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-900">{action.title}</p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  {compactText(action.value || action.description, 118)}
+                <p className="text-xl font-semibold text-[#f5f8f3]">
+                  {nextAction?.title || 'Nenhuma acao em foco'}
+                </p>
+                <p className="mt-3 text-sm leading-6 text-[#c5d8c8]">
+                  {compactText(nextAction?.value || nextAction?.description || guidance.message, 140)}
                 </p>
               </div>
-              <Badge variant="outline" className="shrink-0 bg-white">
-                {priorityLabels[action.priority]}
-              </Badge>
+              {nextAction && (
+                <Badge className="shrink-0 border-none bg-[#ffd15c] px-3 py-1 text-[#40320a]">
+                  {priorityLabels[nextAction.priority]}
+                </Badge>
+              )}
             </div>
-            {action.impact && (
-              <div className="mt-3 flex items-start gap-2 rounded-[18px] bg-white/80 px-3 py-2 text-xs text-slate-500">
-                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
-                <span>{compactText(action.impact, 84)}</span>
+          </div>
+
+          {quickActions[1] && (
+            <div className="rounded-[18px] border border-[#365f58] bg-[#113731] p-4">
+              <div className="inline-flex items-center gap-2 text-sm font-semibold text-[#f5f8f3]">
+                <CheckCircle2 className="h-4 w-4 text-[#8fd08e]" />
+                Frente seguinte
               </div>
-            )}
+              <p className="mt-2 text-sm leading-6 text-[#c5d8c8]">
+                {compactText(quickActions[1].title, 84)}
+              </p>
+            </div>
+          )}
+
+          {renderPrimaryAction('Abrir recomendacoes', onOpenActions, <Lightbulb className="h-4 w-4" />)}
+        </div>
+      );
+    }
+
+    if (activeView === 'score') {
+      return (
+        <div className="flex h-full flex-col gap-4">
+          <div className="rounded-[18px] border border-[#365f58] bg-[#163f39] p-5">
+            <p className="text-xl font-semibold text-[#f5f8f3]">{scoreExplanation.summary}</p>
+            <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-[14px] bg-[#113731] px-4 py-4">
+                <div className="text-[#9dbfa6]">Nivel</div>
+                <div className="mt-1 text-lg font-semibold text-[#f5f8f3]">{scoreState.level}</div>
+              </div>
+              <div className="rounded-[14px] bg-[#113731] px-4 py-4">
+                <div className="text-[#9dbfa6]">Proximo ganho</div>
+                <div className="mt-1 text-sm font-semibold leading-5 text-[#f5f8f3]">
+                  {scoreExplanation.nextGain?.title || 'Continue a jornada'}
+                </div>
+              </div>
+            </div>
           </div>
-        ))}
-      </div>
 
-      <div className="rounded-[22px] border border-slate-200 bg-white/80 p-4 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-          Em foco
-        </p>
-        <p className="mt-2 text-sm leading-6 text-slate-600">
-          {compactText(latestAnalysis?.whatMattersNext || guidance.message, 118)}
-        </p>
-      </div>
+          {renderPrimaryAction('Entender score', onOpenScoreDetails, <Crown className="h-4 w-4" />)}
+        </div>
+      );
+    }
 
-      <Button onClick={onOpenActions} className="w-full justify-between rounded-[20px]">
-        Abrir recomendacoes
-        <Lightbulb className="h-4 w-4" />
-      </Button>
-    </div>
-  );
-
-  const renderScorePanel = () => (
-    <div className="space-y-4">
-      <div className="rounded-[24px] border border-violet-100 bg-violet-50/75 p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">
-              Score atual
+    if (activeView === 'summary') {
+      return (
+        <div className="flex h-full flex-col gap-4">
+          <div className="rounded-[18px] border border-[#365f58] bg-[#163f39] p-5">
+            <p className="text-xl font-semibold text-[#f5f8f3]">
+              {latestAnalysis?.whatMattersNext || guidance.title}
             </p>
-            <div className="mt-2 flex items-end gap-2">
-              <span className="text-4xl font-bold leading-none text-slate-900">
-                {scoreState.score.toLocaleString()}
-              </span>
-              <span className="pb-1 text-sm text-violet-700">pontos</span>
-            </div>
-          </div>
-          <Badge variant="outline" className="border-violet-200 bg-white text-violet-700">
-            Nivel {scoreState.level}
-          </Badge>
-        </div>
-
-        <p className="mt-3 text-sm leading-6 text-slate-600">{scoreExplanation.summary}</p>
-
-        <div className="mt-4 space-y-2">
-          <div className="flex items-center justify-between text-xs font-medium text-slate-500">
-            <span>{scoreState.score} pontos</span>
-            <span>{scoreState.nextLevelScore} proximo marco</span>
-          </div>
-          <Progress value={scoreState.progressToNextLevel} className="h-2.5" />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-[22px] border border-slate-200 bg-white/80 p-3 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-            Proximo ganho
-          </div>
-          <div className="mt-2 text-sm font-semibold leading-5 text-slate-900">
-            {scoreExplanation.nextGain?.title || 'Continue a jornada atual'}
-          </div>
-        </div>
-        <div className="rounded-[22px] border border-slate-200 bg-white/80 p-3 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-            Perfil
-          </div>
-          <div className="mt-2 text-sm font-semibold text-slate-900">{profile.consumerType}</div>
-        </div>
-      </div>
-
-      <Button onClick={onOpenScoreDetails} className="w-full justify-between rounded-[20px]">
-        Entender score
-        <Crown className="h-4 w-4" />
-      </Button>
-    </div>
-  );
-
-  const renderSummaryPanel = () => (
-    <div className="space-y-4">
-      <div className="rounded-[24px] border border-teal-100 bg-teal-50/75 p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">
-          Leitura em foco
-        </p>
-        <p className="mt-2 text-base font-semibold leading-7 text-slate-900">
-          {latestAnalysis?.whatMattersNext || guidance.title}
-        </p>
-        <p className="mt-3 text-sm leading-6 text-slate-600">
-          {compactText(latestAnalysis?.headline || guidance.message, 138)}
-        </p>
-      </div>
-
-      {focusedInvoice && (
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-[22px] border border-slate-200 bg-white/80 p-3 shadow-sm">
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-              Fatura
-            </div>
-            <div className="mt-2 text-sm font-semibold text-slate-900">
-              {getInvoiceReferenceLabel(focusedInvoice)}
-            </div>
-          </div>
-          <div className="rounded-[22px] border border-slate-200 bg-white/80 p-3 shadow-sm">
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-              Consumo
-            </div>
-            <div className="mt-2 text-sm font-semibold text-slate-900">
-              {formatConsumption(focusedInvoice.consumption)}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <Button onClick={onOpenSummary} className="w-full justify-between rounded-[20px]">
-        Abrir leitura detalhada
-        <BarChart3 className="h-4 w-4" />
-      </Button>
-    </div>
-  );
-
-  const renderProfilePanel = () => (
-    <div className="space-y-4">
-      <div className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Perfil ativo
+            <p className="mt-3 text-sm leading-6 text-[#c5d8c8]">
+              {compactText(latestAnalysis?.headline || guidance.message, 148)}
             </p>
-            <p className="mt-2 text-base font-semibold text-slate-900">{profile.consumerType}</p>
           </div>
-          <Badge variant="outline" className="bg-white text-slate-600">
-            {profileCompletion}%
-          </Badge>
+
+          {focusedInvoice && (
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-[18px] border border-[#365f58] bg-[#113731] p-4">
+                <div className="text-[#9dbfa6]">Fatura</div>
+                <div className="mt-1 font-semibold text-[#f5f8f3]">
+                  {getInvoiceReferenceLabel(focusedInvoice)}
+                </div>
+              </div>
+              <div className="rounded-[18px] border border-[#365f58] bg-[#113731] p-4">
+                <div className="text-[#9dbfa6]">Consumo</div>
+                <div className="mt-1 font-semibold text-[#f5f8f3]">
+                  {formatConsumption(focusedInvoice.consumption)}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {renderPrimaryAction('Abrir leitura', onOpenSummary, <Sparkles className="h-4 w-4" />)}
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex h-full flex-col gap-4">
+        <div className="rounded-[18px] border border-[#365f58] bg-[#163f39] p-5">
+          <p className="text-xl font-semibold text-[#f5f8f3]">{profile.consumerType}</p>
+          <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+            <div className="rounded-[14px] bg-[#113731] px-4 py-4">
+              <div className="text-[#9dbfa6]">Perfil</div>
+              <div className="mt-1 font-semibold text-[#f5f8f3]">{profileCompletion}%</div>
+            </div>
+            <div className="rounded-[14px] bg-[#113731] px-4 py-4">
+              <div className="text-[#9dbfa6]">Local</div>
+              <div className="mt-1 font-semibold text-[#f5f8f3]">
+                {profile.location || 'Nao informado'}
+              </div>
+            </div>
+            <div className="rounded-[14px] bg-[#113731] px-4 py-4">
+              <div className="text-[#9dbfa6]">Energia</div>
+              <div className="mt-1 font-semibold text-[#f5f8f3]">{profile.energyPreference}</div>
+            </div>
+            <div className="rounded-[14px] bg-[#113731] px-4 py-4">
+              <div className="text-[#9dbfa6]">Etapa</div>
+              <div className="mt-1 font-semibold text-[#f5f8f3]">{stageLabels[guidance.stage]}</div>
+            </div>
+          </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-          <div className="rounded-[18px] bg-white px-3 py-3">
-            <div className="text-slate-500">Local</div>
-            <div className="mt-1 font-semibold text-slate-900">
-              {profile.location || 'Nao informado'}
-            </div>
-          </div>
-          <div className="rounded-[18px] bg-white px-3 py-3">
-            <div className="text-slate-500">Energia</div>
-            <div className="mt-1 font-semibold text-slate-900">{profile.energyPreference}</div>
-          </div>
-          <div className="rounded-[18px] bg-white px-3 py-3">
-            <div className="text-slate-500">Pessoas</div>
-            <div className="mt-1 font-semibold text-slate-900">{profile.peopleCount}</div>
-          </div>
-          <div className="rounded-[18px] bg-white px-3 py-3">
-            <div className="text-slate-500">Imovel</div>
-            <div className="mt-1 font-semibold text-slate-900">
-              {profile.propertySize > 0 ? `${profile.propertySize} m2` : 'Nao informado'}
-            </div>
-          </div>
-        </div>
+        {renderPrimaryAction('Abrir perfil', onOpenProfileDetails, <UserRound className="h-4 w-4" />)}
       </div>
-
-      <Button onClick={onOpenProfileDetails} className="w-full justify-between rounded-[20px]">
-        Abrir perfil
-        <UserRound className="h-4 w-4" />
-      </Button>
-    </div>
-  );
+    );
+  };
 
   return (
-    <Card className="overflow-hidden border border-slate-200 bg-white/85 shadow-lg backdrop-blur">
-      <CardContent className="p-4 sm:p-5">
+    <Card className="min-h-[425px] overflow-hidden border border-[#2a5c56] bg-[#103a35] text-white shadow-[0_18px_40px_rgba(0,0,0,0.18)]">
+      <CardContent className="flex h-full flex-col p-5">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <div
-              className={cn(
-                'flex h-10 w-10 items-center justify-center rounded-2xl border',
-                panelConfig.tone
-              )}
-            >
-              <PanelIcon className="h-4 w-4" />
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[#7bc683] text-[#0f342f]">
+              <PanelIcon className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                Painel dinamico
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9dbfa6]">
+                {panelConfig.title}
               </p>
-              <p className="text-sm font-semibold text-slate-900">{panelConfig.title}</p>
+              <p className="text-lg font-semibold text-[#f5f8f3]">{panelConfig.label}</p>
             </div>
           </div>
 
-          <Badge variant="outline" className="bg-white text-slate-500">
+          <Badge className="border border-[#365f58] bg-[#123f39] text-[#f5f8f3]">
             1 foco
           </Badge>
         </div>
 
         <div
           className={cn(
-            'mt-5 transition-all duration-300',
+            'mt-5 flex-1 transition-all duration-300',
             isVisible ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
           )}
         >
-          {activeView === 'mascot' && renderMascotPanel()}
-          {activeView === 'co2' && renderCo2Panel()}
-          {activeView === 'history' && renderHistoryPanel()}
-          {activeView === 'actions' && renderActionsPanel()}
-          {activeView === 'score' && renderScorePanel()}
-          {activeView === 'summary' && renderSummaryPanel()}
-          {activeView === 'profile' && renderProfilePanel()}
+          {renderContent()}
         </div>
       </CardContent>
     </Card>
