@@ -51,14 +51,14 @@ const EnergyProgressVisual = ({ invoiceCount, interactionEvent }: EnergyProgress
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-2">
             <div className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-              Camada visual de progresso
+              Impulso da jornada
             </div>
             <div className="space-y-1">
               <p className="text-sm font-semibold text-slate-900">
                 Você está evoluindo seu padrão de consumo
               </p>
               <p className="text-sm text-slate-600">
-                Continue para fortalecer sua eficiência
+                Siga no seu ritmo para fortalecer sua eficiência
               </p>
             </div>
           </div>
@@ -70,10 +70,10 @@ const EnergyProgressVisual = ({ invoiceCount, interactionEvent }: EnergyProgress
           >
             {isFeedbackActive && (
               <>
-                <span className="pointer-events-none absolute -right-1 -top-2 text-sm animate-ping text-amber-400">
+                <span className="pointer-events-none absolute -right-1 -top-2 text-sm animate-pulse text-amber-400">
                   {'\u2728'}
                 </span>
-                <span className="pointer-events-none absolute -bottom-1 -left-1 text-xs text-cyan-400">
+                <span className="pointer-events-none absolute -bottom-1 -left-1 text-xs animate-pulse text-cyan-400">
                   {'\u2728'}
                 </span>
               </>
@@ -85,7 +85,7 @@ const EnergyProgressVisual = ({ invoiceCount, interactionEvent }: EnergyProgress
         <div className="space-y-2">
           <div className="flex items-center justify-between text-xs font-medium text-slate-500">
             <span>{normalizedInvoiceCount} fatura{normalizedInvoiceCount === 1 ? '' : 's'} na jornada</span>
-            <span>{Math.round(progressValue)} pontos visuais</span>
+            <span>{Math.round(progressValue)} pontos de ritmo</span>
           </div>
 
           <div

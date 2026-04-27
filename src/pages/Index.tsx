@@ -8,6 +8,7 @@ import InvoiceHistory from '../components/InvoiceHistory';
 import SmartRecommendations from '../components/SmartRecommendations';
 import UserProfile from '../components/UserProfile';
 import MascotCustomization from '../components/MascotCustomization';
+import ProfileMascotAmbient from '../components/ProfileMascotAmbient';
 import AnalysisSummary from '../components/AnalysisSummary';
 import MascotGuidanceCard from '../components/MascotGuidanceCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -260,6 +261,10 @@ const Index = () => {
                       onCustomizationUpdate={updateMascotCustomization}
                       currentScore={scoreState.score}
                     />
+                  </div>
+
+                  <div className="md:max-w-xl xl:max-w-none">
+                    <ProfileMascotAmbient />
                   </div>
                 </div>
 

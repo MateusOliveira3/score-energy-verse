@@ -59,7 +59,7 @@ const MascotGuidanceCard = ({
       <CardHeader>
         <CardTitle className="flex items-center space-x-2 text-emerald-700">
           <MessageCircleHeart className="h-5 w-5" />
-          <span>Resumo do Mascote</span>
+          <span>Mascote da jornada</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -79,10 +79,10 @@ const MascotGuidanceCard = ({
               <h3 className="text-lg font-semibold text-slate-800">{guidance.title}</h3>
               <p className="mt-2 text-sm leading-6 text-slate-700">{guidance.message}</p>
             </div>
-            <div className="rounded-lg bg-emerald-50 p-3 text-xs text-emerald-800 flex items-start gap-2">
-              <Sparkles className="h-4 w-4 mt-0.5 shrink-0" />
+            <div className="flex items-start gap-2 rounded-lg bg-emerald-50 p-3 text-xs text-emerald-800">
+              <Sparkles className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
-                O mascote resume o momento da jornada e reforça o próximo passo mais útil agora.
+                O mascote resume o momento da jornada e destaca o próximo passo com mais clareza.
               </span>
             </div>
 
@@ -95,14 +95,14 @@ const MascotGuidanceCard = ({
                     </p>
                     <div className="flex flex-wrap gap-2">
                       <Button size="sm" onClick={() => setIsAnswering(true)}>
-                        Responder
+                        Ver dica
                       </Button>
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => onContextQuestionIgnore?.(contextQuestion.id)}
                       >
-                        Ignorar
+                        Agora não
                       </Button>
                     </div>
                   </div>
