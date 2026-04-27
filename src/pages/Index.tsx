@@ -1,4 +1,5 @@
 import React from 'react';
+import { BarChart3, History, Lightbulb, Sparkles } from 'lucide-react';
 import ScoreCard from '../components/ScoreCard';
 import LevelProgress from '../components/LevelProgress';
 import EnergyProgressVisual from '../components/EnergyProgressVisual';
@@ -11,6 +12,7 @@ import MascotCustomization from '../components/MascotCustomization';
 import ProfileMascotAmbient from '../components/ProfileMascotAmbient';
 import AnalysisSummary from '../components/AnalysisSummary';
 import MascotGuidanceCard from '../components/MascotGuidanceCard';
+import LiveMascotJourney, { JourneyTarget } from '../components/LiveMascotJourney';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -55,7 +57,7 @@ const Index = () => {
     ignoreMascotContextQuestion,
   } = useMvpJourney();
   const [selectedInvoice, setSelectedInvoice] = React.useState<InvoiceData | undefined>(latestInvoice);
-  const [activeSection, setActiveSection] = React.useState<DashboardSectionKey | null>('summary');
+  const [activeSection, setActiveSection] = React.useState<DashboardSectionKey | null>(null);
   const [interactionFeedback, setInteractionFeedback] = React.useState<InteractionFeedbackEvent | null>(null);
   const feedbackTimeoutRef = React.useRef<number | null>(null);
 
@@ -128,21 +130,27 @@ const Index = () => {
   }, [invoiceHistory, profile, selectedInvoice]);
   const historyPreviewMessage =
     invoiceHistory.length >= 3
-      ? `Você já tem ${invoiceHistory.length} meses de histórico. Continue acompanhando para entender seu padrão.`
+      ? `Voce ja tem ${invoiceHistory.length} meses de historico. Continue acompanhando para entender seu padrao.`
       : invoiceHistory.length === 1
-        ? 'Adicione a próxima fatura para começar a ver evolução.'
+        ? 'Adicione a proxima fatura para comecar a ver evolucao.'
         : undefined;
+  const primaryJourneyAction =
+    nextActions.find((action) => action.status !== 'completed') || nextActions[0];
 
   const sectionCards = [
     {
       key: 'summary' as const,
       title: 'Resumo da analise',
       subtitle: selectedInvoice ? 'Leitura da fatura em foco' : 'Pronto para a primeira leitura',
+      eyebrow: 'Painel de leitura',
+      Icon: BarChart3,
     },
     {
       key: 'actions' as const,
       title: 'Acoes recomendadas',
       subtitle: 'Prioridades da jornada atual',
+      eyebrow: 'Modo acao',
+      Icon: Lightbulb,
     },
     {
       key: 'history' as const,
@@ -151,12 +159,39 @@ const Index = () => {
         invoiceHistory.length > 0
           ? `${invoiceHistory.length} fatura${invoiceHistory.length > 1 ? 's' : ''} na jornada`
           : 'Comparacao do historico enviado',
+      eyebrow: 'Linha do tempo',
+      Icon: History,
     },
   ];
 
   const handleSectionToggle = (section: DashboardSectionKey) => {
     setActiveSection((currentSection) => (currentSection === section ? null : section));
   };
+
+  const focusJourneyTarget = React.useCallback((target: JourneyTarget) => {
+    const sectionTargets: Record<
+      JourneyTarget,
+      { id: string; section?: DashboardSectionKey }
+    > = {
+      profile: { id: 'section-profile' },
+      upload: { id: 'section-mvp' },
+      summary: { id: 'section-summary', section: 'summary' },
+      actions: { id: 'section-actions', section: 'actions' },
+      history: { id: 'section-history', section: 'history' },
+    };
+    const nextTarget = sectionTargets[target];
+
+    if (nextTarget.section) {
+      setActiveSection(nextTarget.section);
+    }
+
+    window.setTimeout(() => {
+      document.getElementById(nextTarget.id)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }, nextTarget.section ? 140 : 0);
+  }, []);
 
   const handleInvoiceProcessed = async (file: File) => {
     return completeInvoiceFlow(file);
@@ -170,11 +205,11 @@ const Index = () => {
     updateActionStatus(action, status);
 
     toast({
-      title: status === 'completed' ? 'Ação testada' : 'Ação iniciada',
+      title: status === 'completed' ? 'Acao testada' : 'Acao iniciada',
       description:
         status === 'completed'
-          ? `Você marcou "${action.title}" como testada na jornada.`
-          : `Você começou "${action.title}" e registrou progresso real na jornada.`,
+          ? `Voce marcou "${action.title}" como testada na jornada.`
+          : `Voce comecou "${action.title}" e registrou progresso real na jornada.`,
     });
   };
 
@@ -190,19 +225,46 @@ const Index = () => {
     removeInvoiceFromHistory(fingerprint);
     toast({
       title: 'Fatura removida',
-      description: 'O histórico da jornada MVP foi atualizado sem depender do fluxo legado.',
+      description: 'O historico da jornada MVP foi atualizado sem depender do fluxo legado.',
     });
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-cyan-50">
-      <main className="container mx-auto px-4 py-8 space-y-8">
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
-          <div className="xl:col-span-2">
-            <Card className="border-2 border-emerald-100 shadow-lg">
-              <CardHeader>
-                <CardTitle className="text-emerald-700">Perfil e Score Energy</CardTitle>
+      <main className="container mx-auto space-y-8 px-4 py-8">
+        <LiveMascotJourney
+          guidance={mascotGuidance}
+          nextActions={nextActions}
+          invoiceCount={invoiceHistory.length}
+          profileCompletion={profileCompletion}
+          isProfileComplete={isProfileComplete}
+          latestAnalysis={latestAnalysis}
+          customization={mascotCustomization}
+          profile={profile}
+          onNavigate={focusJourneyTarget}
+        />
+
+        <div className="grid grid-cols-1 items-start gap-8 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.7fr)]">
+          <div>
+            <Card className="overflow-hidden border border-emerald-100 bg-gradient-to-br from-white via-white to-emerald-50/60 shadow-lg">
+              <CardHeader className="border-b border-emerald-100/80 bg-white/75 backdrop-blur">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div className="space-y-2">
+                    <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Dashboard vivo
+                    </div>
+                    <CardTitle className="text-emerald-700">Perfil e Score Energy</CardTitle>
+                    <p className="text-sm text-slate-600">
+                      Painel principal da jornada com perfil, score e leitura visual do progresso.
+                    </p>
+                  </div>
+                  <div className="rounded-full border border-emerald-100 bg-white/80 px-3 py-1 text-sm font-medium text-slate-600">
+                    {completedSteps}/3 marcos base
+                  </div>
+                </div>
               </CardHeader>
+
               <CardContent className="grid grid-cols-1 gap-6 xl:grid-cols-5">
                 <div id="section-profile" className="space-y-5 xl:col-span-3">
                   <div className="flex flex-wrap items-center gap-3">
@@ -216,34 +278,34 @@ const Index = () => {
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm text-slate-600">
-                      <span>Completação do perfil</span>
+                      <span>Completacao do perfil</span>
                       <span>{profileCompletion}%</span>
                     </div>
                     <Progress value={profileCompletion} className="h-3" />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-3">
-                    <div className="rounded-lg bg-slate-50 p-3">
+                    <div className="rounded-2xl bg-slate-50/90 p-3 shadow-sm ring-1 ring-slate-100">
                       <div className="text-slate-500">Tipo</div>
                       <div className="font-semibold text-slate-800">{profile.consumerType}</div>
                     </div>
-                    <div className="rounded-lg bg-slate-50 p-3">
+                    <div className="rounded-2xl bg-slate-50/90 p-3 shadow-sm ring-1 ring-slate-100">
                       <div className="text-slate-500">Local</div>
                       <div className="font-semibold text-slate-800">
-                        {profile.location || 'Não informado'}
+                        {profile.location || 'Nao informado'}
                       </div>
                     </div>
-                    <div className="rounded-lg bg-slate-50 p-3">
-                      <div className="text-slate-500">Imóvel</div>
+                    <div className="rounded-2xl bg-slate-50/90 p-3 shadow-sm ring-1 ring-slate-100">
+                      <div className="text-slate-500">Imovel</div>
                       <div className="font-semibold text-slate-800">
-                        {profile.propertySize > 0 ? `${profile.propertySize} m2` : 'Não informado'}
+                        {profile.propertySize > 0 ? `${profile.propertySize} m2` : 'Nao informado'}
                       </div>
                     </div>
-                    <div className="rounded-lg bg-slate-50 p-3">
+                    <div className="rounded-2xl bg-slate-50/90 p-3 shadow-sm ring-1 ring-slate-100">
                       <div className="text-slate-500">Pessoas</div>
                       <div className="font-semibold text-slate-800">{profile.peopleCount}</div>
                     </div>
-                    <div className="rounded-lg bg-slate-50 p-3">
+                    <div className="rounded-2xl bg-slate-50/90 p-3 shadow-sm ring-1 ring-slate-100">
                       <div className="text-slate-500">Energia</div>
                       <div className="font-semibold text-slate-800">{profile.energyPreference}</div>
                     </div>
@@ -295,12 +357,26 @@ const Index = () => {
             </Card>
           </div>
 
-          <div id="section-mascot" className="space-y-8">
+          <div id="section-mascot" className="space-y-3 xl:sticky xl:top-6">
+            <div className="flex items-center justify-between gap-3 px-1">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Apoio secundario
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  O foco principal da jornada agora fica na trilha do mascote.
+                </p>
+              </div>
+              <Badge variant="outline" className="border-slate-200 bg-white/80 text-slate-500">
+                Consulta
+              </Badge>
+            </div>
             <MascotGuidanceCard
               guidance={mascotGuidance}
               score={scoreState.score}
               level={scoreState.level}
               profile={profile}
+              nextAction={primaryJourneyAction}
               customization={mascotCustomization}
               contextQuestion={mascotContextQuestion}
               onContextQuestionAnswer={handleContextQuestionAnswer}
@@ -318,7 +394,7 @@ const Index = () => {
         </div>
 
         <section className="space-y-6">
-          {historyPreviewMessage && (
+          {activeSection === 'history' && historyPreviewMessage && (
             <Card className="border-slate-200 bg-white/80 shadow-sm">
               <CardContent className="p-4 text-sm text-slate-600">
                 {historyPreviewMessage}
@@ -343,16 +419,42 @@ const Index = () => {
                     className={`h-full border-2 transition-all duration-200 ${
                       isOpen
                         ? 'border-emerald-300 bg-white shadow-lg ring-2 ring-emerald-100'
-                        : 'border-slate-200 bg-white/80 shadow-sm hover:border-emerald-200 hover:shadow-md'
+                        : 'border-slate-200 bg-white/85 shadow-sm hover:border-emerald-200 hover:shadow-md'
                     }`}
                   >
                     <CardContent className="flex h-full flex-col gap-3 p-5">
-                      <div className="space-y-1">
-                        <h2 className="text-base font-semibold text-slate-900">{section.title}</h2>
-                        <p className="text-sm text-slate-600">{section.subtitle}</p>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="inline-flex items-center gap-2 rounded-full bg-slate-100/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+                            <section.Icon className="h-3.5 w-3.5" />
+                            {section.eyebrow}
+                          </div>
+                          <h2 className="text-base font-semibold text-slate-900">{section.title}</h2>
+                        </div>
+                        <div
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            isOpen
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-slate-100 text-slate-500'
+                          }`}
+                        >
+                          {isOpen
+                            ? 'Fechar'
+                            : section.key === 'summary'
+                              ? 'Ver mais'
+                              : 'Explorar'}
+                        </div>
                       </div>
-                      <div className="pt-1 text-sm font-medium text-slate-500">
-                        {isOpen ? 'Aberto' : 'Fechado'}
+
+                      <div className="space-y-2">
+                        <p className="text-sm text-slate-600">{section.subtitle}</p>
+                        <div className="pt-1 text-sm font-medium text-slate-500">
+                          {isOpen
+                            ? 'Em leitura'
+                            : section.key === 'summary'
+                              ? 'Ver mais'
+                              : 'Explorar'}
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -409,7 +511,18 @@ const Index = () => {
           )}
         </section>
 
-        <ScoreExplanationCard explanation={scoreExplanation} />
+        <details className="group rounded-[28px] border border-slate-200 bg-white/75 p-4 shadow-sm">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-700">
+            <span>Entender score e historico da jornada</span>
+            <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+              Secundario
+            </span>
+          </summary>
+
+          <div className="mt-4">
+            <ScoreExplanationCard explanation={scoreExplanation} />
+          </div>
+        </details>
       </main>
     </div>
   );

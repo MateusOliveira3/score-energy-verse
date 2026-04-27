@@ -251,7 +251,7 @@ const AnalysisSummary = ({
   profile,
   invoiceHistory,
   onSelectInvoice,
-  isExpanded = true,
+  isExpanded = false,
   onToggle,
   showHeader = true,
 }: AnalysisSummaryProps) => {
@@ -290,7 +290,7 @@ const AnalysisSummary = ({
                 </p>
               </div>
               <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-                <span>{isExpanded ? 'Aberto' : 'Fechado'}</span>
+                <span>{isExpanded ? 'Fechar' : 'Ver mais'}</span>
                 <ExpansionIcon className="h-4 w-4" />
               </div>
             </div>
@@ -381,7 +381,7 @@ const AnalysisSummary = ({
               </p>
             </div>
             <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-              <span>{isExpanded ? 'Aberto' : 'Fechado'}</span>
+              <span>{isExpanded ? 'Fechar' : 'Ver mais'}</span>
               <ExpansionIcon className="h-4 w-4" />
             </div>
           </div>

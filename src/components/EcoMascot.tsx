@@ -1,12 +1,14 @@
-
 import React from 'react';
-import { Crown, Star, Sparkles } from 'lucide-react';
+import { Crown, Sparkles, Star } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface EcoMascotProps {
   score: number;
   level: number;
   consumerType?: string;
   customization?: MascotCustomization;
+  variant?: 'default' | 'compact';
+  journeyState?: 'wake' | 'observe' | 'understand' | 'action';
 }
 
 interface MascotCustomization {
@@ -16,166 +18,164 @@ interface MascotCustomization {
   borderEffect: string;
 }
 
-const EcoMascot = ({ score, level, consumerType = 'Residencial', customization }: EcoMascotProps) => {
-  const getMascotData = (
-    level: number,
-    consumerType: string,
-    customization?: MascotCustomization
-  ) => {
-    // Nome baseado no tipo de consumidor
-    const getNameByType = (type: string) => {
-      const names = {
-        'Residencial': 'EcoFamília',
-        'Comercial': 'EcoBiz',
-        'Restaurante': 'EcoChef',
-        'Escola': 'EcoAluno',
-        'Industria': 'EcoTech'
-      };
-      return names[type as keyof typeof names] || 'EcoFriend';
-    };
-
-    const baseName = customization?.name || getNameByType(consumerType);
-    const emoji = customization?.emoji || '🌱';
-
-    if (level >= 10) {
-      return {
-        name: `${baseName} Master`,
-        emoji: emoji,
-        size: 'text-8xl',
-        color: getColorPalette(customization?.colorPalette || 'emerald', 'master'),
-        effect: getBorderEffect(customization?.borderEffect || 'pulse'),
-        description: 'Guardião da Sustentabilidade'
-      };
-    } else if (level >= 7) {
-      return {
-        name: `${baseName} Champion`,
-        emoji: emoji,
-        size: 'text-7xl',
-        color: getColorPalette(customization?.colorPalette || 'emerald', 'champion'),
-        effect: getBorderEffect(customization?.borderEffect || 'glow'),
-        description: 'Campeão Ecológico'
-      };
-    } else if (level >= 4) {
-      return {
-        name: `${baseName} Warrior`,
-        emoji: emoji,
-        size: 'text-6xl',
-        color: getColorPalette(customization?.colorPalette || 'emerald', 'warrior'),
-        effect: getBorderEffect(customization?.borderEffect || 'hover:scale-105'),
-        description: 'Guerreiro Verde'
-      };
-    } else {
-      return {
-        name: baseName,
-        emoji: emoji,
-        size: 'text-5xl',
-        color: getColorPalette(customization?.colorPalette || 'emerald', 'basic'),
-        effect: getBorderEffect(customization?.borderEffect || 'hover:scale-105'),
-        description: 'Broto Sustentável'
-      };
-    }
+const getNameByType = (type: string) => {
+  const names = {
+    Residencial: 'EcoFamilia',
+    Comercial: 'EcoBiz',
+    Restaurante: 'EcoChef',
+    Escola: 'EcoAluno',
+    Industria: 'EcoTech',
   };
 
-  const getColorPalette = (palette: string, tier: string) => {
-    const palettes = {
-      emerald: {
-        basic: 'from-emerald-300 to-green-400',
-        warrior: 'from-emerald-400 to-green-500',
-        champion: 'from-emerald-500 to-green-600',
-        master: 'from-emerald-600 to-green-700'
-      },
-      blue: {
-        basic: 'from-blue-300 to-cyan-400',
-        warrior: 'from-blue-400 to-cyan-500',
-        champion: 'from-blue-500 to-cyan-600',
-        master: 'from-blue-600 to-cyan-700'
-      },
-      purple: {
-        basic: 'from-purple-300 to-indigo-400',
-        warrior: 'from-purple-400 to-indigo-500',
-        champion: 'from-purple-500 to-indigo-600',
-        master: 'from-purple-600 to-indigo-700'
-      },
-      orange: {
-        basic: 'from-orange-300 to-red-400',
-        warrior: 'from-orange-400 to-red-500',
-        champion: 'from-orange-500 to-red-600',
-        master: 'from-orange-600 to-red-700'
-      }
-    };
-    return palettes[palette as keyof typeof palettes]?.[tier as keyof typeof palettes.emerald] || palettes.emerald[tier as keyof typeof palettes.emerald];
+  return names[type as keyof typeof names] || 'EcoFriend';
+};
+
+const getColorPalette = (palette: string, tier: keyof typeof colorPalettes.emerald) =>
+  colorPalettes[palette as keyof typeof colorPalettes]?.[tier] || colorPalettes.emerald[tier];
+
+const getBorderEffect = (effect: string) => {
+  const effects = {
+    none: 'hover:scale-[1.03]',
+    glow: 'hover:scale-[1.03] shadow-lg shadow-emerald-200/70',
+    pulse: 'hover:scale-[1.03] animate-pulse',
+    rainbow:
+      'hover:scale-[1.03] ring-2 ring-amber-200 shadow-lg shadow-cyan-200/60',
   };
 
-  const getBorderEffect = (effect: string) => {
-    const effects = {
-      none: 'hover:scale-110',
-      glow: 'hover:scale-110 shadow-lg animate-glow',
-      pulse: 'hover:scale-110 animate-pulse',
-      rainbow: 'hover:scale-110 animate-pulse border-4 border-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-500'
-    };
-    return effects[effect as keyof typeof effects] || effects.none;
-  };
+  return effects[effect as keyof typeof effects] || effects.none;
+};
 
-  const mascot = getMascotData(level, consumerType, customization);
+const colorPalettes = {
+  emerald: {
+    basic: 'from-emerald-300 to-green-400',
+    warrior: 'from-emerald-400 to-green-500',
+    champion: 'from-emerald-500 to-green-600',
+    master: 'from-emerald-600 to-green-700',
+  },
+  blue: {
+    basic: 'from-blue-300 to-cyan-400',
+    warrior: 'from-blue-400 to-cyan-500',
+    champion: 'from-blue-500 to-cyan-600',
+    master: 'from-blue-600 to-cyan-700',
+  },
+  purple: {
+    basic: 'from-purple-300 to-indigo-400',
+    warrior: 'from-purple-400 to-indigo-500',
+    champion: 'from-purple-500 to-indigo-600',
+    master: 'from-purple-600 to-indigo-700',
+  },
+  orange: {
+    basic: 'from-orange-300 to-red-400',
+    warrior: 'from-orange-400 to-red-500',
+    champion: 'from-orange-500 to-red-600',
+    master: 'from-orange-600 to-red-700',
+  },
+} as const;
+
+const EcoMascot = ({
+  score,
+  level,
+  consumerType = 'Residencial',
+  customization,
+  variant = 'default',
+  journeyState = 'wake',
+}: EcoMascotProps) => {
+  const tier =
+    level >= 10 ? 'master' : level >= 7 ? 'champion' : level >= 4 ? 'warrior' : 'basic';
+  const baseName = customization?.name || getNameByType(consumerType);
+  const emoji = customization?.emoji || '\u{1F331}';
   const progressToNext = Math.min(((score % 200) / 200) * 100, 100);
+  const mascot = {
+    name: level >= 10 ? `${baseName} Master` : level >= 7 ? `${baseName} Champion` : level >= 4 ? `${baseName} Warrior` : baseName,
+    emoji,
+    color: getColorPalette(customization?.colorPalette || 'emerald', tier),
+    effect: getBorderEffect(customization?.borderEffect || (level >= 10 ? 'pulse' : 'glow')),
+    description:
+      level >= 10
+        ? 'Guardiao da Sustentabilidade'
+        : level >= 7
+          ? 'Campeao Ecologico'
+          : level >= 4
+            ? 'Guerreiro Verde'
+            : 'Broto Sustentavel',
+  };
+
+  const orbSize = variant === 'compact' ? 'h-20 w-20 text-4xl' : 'h-32 w-32 text-6xl';
+  const stateTone = {
+    wake: 'ring-4 ring-white/10',
+    observe: 'ring-4 ring-cyan-200/25 shadow-cyan-200/25',
+    understand: 'ring-4 ring-emerald-200/30 shadow-emerald-200/30',
+    action: 'ring-4 ring-amber-200/35 shadow-amber-200/30 scale-[1.03]',
+  } as const;
+  const stateBadge = {
+    wake: 'Acordando',
+    observe: 'Olhando',
+    understand: 'Entendendo',
+    action: 'Agindo',
+  } as const;
 
   return (
     <div className="text-center">
-      <div className="relative inline-block">
-        {/* Círculo de fundo com gradiente personalizado */}
-        <div className={`w-32 h-32 rounded-full bg-gradient-to-br ${mascot.color} flex items-center justify-center shadow-lg transition-all duration-500 ${mascot.effect}`}>
-          <div className={`${mascot.size} transition-all duration-500`}>
+      <div className="relative inline-flex items-center justify-center">
+        <div
+          className={cn(
+            'relative flex items-center justify-center rounded-full bg-gradient-to-br shadow-lg transition-all duration-500',
+            mascot.color,
+            mascot.effect,
+            stateTone[journeyState],
+            orbSize
+          )}
+        >
+          <span className="absolute inset-1 rounded-full bg-white/15" aria-hidden="true" />
+          <span className="relative drop-shadow-sm" aria-hidden="true">
             {mascot.emoji}
-          </div>
+          </span>
         </div>
-        
-        {/* Efeitos especiais baseados no nível */}
+
+        <div className="absolute -bottom-1 -right-1 rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">
+          {variant === 'compact' ? stateBadge[journeyState] : `Lv ${level}`}
+        </div>
+
         {level >= 7 && (
-          <div className="absolute -top-2 -right-2 animate-bounce">
-            <Crown className="h-6 w-6 text-yellow-500" />
+          <div className="absolute -right-2 -top-2 rounded-full bg-white/85 p-1 shadow-sm">
+            <Crown className="h-4 w-4 text-amber-500" />
           </div>
         )}
-        
-        {level >= 10 && (
-          <div className="absolute inset-0 animate-ping">
-            <div className="w-32 h-32 rounded-full bg-emerald-400 opacity-20"></div>
-          </div>
-        )}
-        
-        {/* Estrelas flutuantes para níveis altos */}
-        {level >= 5 && (
+
+        {level >= 5 && variant === 'default' && (
           <>
-            <div className="absolute -top-1 left-2 animate-pulse delay-100">
-              <Star className="h-3 w-3 text-yellow-400 fill-current" />
+            <div className="absolute -left-2 top-2 rounded-full bg-white/75 p-1 shadow-sm">
+              <Star className="h-3.5 w-3.5 fill-current text-amber-400" />
             </div>
-            <div className="absolute top-2 -right-1 animate-pulse delay-300">
-              <Sparkles className="h-3 w-3 text-blue-400" />
+            <div className="absolute right-1 top-8 rounded-full bg-white/75 p-1 shadow-sm">
+              <Sparkles className="h-3.5 w-3.5 text-cyan-500" />
             </div>
           </>
         )}
       </div>
-      
-      <div className="mt-4 space-y-2">
-        <h3 className="text-xl font-bold text-gray-800">{mascot.name}</h3>
-        <p className="text-sm text-gray-600">{mascot.description}</p>
-        
-        {/* Barra de progresso para o próximo nível */}
-        <div className="max-w-xs mx-auto">
-          <div className="flex justify-between text-xs text-gray-500 mb-1">
-            <span>Nível {level}</span>
-            <span>Nível {level + 1}</span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-gradient-to-r from-emerald-500 to-green-500 h-2 rounded-full transition-all duration-1000 ease-out"
-              style={{ width: `${progressToNext}%` }}
-            ></div>
-          </div>
-          <div className="text-xs text-center text-gray-500 mt-1">
-            {Math.round(progressToNext)}% para evoluir
+
+      {variant === 'default' && (
+        <div className="mt-4 space-y-2">
+          <h3 className="text-xl font-bold text-slate-800">{mascot.name}</h3>
+          <p className="text-sm text-slate-600">
+            {mascot.description} em modo {stateBadge[journeyState].toLowerCase()}.
+          </p>
+
+          <div className="mx-auto max-w-xs rounded-2xl bg-white/75 p-3 shadow-sm ring-1 ring-slate-100">
+            <div className="mb-1 flex justify-between text-xs text-slate-500">
+              <span>Nivel {level}</span>
+              <span>Nivel {level + 1}</span>
+            </div>
+            <div className="h-2 rounded-full bg-slate-200">
+              <div
+                className="h-2 rounded-full bg-gradient-to-r from-emerald-500 to-green-500 transition-all duration-1000 ease-out"
+                style={{ width: `${progressToNext}%` }}
+              />
+            </div>
+            <div className="mt-1 text-xs text-slate-500">{Math.round(progressToNext)}% para evoluir</div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

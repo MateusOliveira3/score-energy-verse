@@ -382,7 +382,7 @@ const InvoiceHistory = ({
   onSelectInvoice,
   onDeleteInvoice,
   userContext,
-  isExpanded = true,
+  isExpanded = false,
   onToggle,
   showHeader = true,
 }: InvoiceHistoryProps) => {
@@ -437,7 +437,7 @@ const InvoiceHistory = ({
                 </p>
               </div>
               <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-                <span>{isExpanded ? 'Aberto' : 'Fechado'}</span>
+                <span>{isExpanded ? 'Fechar' : 'Explorar'}</span>
                 <ExpansionIcon className="h-4 w-4" />
               </div>
             </div>

@@ -1,5 +1,12 @@
 import React from 'react';
-import { CheckCircle2, ChevronDown, ChevronRight, Lightbulb } from 'lucide-react';
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Lightbulb,
+  Sparkles,
+  Target,
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   AnalysisSummary,
@@ -47,38 +54,46 @@ interface FeedbackContext {
 }
 
 const priorityClasses = {
-  high: 'border-red-200 bg-red-50',
-  medium: 'border-yellow-200 bg-yellow-50',
-  low: 'border-blue-200 bg-blue-50',
+  high: 'border-red-200 bg-red-50/90',
+  medium: 'border-amber-200 bg-amber-50/90',
+  low: 'border-blue-200 bg-blue-50/90',
 } as const;
 
 const priorityLabels = {
   high: 'Alta',
-  medium: 'Média',
+  medium: 'Media',
   low: 'Baixa',
 } as const;
 
 const statusLabels: Record<NextActionStatus, string> = {
-  new: 'Não iniciada',
-  viewed: 'Revisada',
+  new: 'Nao iniciada',
+  viewed: 'Vista',
   in_progress: 'Em andamento',
   completed: 'Testada',
+};
+
+const actionCategoryLabels: Record<ActionCategory, string> = {
+  habito: 'Habito',
+  equipamento: 'Equipamento',
+  tarifa: 'Tarifa',
+  solar: 'Solar',
+  monitoramento: 'Monitoramento',
 };
 
 const actionEngagementOptions: Array<{
   value: ActionEngagementChoice;
   label: string;
 }> = [
-  { value: 'start', label: 'Começar' },
-  { value: 'done', label: 'Já fiz' },
-  { value: 'try', label: 'Vou tentar' },
+  { value: 'start', label: 'Comecar' },
+  { value: 'done', label: 'Ja fiz' },
+  { value: 'try', label: 'Vou testar' },
 ];
 
 const formatCurrency = (value?: number) =>
-  typeof value === 'number' ? `R$ ${value.toFixed(2)}` : 'Custo não identificado';
+  typeof value === 'number' ? `R$ ${value.toFixed(2)}` : 'Custo nao identificado';
 
 const formatConsumption = (value?: number) =>
-  typeof value === 'number' ? `${value} kWh` : 'Consumo não identificado';
+  typeof value === 'number' ? `${value} kWh` : 'Consumo nao identificado';
 
 const formatCurrencyPerKwh = (value?: number) =>
   typeof value === 'number' ? `R$ ${value.toFixed(2)}/kWh` : undefined;
@@ -104,7 +119,7 @@ const getInvoiceReferenceLabel = (invoice: InvoiceData) => {
     return referenceMonth;
   }
 
-  return invoice.month || 'Referência não identificada';
+  return invoice.month || 'Referencia nao identificada';
 };
 
 const getAverageCostPerKwh = (invoice?: InvoiceData) => {
@@ -154,30 +169,30 @@ const buildBlockOrientation = ({
   const primaryGoal = getAnsweredContextValue(userContext, 'primary_goal');
 
   if (profile.consumerType === 'Residencial' && analysis?.consumptionLevel === 'alto') {
-    return 'Para este perfil residencial, vale priorizar hábitos de maior impacto antes de trocar equipamentos.';
+    return 'Neste perfil, vale priorizar habitos de maior impacto antes de pensar em troca de equipamento.';
   }
 
   if (averageCostPerKwh !== undefined && analysis?.costSignal && analysis.costSignal !== 'controlado') {
-    return 'O custo por kWh desta fatura é um sinal de atenção antes de avaliar qualquer investimento.';
+    return 'O custo por kWh desta fatura pede atencao antes de ampliar qualquer decisao.';
   }
 
   if (hasSolarInterest(profile)) {
-    return 'Antes de simular energia solar, vale consolidar uma leitura confiável dos usos que mais pesam.';
+    return 'Antes de simular energia solar, vale firmar uma leitura melhor do uso atual.';
   }
 
   if (primaryGoal === 'reduce_cost') {
-    return 'Priorize ajustes simples e acompanhe o próximo ciclo antes de ampliar a ação.';
+    return 'Priorize ajustes simples e compare o proximo ciclo antes de ampliar a acao.';
   }
 
   if (primaryGoal === 'understand_consumption') {
-    return 'Use esta fatura em foco como referência e compare o próximo ciclo antes de concluir uma causa.';
+    return 'Use esta fatura em foco como base e compare o proximo ciclo antes de concluir uma causa.';
   }
 
   if (analysis?.consumptionLevel === 'baixo') {
-    return 'O consumo desta fatura parece mais contido; vale manter uma leitura neutra e acompanhar o próximo ciclo.';
+    return 'O consumo parece mais contido; mantenha a leitura leve e acompanhe o proximo ciclo.';
   }
 
-  return 'Use esta fatura em foco como referência e valide o próximo ciclo.';
+  return 'Use esta fatura como referencia e observe uma mudanca por vez.';
 };
 
 const buildActionContextLine = ({
@@ -198,35 +213,35 @@ const buildActionContextLine = ({
 
   if (analysis?.consumptionLevel === 'alto' && profile.consumerType === 'Residencial') {
     return action.priority === 'high'
-      ? 'Neste perfil residencial, esta frente pode indicar hábitos que estão puxando o consumo.'
-      : 'Neste perfil residencial, use esta frente como apoio para reduzir desperdícios mais visíveis.';
+      ? 'Neste perfil residencial, esta frente pode revelar habitos que puxam o consumo.'
+      : 'Neste perfil residencial, use esta frente como apoio para reduzir desperdicios mais visiveis.';
   }
 
   if (averageCostPerKwh !== undefined && analysis?.costSignal && analysis.costSignal !== 'controlado') {
-    return 'Nesta fatura, vale relacionar esta ação ao custo por kWh antes de considerar novos gastos.';
+    return 'Nesta fatura, relacione esta acao ao custo por kWh antes de considerar novos gastos.';
   }
 
   if (hasSolarInterest(profile)) {
-    return 'Mesmo com interesse em energia solar, comece pelos sinais mais visíveis da rotina atual.';
+    return 'Mesmo com interesse em energia solar, comece pelos sinais mais visiveis da rotina atual.';
   }
 
   if (primaryGoal === 'reduce_cost') {
-    return 'Priorize esta ação se ela permitir testar um ajuste simples antes do próximo vencimento.';
+    return 'Priorize esta acao se ela permitir um teste simples antes do proximo vencimento.';
   }
 
   if (primaryGoal === 'understand_consumption') {
-    return 'Use esta ação para separar percepção do que a fatura em foco mostra.';
+    return 'Use esta acao para separar percepcao do que a fatura em foco realmente mostra.';
   }
 
   if (action.priority === 'high') {
-    return 'Priorize esta frente primeiro e acompanhe um sinal observável no próximo ciclo.';
+    return 'Priorize esta frente primeiro e acompanhe um sinal observavel no proximo ciclo.';
   }
 
   if (action.priority === 'medium') {
-    return 'Vale observar esta frente depois da principal, sem mudar muitas variáveis ao mesmo tempo.';
+    return 'Vale observar esta frente depois da principal, sem mudar muitas variaveis ao mesmo tempo.';
   }
 
-  return 'Trate esta frente como ajuste complementar e acompanhe se o sinal se repete.';
+  return 'Trate esta frente como ajuste complementar e veja se o sinal se repete.';
 };
 
 const buildActionQuickTip = ({
@@ -241,11 +256,11 @@ const buildActionQuickTip = ({
   const primaryGoal = getAnsweredContextValue(userContext, 'primary_goal');
 
   if (usagePeriod === 'night') {
-    return 'Se o pico costuma acontecer à noite, observe banho, climatização e cargas acumuladas nesse período.';
+    return 'Se o pico costuma acontecer a noite, observe banho, climatizacao e cargas acumuladas nesse periodo.';
   }
 
   if (usagePeriod === 'afternoon') {
-    return 'Se o uso pesa mais à tarde, compare esta ação com equipamentos que ficam ligados por mais tempo nesse período.';
+    return 'Se o uso pesa mais a tarde, compare esta acao com equipamentos ligados por mais tempo nesse periodo.';
   }
 
   if (electricShowerUsage === 'daily') {
@@ -253,57 +268,14 @@ const buildActionQuickTip = ({
   }
 
   if (primaryGoal === 'both') {
-    return 'Registre uma mudança por vez para entender consumo e custo sem confundir os sinais.';
+    return 'Registre uma mudanca por vez para entender consumo e custo sem confundir os sinais.';
   }
 
   if (!analysis) {
-    return 'Use esta fatura em foco como referência e valide o próximo ciclo.';
+    return 'Use esta fatura em foco como referencia e valide o proximo ciclo.';
   }
 
   return undefined;
-};
-
-const buildActionFeedbackMessage = ({
-  choice,
-  action,
-  analysis,
-  invoice,
-  userContext,
-}: {
-  choice: ActionEngagementChoice;
-  action: NextAction;
-  analysis?: AnalysisSummary;
-  invoice?: InvoiceData;
-  userContext?: Partial<UserContextState>;
-}) => {
-  const averageCostPerKwh = getAverageCostPerKwh(invoice);
-  const primaryGoal = getAnsweredContextValue(userContext, 'primary_goal');
-
-  if (choice === 'start') {
-    if (action.priority === 'high') {
-      return 'Boa. Comece por este ponto e acompanhe o reflexo no próximo ciclo.';
-    }
-
-    if (analysis?.costSignal && analysis.costSignal !== 'controlado') {
-      return 'Boa. Vale acompanhar isso na próxima fatura.';
-    }
-
-    return 'Boa. Teste isso agora e veja se o sinal muda no próximo ciclo.';
-  }
-
-  if (choice === 'done') {
-    if (averageCostPerKwh !== undefined) {
-      return 'Perfeito. Veja se isso impacta seu consumo no próximo ciclo.';
-    }
-
-    return 'Perfeito. Compare a próxima fatura para entender se esse ajuste fez diferença.';
-  }
-
-  if (primaryGoal === 'understand_consumption') {
-    return 'Boa escolha. Tente uma mudança por vez para comparar melhor os sinais.';
-  }
-
-  return 'Boa. Vale tentar isso agora e conferir o reflexo na próxima fatura.';
 };
 
 const deriveActionCategory = (action: NextAction): ActionCategory => {
@@ -374,48 +346,48 @@ const buildFeedbackMessage = (
   const leadByIntent: Record<ActionEngagementChoice, Record<NextAction['priority'], string>> = {
     start: {
       high: 'Boa. Comece por este ponto.',
-      medium: 'Boa. Vale começar por aqui.',
+      medium: 'Boa. Vale comecar por aqui.',
       low: 'Bom passo. Comece quando fizer sentido.',
     },
     done: {
-      high: 'Perfeito. Se já aplicou, vale atenção agora.',
-      medium: 'Perfeito. Se já aplicou, acompanhe o próximo ciclo.',
-      low: 'Bom passo. Se já aplicou, acompanhe quando possível.',
+      high: 'Perfeito. Se ja aplicou, vale atencao agora.',
+      medium: 'Perfeito. Se ja aplicou, acompanhe o proximo ciclo.',
+      low: 'Bom passo. Se ja aplicou, acompanhe quando possivel.',
     },
     try: {
-      high: 'Ótimo começo. Vale testar logo.',
-      medium: 'Ótimo começo. Vale testar por alguns dias.',
+      high: 'Otimo comeco. Vale testar logo.',
+      medium: 'Otimo comeco. Vale testar por alguns dias.',
       low: 'Bom caminho. Teste com calma quando puder.',
     },
   };
 
   const habitFollowUp =
     context.electricShowerUsage === 'daily' || context.usagePeriod === 'night'
-      ? 'Se envolve hábito diário, ajuste tempo e uso antes de comparar.'
-      : 'Se envolve hábito diário, ajuste a rotina e compare no próximo ciclo.';
+      ? 'Se envolve habito diario, ajuste tempo e uso antes de comparar.'
+      : 'Se envolve habito diario, ajuste a rotina e compare no proximo ciclo.';
 
   const categoryFollowUp: Record<ActionCategory, string> = {
     habito: habitFollowUp,
-    equipamento: 'Se envolve equipamento, verifique uso e eficiência antes de concluir algo.',
+    equipamento: 'Se envolve equipamento, verifique uso e eficiencia antes de concluir algo.',
     tarifa: context.hints.costPerKwhHigh
       ? 'Olhe o custo por kWh desta fatura antes de concluir qualquer ganho.'
-      : 'Vale acompanhar custo por kWh e bandeira no próximo ciclo.',
+      : 'Vale acompanhar custo por kWh e bandeira no proximo ciclo.',
     solar: context.hints.costPerKwhHigh
       ? 'Antes de investir, observe o custo por kWh desta fatura.'
       : 'Antes de investir, confirme primeiro o que mais pesa nesta fatura.',
-    monitoramento: 'Acompanhe a próxima fatura para ver se o sinal se repete.',
+    monitoramento: 'Acompanhe a proxima fatura para ver se o sinal se repete.',
   };
 
   let followUp = categoryFollowUp[category];
 
   if (context.hints.consumptionHigh && category !== 'solar' && category !== 'tarifa') {
-    followUp = 'Acompanhe os hábitos de maior impacto no próximo ciclo.';
+    followUp = 'Acompanhe os habitos de maior impacto no proximo ciclo.';
   } else if (context.hints.costPerKwhHigh && category !== 'solar' && category !== 'tarifa') {
-    followUp = 'Vale olhar o custo por kWh desta fatura antes de tirar conclusões.';
+    followUp = 'Vale olhar o custo por kWh desta fatura antes de tirar conclusoes.';
   } else if (context.hints.insufficientData) {
-    followUp = 'Use esta fatura como referência e compare o próximo ciclo.';
+    followUp = 'Use esta fatura como referencia e compare o proximo ciclo.';
   } else if (context.primaryGoal === 'understand_consumption' && category === 'monitoramento') {
-    followUp = 'Observe uma mudança por vez para comparar melhor os sinais.';
+    followUp = 'Observe uma mudanca por vez para comparar melhor os sinais.';
   } else if (context.hints.hasSolarPreference && category === 'solar') {
     followUp = 'Antes de investir, compare este sinal com os usos que mais pesam.';
   }
@@ -438,22 +410,26 @@ const buildContextFooter = ({
   const primaryGoal = getAnsweredContextValue(userContext, 'primary_goal');
 
   if (averageCostPerKwh !== undefined && analysis?.costSignal && analysis.costSignal !== 'controlado') {
-    return `O custo por kWh observado ficou em ${formatCurrencyPerKwh(averageCostPerKwh)}; compare o próximo ciclo antes de concluir uma causa.`;
+    return `O custo por kWh observado ficou em ${formatCurrencyPerKwh(averageCostPerKwh)}; compare o proximo ciclo antes de concluir uma causa.`;
   }
 
   if (hasSolarInterest(profile)) {
-    return 'Com preferência por energia solar, vale primeiro confirmar quais usos realmente pesam nesta fatura.';
+    return 'Com preferencia por energia solar, vale primeiro confirmar quais usos realmente pesam nesta fatura.';
   }
 
   if (primaryGoal === 'both') {
-    return 'Como o objetivo atual mistura custo e consumo, priorize uma mudança por vez para comparar melhor.';
+    return 'Como o objetivo mistura custo e consumo, priorize uma mudanca por vez para comparar melhor.';
   }
 
   if (analysis?.consumptionLevel === 'baixo') {
-    return 'A leitura atual parece mais neutra; mantenha esta fatura em foco como referência para a próxima comparação.';
+    return 'A leitura atual parece mais neutra; mantenha esta fatura em foco como referencia para a proxima comparacao.';
   }
 
-  return 'Use esta leitura como base e acompanhe o próximo ciclo antes de ampliar qualquer decisão.';
+  return 'Use esta leitura como base e acompanhe o proximo ciclo antes de ampliar qualquer decisao.';
+};
+
+const buildActionPreview = (action: NextAction, actionContextLine: string) => {
+  return getCompactText(action.context || action.description || actionContextLine, 88);
 };
 
 const SmartRecommendations = ({
@@ -465,7 +441,7 @@ const SmartRecommendations = ({
   profile,
   userContext,
   onSelectInvoice,
-  isExpanded = true,
+  isExpanded = false,
   onToggle,
   showHeader = true,
   onActionStatusChange: _onActionStatusChange,
@@ -509,6 +485,7 @@ const SmartRecommendations = ({
         : [...currentIds, actionId]
     );
   };
+
   const handleActionFeedback = (action: NextAction, choice: ActionEngagementChoice) => {
     setActionFeedbackById((currentFeedback) => ({
       ...currentFeedback,
@@ -520,10 +497,10 @@ const SmartRecommendations = ({
   };
 
   return (
-    <Card className="border-2 border-blue-100 shadow-lg">
+    <Card className="overflow-hidden border border-blue-100 bg-gradient-to-br from-white via-blue-50/55 to-cyan-50/40 shadow-lg">
       {showHeader && (
         <CardHeader
-          className="cursor-pointer"
+          className="cursor-pointer border-b border-blue-100/80 bg-white/70 backdrop-blur"
           role="button"
           tabIndex={0}
           onClick={onToggle}
@@ -535,33 +512,38 @@ const SmartRecommendations = ({
           }}
         >
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-            <div className="space-y-1">
+            <div className="space-y-2">
               <CardTitle className="flex items-center space-x-2 text-blue-700">
                 <Lightbulb className="h-5 w-5" />
-                <span>Ações recomendadas</span>
+                <span>Acoes recomendadas</span>
               </CardTitle>
               <p className="text-sm text-slate-600">
                 {contextInvoiceLabel
-                  ? `Fatura em foco: ${contextInvoiceLabel}. ${blockOrientation}`
-                  : 'As ações seguem a lista global da jornada, sem recálculo local.'}
+                  ? `Fatura em foco: ${contextInvoiceLabel}`
+                  : 'As acoes seguem a lista global da jornada, sem recalculo local.'}
               </p>
+              <div className="inline-flex max-w-full items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-800">
+                <Sparkles className="h-3.5 w-3.5" />
+                <span className="truncate">{blockOrientation}</span>
+              </div>
             </div>
             <div className="flex items-center gap-2 text-sm font-medium text-slate-500 md:self-center">
-              <span>{isExpanded ? 'Aberto' : 'Fechado'}</span>
+              <span>{isExpanded ? 'Fechar' : 'Explorar'}</span>
               <ExpansionIcon className="h-4 w-4" />
             </div>
           </div>
         </CardHeader>
       )}
+
       {isExpanded && (
-        <CardContent>
+        <CardContent className="space-y-5 p-5">
           {showInvoiceSelector && contextInvoice && invoiceHistory && onSelectInvoice && (
-            <div className="mb-6 flex justify-end">
+            <div className="flex justify-end">
               <label className="flex flex-col gap-1 text-sm text-slate-600">
                 <span className="font-medium text-slate-700">Fatura em foco</span>
                 <select
-                  aria-label="Selecionar fatura para contextualizar as ações"
-                  className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                  aria-label="Selecionar fatura para contextualizar as acoes"
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
                   value={contextInvoice.fingerprint}
                   onClick={(event) => event.stopPropagation()}
                   onChange={(event) => {
@@ -583,9 +565,21 @@ const SmartRecommendations = ({
               </label>
             </div>
           )}
-          <div className="mb-6 rounded-lg border border-blue-100 bg-blue-50/70 p-4">
-            <p className="text-sm font-medium text-blue-900">{blockOrientation}</p>
+
+          <div className="rounded-[24px] border border-blue-100 bg-white/85 p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+                <Target className="h-4 w-4" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
+                  Leitura da vez
+                </p>
+                <p className="text-sm font-medium leading-6 text-slate-800">{blockOrientation}</p>
+              </div>
+            </div>
           </div>
+
           <div className="space-y-4">
             {actions.map((action, index) => {
               const status = action.status ?? (viewedActionIds.includes(action.id) ? 'viewed' : 'new');
@@ -608,78 +602,88 @@ const SmartRecommendations = ({
                 { label: 'Como fazer', value: action.suggestion },
                 { label: 'Como validar', value: action.validation },
               ].filter((detail) => Boolean(detail.value));
-              const compactDescription = getCompactText(action.description, 110);
+              const category = deriveActionCategory(action);
+              const summaryLine = buildActionPreview(action, actionContextLine);
+              const compactGoal = getCompactText(action.value, 52);
+              const compactImpact = action.impact ? getCompactText(action.impact, 64) : undefined;
               const hasExpandableDetails = Boolean(
                 action.description ||
                 actionContextLine ||
                 action.value ||
                 action.impact ||
+                actionQuickTip ||
                 details.length > 0
               );
 
               return (
                 <div
                   key={action.id}
-                  className={`rounded-lg border-2 p-4 transition-all duration-300 ${
+                  className={`rounded-[26px] border-2 p-4 transition-all duration-300 ${
                     priorityClasses[action.priority]
                   } ${index === 0 ? 'ring-2 ring-emerald-200' : ''} sm:p-5`}
                 >
                   <div className="space-y-4">
                     <div className="space-y-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {index === 0 && (
+                          <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white">
+                            Mais promissora
+                          </span>
+                        )}
+                        <span className="rounded-full bg-white/90 px-2.5 py-1 text-xs font-medium text-slate-700">
+                          Prioridade {priorityLabels[action.priority]}
+                        </span>
+                        <span className="rounded-full bg-white/90 px-2.5 py-1 text-xs font-medium text-slate-700">
+                          {statusLabels[status]}
+                        </span>
+                        <span className="rounded-full bg-white/90 px-2.5 py-1 text-xs font-medium text-slate-700">
+                          {actionCategoryLabels[category]}
+                        </span>
+                      </div>
+
                       <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {index === 0 && (
-                            <span className="rounded-full bg-emerald-600 px-2 py-1 text-xs font-semibold text-white">
-                              Ação principal
-                            </span>
-                          )}
-                          <h4 className="min-w-0 break-words font-semibold text-gray-800">
-                            {action.title}
-                          </h4>
-                          <span className="rounded-full bg-white/80 px-2 py-1 text-xs font-medium text-gray-700">
-                            Prioridade {priorityLabels[action.priority]}
-                          </span>
-                          <span className="rounded-full bg-white/80 px-2 py-1 text-xs font-medium text-slate-700">
-                            {statusLabels[status]}
-                          </span>
-                        </div>
-
-                        <p className="break-words text-sm leading-relaxed text-gray-700">
-                          {compactDescription}
-                        </p>
+                        <h4 className="min-w-0 break-words text-base font-semibold text-slate-900">
+                          {action.title}
+                        </h4>
+                        <p className="break-words text-sm leading-6 text-slate-700">{summaryLine}</p>
                       </div>
 
-                      <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
-                        {actionEngagementOptions.map((option) => {
-                          const isSelected = actionFeedback?.choice === option.value;
-
-                          return (
-                            <button
-                              key={option.value}
-                              type="button"
-                              className={`inline-flex w-full items-center justify-center rounded-full border px-4 py-2 text-sm font-medium leading-snug transition sm:w-auto ${
-                                isSelected
-                                  ? 'border-blue-600 bg-blue-600 text-white'
-                                  : 'border-white/80 bg-white/85 text-slate-700 hover:border-blue-200 hover:text-blue-700'
-                              }`}
-                              onClick={() => handleActionFeedback(action, option.value)}
-                            >
-                              {option.label}
-                            </button>
-                          );
-                        })}
+                      <div className="flex flex-wrap gap-2">
+                        <span className="rounded-full border border-white/90 bg-white/80 px-3 py-1 text-xs font-medium text-emerald-700">
+                          Objetivo: {compactGoal}
+                        </span>
+                        {compactImpact && (
+                          <span className="rounded-full border border-white/90 bg-white/80 px-3 py-1 text-xs font-medium text-slate-600">
+                            Impacto: {compactImpact}
+                          </span>
+                        )}
                       </div>
-
-                      {actionFeedback && (
-                        <div className="w-full break-words rounded-md border border-emerald-100 bg-emerald-50/90 px-3 py-2 text-sm leading-relaxed text-emerald-800">
-                          {actionFeedback.message}
-                        </div>
-                      )}
                     </div>
 
-                    {actionQuickTip && (
-                      <div className="break-words rounded-md border border-blue-100 bg-blue-50/80 px-3 py-2 text-sm leading-relaxed text-blue-800">
-                        <span className="font-medium">Dica rápida:</span> {actionQuickTip}
+                    <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+                      {actionEngagementOptions.map((option) => {
+                        const isSelected = actionFeedback?.choice === option.value;
+
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            className={`inline-flex w-full items-center justify-center rounded-full border px-4 py-2 text-sm font-medium leading-snug transition sm:w-auto ${
+                              isSelected
+                                ? 'border-blue-600 bg-blue-600 text-white'
+                                : 'border-white/90 bg-white/90 text-slate-700 hover:border-blue-200 hover:text-blue-700'
+                            }`}
+                            onClick={() => handleActionFeedback(action, option.value)}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {actionFeedback && (
+                      <div className="w-full break-words rounded-2xl border border-emerald-100 bg-emerald-50/95 px-3 py-2 text-sm leading-relaxed text-emerald-800">
+                        {actionFeedback.message}
                       </div>
                     )}
 
@@ -687,17 +691,18 @@ const SmartRecommendations = ({
                       <div className="space-y-3">
                         <button
                           type="button"
-                          className="text-sm font-medium text-blue-700 transition hover:text-blue-800"
+                          className="inline-flex items-center gap-2 text-sm font-medium text-blue-700 transition hover:text-blue-800"
                           onClick={() => toggleActionDetails(action.id)}
                         >
                           {isDetailsExpanded ? 'Ocultar detalhes' : 'Ver detalhes'}
+                          {isDetailsExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                         </button>
 
                         {isDetailsExpanded && (
-                          <div className="space-y-3 rounded-md bg-white/75 p-3">
+                          <div className="space-y-4 rounded-[22px] bg-white/80 p-4 shadow-sm">
                             <div className="space-y-1">
                               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                Descrição completa
+                                Descricao completa
                               </span>
                               <p className="break-words text-sm leading-relaxed text-slate-700">
                                 {action.description}
@@ -720,6 +725,12 @@ const SmartRecommendations = ({
                               <p className="text-sm font-semibold text-emerald-700">{action.value}</p>
                             </div>
 
+                            {actionQuickTip && (
+                              <div className="rounded-2xl border border-blue-100 bg-blue-50/80 px-3 py-2 text-sm leading-relaxed text-blue-800">
+                                <span className="font-medium">Dica rapida:</span> {actionQuickTip}
+                              </div>
+                            )}
+
                             {details.length > 0 && (
                               <div className="grid grid-cols-1 gap-3">
                                 {details.map((detail) => (
@@ -740,7 +751,7 @@ const SmartRecommendations = ({
                                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                                   Impacto observado
                                 </span>
-                                <p className="text-xs font-medium text-slate-500">{action.impact}</p>
+                                <p className="text-sm leading-relaxed text-slate-600">{action.impact}</p>
                               </div>
                             )}
                           </div>
@@ -749,15 +760,15 @@ const SmartRecommendations = ({
                     )}
 
                     {isInProgress && (
-                      <div className="break-words rounded-md bg-blue-50 px-3 py-2 text-sm font-medium leading-relaxed text-blue-700">
-                        Ação em andamento. Quando testar na rotina, marque como testada.
+                      <div className="break-words rounded-2xl bg-blue-50 px-3 py-2 text-sm font-medium leading-relaxed text-blue-700">
+                        Acao em andamento. Quando testar na rotina, marque como testada.
                       </div>
                     )}
 
                     {isCompleted && (
-                      <div className="flex items-start gap-2 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium leading-relaxed text-emerald-700 sm:items-center">
+                      <div className="flex items-start gap-2 rounded-2xl bg-emerald-50 px-3 py-2 text-sm font-medium leading-relaxed text-emerald-700 sm:items-center">
                         <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 sm:mt-0" />
-                        Ação testada e registrada no progresso da jornada.
+                        Acao testada e registrada no progresso da jornada.
                       </div>
                     )}
                   </div>
@@ -766,23 +777,26 @@ const SmartRecommendations = ({
             })}
           </div>
 
-          <p className="mt-4 text-sm text-slate-500">
-            Acompanhe estas ações na próxima fatura para validar o impacto.
+          <p className="text-sm text-slate-500">
+            Guarde o detalhe para quando precisar. No dia a dia, acompanhe estas acoes pela proxima fatura.
           </p>
 
           {contextInvoice && (
-            <div className="mt-6 rounded-lg bg-gradient-to-r from-emerald-50 to-blue-50 p-4">
-              <div className="text-center text-sm">
-                <p className="font-medium text-gray-700">
-                  Fatura em foco: {contextInvoiceLabel}
-                </p>
+            <div className="rounded-[24px] bg-gradient-to-r from-emerald-50 via-white to-blue-50 p-4">
+              <div className="space-y-2 text-sm">
+                <p className="font-medium text-slate-800">Fatura em foco: {contextInvoiceLabel}</p>
                 {analysis && (
-                  <p className="text-gray-600">
-                    Consumo: {formatConsumption(contextInvoice.consumption)} • Custo:{' '}
-                    {formatCurrency(contextInvoice.totalValue)} • {analysis.efficiencyLabel}
-                  </p>
+                  <div className="flex flex-wrap gap-2 text-slate-600">
+                    <span className="rounded-full bg-white/80 px-3 py-1">
+                      Consumo: {formatConsumption(contextInvoice.consumption)}
+                    </span>
+                    <span className="rounded-full bg-white/80 px-3 py-1">
+                      Custo: {formatCurrency(contextInvoice.totalValue)}
+                    </span>
+                    <span className="rounded-full bg-white/80 px-3 py-1">{analysis.efficiencyLabel}</span>
+                  </div>
                 )}
-                <p className="mt-2 text-gray-600">{footerContext}</p>
+                <p className="leading-6 text-slate-600">{footerContext}</p>
               </div>
             </div>
           )}
