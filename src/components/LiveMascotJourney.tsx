@@ -1,10 +1,13 @@
 import React from 'react';
 import {
-  ArrowRight,
-  Eye,
-  MousePointerClick,
+  BarChart3,
+  ClipboardList,
+  History,
+  Lightbulb,
+  LucideIcon,
   Sparkles,
   Target,
+  UserRound,
   Zap,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +24,13 @@ import {
 import EcoMascot from './EcoMascot';
 
 export type JourneyTarget = 'profile' | 'upload' | 'summary' | 'actions' | 'history';
+export type JourneyShortcutId = 'score' | 'history' | 'actions' | 'summary' | 'profile';
+
+export interface JourneyShortcut {
+  id: JourneyShortcutId;
+  hint: string;
+  label: string;
+}
 
 interface LiveMascotJourneyProps {
   guidance: MascotGuidance;
@@ -32,13 +42,20 @@ interface LiveMascotJourneyProps {
   customization?: MascotCustomizationData;
   profile: UserProfileData;
   onNavigate: (target: JourneyTarget) => void;
+  onMascotInteract?: () => void;
+  onCo2Interact?: (payload: { tip: string; objective: string }) => void;
+  shortcuts?: JourneyShortcut[];
+  activeShortcutId?: JourneyShortcutId | null;
+  onShortcutSelect?: (shortcutId: JourneyShortcutId) => void;
+  scorePanel?: React.ReactNode;
+  contextPanel?: React.ReactNode;
 }
 
 const trailSteps = [
-  { id: 'profile', label: 'Perfil', cue: 'Base da jornada' },
-  { id: 'upload', label: 'Fatura', cue: 'Sinal inicial' },
-  { id: 'summary', label: 'Leitura', cue: 'Entender o momento' },
-  { id: 'actions', label: 'Acao', cue: 'Mover a jornada' },
+  { id: 'profile', label: 'Perfil' },
+  { id: 'upload', label: 'Fatura' },
+  { id: 'summary', label: 'Leitura' },
+  { id: 'actions', label: 'Acao' },
 ] as const;
 
 const stageLabels = {
@@ -49,20 +66,71 @@ const stageLabels = {
   'return-visit': 'Retomada',
 } as const;
 
+const shortcutIcons: Record<JourneyShortcutId, LucideIcon> = {
+  score: Zap,
+  history: History,
+  actions: Lightbulb,
+  summary: BarChart3,
+  profile: UserRound,
+};
+
 const visualCo2Tips = [
   'Comparar ciclos parecidos evita conclusoes apressadas sobre eficiencia.',
   'Uma mudanca por vez deixa o consumo mais facil de interpretar.',
   'Equipamentos em espera somam gasto silencioso ao longo da semana.',
   'Luz natural e ventilacao aliviam consumo sem exigir mudanca brusca.',
   'Horario de uso costuma revelar desperdicios que o olho nao pega.',
-] as const;
+];
 
 const co2Bubbles = [
-  { id: 'bubble-1', label: 'CO2', classes: 'left-[8%] top-16' },
-  { id: 'bubble-2', label: 'CO2', classes: 'left-[30%] top-6' },
-  { id: 'bubble-3', label: 'CO2', classes: 'left-[55%] top-20' },
-  { id: 'bubble-4', label: 'CO2', classes: 'right-[18%] top-8' },
-  { id: 'bubble-5', label: 'CO2', classes: 'right-[6%] top-24' },
+  {
+    id: 'bubble-1',
+    label: 'CO2',
+    requiredLevel: 1,
+    zone: 'baixo',
+    classes: 'left-[12%] bottom-24 sm:left-[16%]',
+  },
+  {
+    id: 'bubble-2',
+    label: 'CO2',
+    requiredLevel: 1,
+    zone: 'baixo',
+    classes: 'right-[10%] bottom-28 sm:right-[18%]',
+  },
+  {
+    id: 'bubble-3',
+    label: 'CO2',
+    requiredLevel: 2,
+    zone: 'medio',
+    classes: 'left-[22%] bottom-[43%] sm:left-[28%]',
+  },
+  {
+    id: 'bubble-4',
+    label: 'CO2',
+    requiredLevel: 2,
+    zone: 'medio',
+    classes: 'right-[18%] bottom-[51%] sm:right-[24%]',
+  },
+  {
+    id: 'bubble-5',
+    label: 'CO2',
+    requiredLevel: 3,
+    zone: 'alto',
+    classes: 'left-[38%] bottom-[68%] sm:left-[42%]',
+  },
+  {
+    id: 'bubble-6',
+    label: 'CO2',
+    requiredLevel: 4,
+    zone: 'alto',
+    classes: 'right-[28%] bottom-[78%] sm:right-[34%]',
+  },
+] as const;
+
+const heightGuides = [
+  { id: 'high', classes: 'bottom-[76%]' },
+  { id: 'mid', classes: 'bottom-[50%]' },
+  { id: 'low', classes: 'bottom-[26%]' },
 ] as const;
 
 const compactSentence = (value: string, maxLength = 108) => {
@@ -116,7 +184,9 @@ const getJourneyTarget = ({
     return {
       target: 'actions' as const,
       title: nextAction.title,
-      cue: compactSentence(nextAction.value || nextAction.description || 'Abra a acao destacada e teste um ajuste observavel.'),
+      cue: compactSentence(
+        nextAction.value || nextAction.description || 'Abra a acao destacada e teste um ajuste observavel.'
+      ),
       objective: compactSentence(
         nextAction.value || nextAction.description || 'Levar a leitura para uma acao observavel.'
       ),
@@ -128,7 +198,9 @@ const getJourneyTarget = ({
     return {
       target: 'summary' as const,
       title: latestAnalysis.whatMattersNext || 'Revisar a leitura',
-      cue: compactSentence(latestAnalysis.headline || 'Abra o resumo e confirme o sinal mais forte da fatura em foco.'),
+      cue: compactSentence(
+        latestAnalysis.headline || 'Abra o resumo e confirme o sinal mais forte da fatura em foco.'
+      ),
       objective: compactSentence(
         latestAnalysis.whatMattersNext || 'Entender o que esta puxando a jornada neste ciclo.'
       ),
@@ -145,18 +217,6 @@ const getJourneyTarget = ({
   };
 };
 
-const getFlowIndexByTarget = (target: JourneyTarget) => {
-  if (target === 'profile' || target === 'upload') {
-    return 0;
-  }
-
-  if (target === 'summary' || target === 'history') {
-    return 1;
-  }
-
-  return 2;
-};
-
 const LiveMascotJourney = ({
   guidance,
   nextActions,
@@ -167,18 +227,22 @@ const LiveMascotJourney = ({
   customization,
   profile,
   onNavigate,
+  onMascotInteract,
+  onCo2Interact,
+  shortcuts,
+  activeShortcutId,
+  onShortcutSelect,
+  scorePanel,
+  contextPanel,
 }: LiveMascotJourneyProps) => {
+  const initialTip = 'Toque em um CO2 ao alcance.';
   const [capturedBubbleIds, setCapturedBubbleIds] = React.useState<string[]>([]);
   const [tipIndex, setTipIndex] = React.useState(0);
-  const [activeTip, setActiveTip] = React.useState<{
-    tip: string;
-    objective: string;
-  }>({
-    tip: 'Capture um CO2 visual para puxar uma dica rapida.',
-    objective: 'Objetivo atual ainda aguardando o proximo movimento do mascote.',
-  });
-  const [isMascotLifted, setIsMascotLifted] = React.useState(false);
+  const [isPlantSwaying, setIsPlantSwaying] = React.useState(false);
+  const [isGrowthHighlighted, setIsGrowthHighlighted] = React.useState(false);
   const timeoutIdsRef = React.useRef<number[]>([]);
+  const feedbackTimeoutRef = React.useRef<number | null>(null);
+  const previousJourneyLevelRef = React.useRef(1);
   const nextAction = nextActions.find((action) => action.status !== 'completed') || nextActions[0];
   const currentTarget = getJourneyTarget({
     invoiceCount,
@@ -191,9 +255,16 @@ const LiveMascotJourney = ({
     trailSteps.findIndex((step) => step.id === trailTargetId),
     0
   );
-  const trailProgress = (currentStepIndex / (trailSteps.length - 1)) * 100;
-  const trailFillWidth = currentStepIndex === 0 ? '0%' : `calc(${trailProgress}% - 0.5rem)`;
-  const activeBubbleCount = co2Bubbles.length - capturedBubbleIds.length;
+  const journeyLevel = Math.max(currentStepIndex + 1, 1);
+  const unlockedBubbleCount = co2Bubbles.filter(
+    (bubble) => bubble.requiredLevel <= journeyLevel
+  ).length;
+  const capturedUnlockedCount = capturedBubbleIds.filter((bubbleId) =>
+    co2Bubbles.some(
+      (bubble) => bubble.id === bubbleId && bubble.requiredLevel <= journeyLevel
+    )
+  ).length;
+  const activeBubbleCount = unlockedBubbleCount - capturedUnlockedCount;
   const journeyState =
     trailTargetId === 'actions'
       ? 'action'
@@ -202,67 +273,73 @@ const LiveMascotJourney = ({
         : trailTargetId === 'upload'
           ? 'observe'
           : 'wake';
-  const flowIndex = getFlowIndexByTarget(currentTarget.target);
-  const flowSteps = [
-    {
-      label: 'Olhar',
-      body:
-        trailTargetId === 'profile' || trailTargetId === 'upload'
-          ? currentTarget.title
-          : invoiceCount > 0
-            ? 'Veja onde o mascote acendeu a trilha.'
-            : 'Encontre o primeiro marco que falta.',
-      Icon: Eye,
-    },
-    {
-      label: 'Entender',
-      body:
-        trailTargetId === 'summary' || trailTargetId === 'history'
-          ? currentTarget.cue
-          : compactSentence(guidance.message, 86),
-      Icon: Sparkles,
-    },
-    {
-      label: 'Agir',
-      body:
-        trailTargetId === 'actions'
-          ? currentTarget.objective
-          : compactSentence(nextAction?.value || currentTarget.objective, 86),
-      Icon: MousePointerClick,
-    },
-  ];
+
+  React.useEffect(() => {
+    previousJourneyLevelRef.current = journeyLevel;
+  }, []);
 
   React.useEffect(() => {
     const intervalId = window.setInterval(() => {
-      setIsMascotLifted((currentValue) => !currentValue);
-    }, 1200);
+      setIsPlantSwaying((currentValue) => !currentValue);
+    }, 1600);
 
     return () => {
       window.clearInterval(intervalId);
       timeoutIdsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      if (feedbackTimeoutRef.current !== null) {
+        window.clearTimeout(feedbackTimeoutRef.current);
+      }
     };
   }, []);
 
   React.useEffect(() => {
-    setActiveTip((currentTip) =>
-      currentTip.tip === 'Capture um CO2 visual para puxar uma dica rapida.'
-        ? currentTip
-        : { ...currentTip, objective: currentTarget.objective }
-    );
-  }, [currentTarget.objective]);
+    if (journeyLevel <= previousJourneyLevelRef.current) {
+      previousJourneyLevelRef.current = journeyLevel;
+      return;
+    }
+
+    setIsGrowthHighlighted(true);
+
+    if (feedbackTimeoutRef.current !== null) {
+      window.clearTimeout(feedbackTimeoutRef.current);
+    }
+
+    feedbackTimeoutRef.current = window.setTimeout(() => {
+      setIsGrowthHighlighted(false);
+      feedbackTimeoutRef.current = null;
+    }, 2600);
+
+    previousJourneyLevelRef.current = journeyLevel;
+  }, [journeyLevel]);
 
   const handleCaptureBubble = (bubbleId: string) => {
+    const bubble = co2Bubbles.find((currentBubble) => currentBubble.id === bubbleId);
+
+    if (!bubble) {
+      return;
+    }
+
+    if (bubble.requiredLevel > journeyLevel) {
+      onCo2Interact?.({
+        tip: 'Ainda fora do alcance da planta.',
+        objective: currentTarget.cta,
+      });
+      return;
+    }
+
     if (capturedBubbleIds.includes(bubbleId)) {
       return;
     }
 
     const nextTipIndex = tipIndex % visualCo2Tips.length;
+    const nextPayload = {
+      tip: visualCo2Tips[nextTipIndex],
+      objective: currentTarget.cta,
+    };
+
     setTipIndex((currentIndex) => currentIndex + 1);
     setCapturedBubbleIds((currentIds) => [...currentIds, bubbleId]);
-    setActiveTip({
-      tip: visualCo2Tips[nextTipIndex],
-      objective: currentTarget.objective,
-    });
+    onCo2Interact?.(nextPayload);
 
     const timeoutId = window.setTimeout(() => {
       setCapturedBubbleIds((currentIds) => currentIds.filter((id) => id !== bubbleId));
@@ -272,7 +349,7 @@ const LiveMascotJourney = ({
   };
 
   return (
-    <Card className="overflow-hidden border border-emerald-100 bg-gradient-to-br from-slate-950 via-emerald-950 to-cyan-950 text-white shadow-xl">
+    <Card className="overflow-hidden border border-emerald-100 bg-gradient-to-br from-slate-950 via-emerald-950 to-teal-950 text-white shadow-xl">
       <CardContent className="relative overflow-hidden p-5 sm:p-6">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top,rgba(52,211,153,0.28),transparent_58%)]" />
         <div className="pointer-events-none absolute -right-16 top-10 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl" />
@@ -280,20 +357,14 @@ const LiveMascotJourney = ({
 
         <div className="relative space-y-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-3">
+            <div className="space-y-2">
               <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-100">
                 <Sparkles className="h-3.5 w-3.5" />
-                Mascote condutor v2
+                Jornada unificada
               </div>
 
-              <div className="space-y-2">
-                <h1 className="text-2xl font-semibold text-white sm:text-3xl">
-                  Siga o mascote: olhar, entender e agir.
-                </h1>
-                <p className="max-w-2xl text-sm leading-6 text-emerald-50/80">
-                  {compactSentence(guidance.message, 138)}
-                </p>
-              </div>
+              <h1 className="text-2xl font-semibold text-white sm:text-3xl">{currentTarget.title}</h1>
+              <p className="max-w-2xl text-sm leading-6 text-emerald-50/75">{currentTarget.cue}</p>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -309,221 +380,217 @@ const LiveMascotJourney = ({
             </div>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-[1.6fr_0.8fr]">
-            <div className="rounded-[30px] border border-white/10 bg-white/5 p-4 backdrop-blur">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-100/80">
-                    Trilha guiada
-                  </p>
-                  <p className="mt-1 text-sm text-emerald-50/75">
-                    O proximo passo nasce do ponto em que o mascote toca.
-                  </p>
-                </div>
-                <div className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-medium text-emerald-50/80">
-                  CO2 visual ativo: {activeBubbleCount}
-                </div>
-              </div>
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
+            <div className="space-y-4">
+              <div className="rounded-[30px] border border-white/10 bg-white/5 p-4 backdrop-blur">
+                <div className="relative min-h-[360px] overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/45 px-4 py-6 sm:px-6">
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.18),transparent_62%)]" />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-emerald-950 via-emerald-950/95 to-transparent" />
+                  <div className="pointer-events-none absolute inset-x-6 bottom-0 h-20 rounded-t-[90px] bg-gradient-to-b from-emerald-800/35 to-emerald-950" />
 
-              <div className="relative mt-6 min-h-[320px] rounded-[26px] border border-white/10 bg-slate-950/35 px-4 py-8 sm:px-6">
-                <div className="absolute left-6 right-6 top-[42%] h-2 rounded-full bg-white/10" />
-                <div
-                  className="absolute left-6 top-[42%] h-2 rounded-full bg-gradient-to-r from-emerald-400 via-cyan-300 to-emerald-300 transition-all duration-700"
-                  style={{ width: trailFillWidth }}
-                />
-
-                {trailSteps.map((step, index) => {
-                  const isReached = index <= currentStepIndex;
-                  const isCurrent = step.id === trailTargetId;
-                  const leftPosition = `${(index / (trailSteps.length - 1)) * 100}%`;
-
-                  return (
+                  {heightGuides.map((guide) => (
                     <div
-                      key={step.id}
-                      className="absolute top-[42%] w-24 -translate-x-1/2 -translate-y-1/2 text-center"
-                      style={{ left: `calc(1.5rem + (${leftPosition} * (100% - 3rem) / 100))` }}
+                      key={guide.id}
+                      className={cn(
+                        'pointer-events-none absolute left-6 right-6',
+                        guide.classes
+                      )}
+                    >
+                      <div className="h-px border-t border-dashed border-white/12" />
+                    </div>
+                  ))}
+
+                  <div className="absolute right-4 top-4 z-10 rounded-full border border-white/10 bg-slate-950/50 px-3 py-1 text-xs font-medium text-emerald-50/80 backdrop-blur">
+                    {activeBubbleCount}
+                  </div>
+
+                  <div
+                    className={cn(
+                      'absolute bottom-14 left-1/2 z-10 -translate-x-1/2 transition-transform duration-700',
+                      isGrowthHighlighted && 'scale-[1.03]'
+                    )}
+                    style={{
+                      transform: `translateX(-50%) rotate(${isPlantSwaying ? '-1.5deg' : '1.5deg'})`,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onMascotInteract) {
+                          onMascotInteract();
+                          return;
+                        }
+
+                        onNavigate(currentTarget.target);
+                      }}
+                      className="group flex flex-col items-center gap-3 text-center"
                     >
                       <div
                         className={cn(
-                          'mx-auto flex h-11 w-11 items-center justify-center rounded-full border text-xs font-semibold transition-all duration-300',
-                          isReached
-                            ? 'border-emerald-200 bg-emerald-300 text-slate-950 shadow-lg shadow-emerald-400/30'
-                            : 'border-white/20 bg-white/10 text-white/70',
-                          isCurrent && 'scale-110 ring-4 ring-emerald-300/20'
+                          'relative rounded-[34px] border border-white/15 bg-white/10 px-4 py-4 shadow-2xl shadow-emerald-500/15 backdrop-blur-sm transition-transform duration-300 group-hover:scale-[1.03]',
+                          isGrowthHighlighted && 'border-emerald-200/35 shadow-emerald-300/25'
                         )}
                       >
-                        {index + 1}
+                        <div className="pointer-events-none absolute inset-0 rounded-[34px] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.28),transparent_60%)]" />
+                        <EcoMascot
+                          score={Math.max(journeyLevel * 200, 200)}
+                          level={journeyLevel}
+                          consumerType={profile.consumerType}
+                          customization={customization}
+                          variant="compact"
+                          journeyState={journeyState}
+                        />
                       </div>
-                      <div className="mt-3 text-[11px] font-medium uppercase tracking-[0.14em] text-emerald-50/80">
-                        {step.label}
-                      </div>
-                      <div className="mt-1 text-[10px] text-emerald-50/60">{step.cue}</div>
+                    </button>
+                  </div>
 
-                      {isCurrent && (
-                        <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-300 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-950 shadow-sm">
-                          Agora
-                          <ArrowRight className="h-3 w-3" />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                  {co2Bubbles.map((bubble, index) => {
+                    const isCaptured = capturedBubbleIds.includes(bubble.id);
+                    const isUnlocked = bubble.requiredLevel <= journeyLevel;
 
-                <div
-                  className="absolute z-10 -translate-x-1/2"
-                  style={{
-                    left: `calc(1.5rem + (${trailProgress}% * (100% - 3rem) / 100))`,
-                    top: isMascotLifted ? '18%' : '20%',
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => onNavigate(currentTarget.target)}
-                    className="group flex flex-col items-center gap-3 text-center"
-                  >
-                    <div className="rounded-full bg-white/8 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-100">
-                      Toque no mascote
-                    </div>
-
-                    <div className="relative rounded-[34px] border border-white/15 bg-white/10 px-4 py-4 shadow-2xl shadow-emerald-500/20 backdrop-blur-sm transition-transform duration-300 group-hover:scale-[1.03]">
-                      <div className="pointer-events-none absolute inset-0 rounded-[34px] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.32),transparent_60%)]" />
-                      <EcoMascot
-                        score={Math.max((currentStepIndex + 1) * 200, 200)}
-                        level={Math.max(currentStepIndex + 1, 1)}
-                        consumerType={profile.consumerType}
-                        customization={customization}
-                        variant="compact"
-                        journeyState={journeyState}
-                      />
-                    </div>
-
-                    <div className="max-w-[220px] rounded-[22px] border border-emerald-200/20 bg-slate-950/70 px-3 py-3 shadow-lg">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-100/80">
-                        Proxima chamada
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-white">{currentTarget.title}</p>
-                      <p className="mt-2 text-xs leading-5 text-emerald-50/75">{currentTarget.cue}</p>
-                    </div>
-                  </button>
+                    return (
+                      <button
+                        key={bubble.id}
+                        type="button"
+                        onClick={() => handleCaptureBubble(bubble.id)}
+                        aria-label={`Ler CO2 ${bubble.zone} ${index + 1}`}
+                        className={cn(
+                          'absolute z-10 rounded-full border px-3 py-1 text-xs font-semibold tracking-[0.12em] shadow-lg backdrop-blur transition-all duration-300',
+                          bubble.classes,
+                          isUnlocked
+                            ? 'border-emerald-200/40 bg-white/15 text-emerald-50 hover:-translate-y-1 hover:bg-emerald-300/20'
+                            : 'border-white/10 bg-white/5 text-white/35',
+                          isCaptured && 'pointer-events-none scale-75 opacity-0',
+                          isUnlocked && bubble.requiredLevel === journeyLevel && 'animate-pulse'
+                        )}
+                      >
+                        <span>{bubble.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
 
-                {co2Bubbles.map((bubble, index) => {
-                  const isCaptured = capturedBubbleIds.includes(bubble.id);
+                <div className="mt-4 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+                  <div className="grid gap-3 sm:grid-cols-4">
+                    {trailSteps.map((step, index) => {
+                      const isReached = index <= currentStepIndex;
+                      const isCurrent = step.id === trailTargetId;
 
-                  return (
-                    <button
-                      key={bubble.id}
+                      return (
+                        <div
+                          key={step.id}
+                          className={cn(
+                            'rounded-[22px] border px-3 py-3 transition-all duration-300',
+                            isReached
+                              ? 'border-emerald-200/30 bg-emerald-300/12'
+                              : 'border-white/10 bg-white/5',
+                            isCurrent && 'shadow-lg shadow-emerald-900/20'
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-semibold text-white">{step.label}</span>
+                            <span
+                              className={cn(
+                                'flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold',
+                                isReached
+                                  ? 'bg-emerald-300 text-slate-950'
+                                  : 'bg-white/10 text-white/65'
+                              )}
+                            >
+                              {index + 1}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="rounded-[24px] border border-emerald-200/20 bg-slate-950/55 p-4 shadow-lg">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-100/80">
+                      Proxima chamada
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-white">{currentTarget.objective}</p>
+                    <Button
                       type="button"
-                      onClick={() => handleCaptureBubble(bubble.id)}
-                      aria-label={`Capturar dica visual ${index + 1}`}
-                      className={cn(
-                        'absolute rounded-full border border-emerald-200/40 bg-white/15 px-3 py-1 text-xs font-semibold tracking-[0.12em] text-emerald-50 shadow-lg backdrop-blur transition-all duration-300',
-                        bubble.classes,
-                        isCaptured
-                          ? 'pointer-events-none scale-75 opacity-0'
-                          : 'animate-pulse hover:-translate-y-1 hover:bg-emerald-300/20'
-                      )}
+                      onClick={() => onNavigate(currentTarget.target)}
+                      variant="ghost"
+                      className="mt-4 w-full justify-between rounded-[18px] border border-white/10 bg-white/5 text-emerald-50 hover:bg-white/10"
                     >
-                      {bubble.label}
-                    </button>
-                  );
-                })}
+                      {currentTarget.cta}
+                      <Target className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
 
             <div className="space-y-4">
-              <div className="rounded-[28px] border border-white/10 bg-white/6 p-4 backdrop-blur">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100/80">
-                  Sequencia da jornada
-                </p>
+              {scorePanel}
 
-                <div className="mt-4 space-y-3">
-                  {flowSteps.map((step, index) => {
-                    const isActive = index === flowIndex;
-                    const isDone = index < flowIndex;
-
-                    return (
-                      <div
-                        key={step.label}
-                        className={cn(
-                          'rounded-[22px] border px-4 py-3 transition-all duration-200',
-                          isActive
-                            ? 'border-emerald-300/40 bg-emerald-300/12 shadow-sm'
-                            : 'border-white/10 bg-white/5',
-                          isDone && 'border-cyan-300/30 bg-cyan-300/10'
-                        )}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div
-                            className={cn(
-                              'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl',
-                              isActive || isDone ? 'bg-white/15 text-white' : 'bg-white/8 text-white/65'
-                            )}
-                          >
-                            <step.Icon className="h-4 w-4" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-white">{step.label}</p>
-                            <p className="mt-1 text-sm leading-5 text-emerald-50/72">{step.body}</p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="rounded-[28px] border border-white/10 bg-white/6 p-4 backdrop-blur">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-cyan-300/20 text-cyan-100">
-                    <Zap className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100/80">
-                      Dica capturada
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-cyan-50/85" aria-live="polite">
-                      {activeTip.tip}
-                    </p>
-                    <div className="mt-3 rounded-2xl border border-emerald-200/15 bg-slate-950/45 px-3 py-2 text-xs leading-5 text-emerald-50/80">
-                      Objetivo atual: {activeTip.objective}
+              {shortcuts && shortcuts.length > 0 && (
+                <div className="rounded-[28px] border border-white/10 bg-white/6 p-4 backdrop-blur">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-100/70">
+                        Acessos do hub
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-white">Troque o foco sem sair da jornada</p>
+                    </div>
+                    <div className="rounded-full border border-white/10 bg-slate-950/45 px-3 py-1 text-xs font-medium text-emerald-50/75">
+                      1 painel
                     </div>
                   </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {shortcuts.map((shortcut) => {
+                      const ShortcutIcon = shortcutIcons[shortcut.id];
+                      const isActive = activeShortcutId === shortcut.id;
+
+                      return (
+                        <button
+                          key={shortcut.id}
+                          type="button"
+                          onClick={() => onShortcutSelect?.(shortcut.id)}
+                          className={cn(
+                            'rounded-[22px] border p-3 text-left transition-all duration-200',
+                            isActive
+                              ? 'border-emerald-200/40 bg-emerald-300/18 shadow-lg shadow-emerald-950/20'
+                              : 'border-white/10 bg-white/5 hover:border-emerald-200/20 hover:bg-white/10'
+                          )}
+                        >
+                          <div className="flex items-center gap-2 text-white">
+                            <div
+                              className={cn(
+                                'flex h-8 w-8 items-center justify-center rounded-2xl',
+                                isActive ? 'bg-white/20' : 'bg-white/10'
+                              )}
+                            >
+                              <ShortcutIcon className="h-4 w-4" />
+                            </div>
+                            <span className="text-sm font-semibold">{shortcut.label}</span>
+                          </div>
+                          <p className="mt-2 text-xs leading-5 text-emerald-50/70">{shortcut.hint}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {contextPanel}
+
+              <div className="rounded-[24px] border border-white/10 bg-white/6 p-4">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-100/70">
+                  Perfil ativo
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2 text-sm text-white/85">
+                  <span className="rounded-full bg-white/10 px-3 py-1.5">{profileCompletion}% completo</span>
+                  {profile.location && (
+                    <span className="rounded-full bg-white/10 px-3 py-1.5">{profile.location}</span>
+                  )}
+                  <span className="rounded-full bg-white/10 px-3 py-1.5">{profile.energyPreference}</span>
                 </div>
               </div>
-
-              <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-                <div className="rounded-[24px] border border-white/10 bg-white/6 p-3">
-                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-100/70">
-                    Perfil
-                  </div>
-                  <div className="mt-2 text-lg font-semibold text-white">{profileCompletion}%</div>
-                </div>
-                <div className="rounded-[24px] border border-white/10 bg-white/6 p-3">
-                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-100/70">
-                    Faturas
-                  </div>
-                  <div className="mt-2 text-lg font-semibold text-white">{invoiceCount}</div>
-                </div>
-                <div className="rounded-[24px] border border-white/10 bg-white/6 p-3">
-                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-100/70">
-                    Foco
-                  </div>
-                  <div className="mt-2 text-sm font-semibold leading-5 text-white">
-                    {currentTarget.cta}
-                  </div>
-                </div>
-              </div>
-
-              <Button
-                type="button"
-                onClick={() => onNavigate(currentTarget.target)}
-                variant="ghost"
-                className="w-full justify-between rounded-[22px] border border-white/10 bg-white/5 text-emerald-50 hover:bg-white/10"
-              >
-                Apoio rapido: {currentTarget.cta}
-                <Target className="h-4 w-4" />
-              </Button>
             </div>
           </div>
         </div>
