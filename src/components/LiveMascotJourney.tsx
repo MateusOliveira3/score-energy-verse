@@ -6,7 +6,6 @@ import {
   Sparkles,
   Target,
   UserRound,
-  Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -21,7 +20,7 @@ import {
 import EcoMascot from './EcoMascot';
 
 export type JourneyTarget = 'profile' | 'upload' | 'summary' | 'actions' | 'history';
-export type JourneyQuickAccessId = 'score' | 'history' | 'actions' | 'summary' | 'profile';
+export type JourneyQuickAccessId = 'history' | 'actions' | 'summary' | 'profile';
 
 interface LiveMascotJourneyProps {
   guidance: MascotGuidance;
@@ -74,22 +73,21 @@ const co2Bubbles = [
   {
     id: 'bubble-high',
     requiredLevel: 4,
-    classes: 'right-[3.5%] top-[16%]',
+    classes: 'right-[4.2%] top-[17%]',
   },
   {
     id: 'bubble-mid',
     requiredLevel: 2,
-    classes: 'right-[3.5%] top-[47%]',
+    classes: 'right-[4.2%] top-[48.5%]',
   },
   {
     id: 'bubble-low',
     requiredLevel: 1,
-    classes: 'right-[3.5%] top-[79%]',
+    classes: 'right-[4.2%] top-[79.5%]',
   },
 ] as const;
 
 const quickAccessItems = [
-  { id: 'score', label: 'Score', icon: Zap },
   { id: 'history', label: 'Historico', icon: BarChart3 },
   { id: 'actions', label: 'Acoes', icon: Lightbulb },
   { id: 'summary', label: 'Leitura', icon: ClipboardList },
@@ -152,7 +150,7 @@ const getJourneyTarget = ({
       title: 'Envie a primeira fatura',
       cue: 'Acenda a trilha para transformar leitura em orientacao.',
       objective: 'Trazer o primeiro ciclo para a jornada.',
-      cta: 'Enviar fatura',
+      cta: 'Adicionar fatura',
     };
   }
 
@@ -317,6 +315,19 @@ const LiveMascotJourney = ({
   return (
     <Card className="overflow-hidden border border-[#29554f] bg-transparent shadow-none">
       <CardContent className="px-0 py-0">
+        <style>
+          {`
+            @keyframes journey-cloud-drift {
+              0%, 100% { transform: translate3d(0, 0, 0); }
+              50% { transform: translate3d(8px, -4px, 0); }
+            }
+
+            @keyframes journey-co2-drift {
+              0%, 100% { transform: translate3d(0, 0, 0); }
+              50% { transform: translate3d(0, -7px, 0); }
+            }
+          `}
+        </style>
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.66fr)_minmax(0,0.82fr)]">
           <div className="rounded-[28px] border border-[#29554f] bg-[#103a35] p-5 text-white shadow-[0_18px_40px_rgba(0,0,0,0.18)] sm:p-7">
             <div className="space-y-5">
@@ -344,18 +355,29 @@ const LiveMascotJourney = ({
                 </div>
               </div>
 
-              <div className="rounded-[22px] border border-[#29554f] bg-[#0f342f] p-3">
-                <div className="relative h-[366px] overflow-hidden rounded-[18px] border border-[#bdd6b5]/80 bg-[linear-gradient(180deg,#dff1d4_0%,#e9f5e3_58%,#f8fbf4_100%)]">
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-[#32573c]" />
-                  <div className="pointer-events-none absolute inset-x-[11%] bottom-[6px] h-3 rounded-t-[10px] bg-[#203b2a]/20" />
+              <div className="rounded-[24px] border border-[#29554f] bg-[#0f342f] p-4">
+                <div className="relative h-[366px] overflow-hidden rounded-[20px] border border-[#c8dbc0]/70 bg-[linear-gradient(180deg,#e4efdc_0%,#eef5e8_56%,#f5f9f1_100%)]">
+                  <div className="pointer-events-none absolute inset-[12px] rounded-[14px] border border-white/35 shadow-[inset_0_0_0_1px_rgba(181,210,179,0.18)]" />
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[linear-gradient(180deg,rgba(255,255,255,0.18),rgba(255,255,255,0))]" />
+                  <div className="pointer-events-none absolute left-[11%] top-[12%] h-14 w-14 rounded-full bg-[#fff2b8]/60 blur-[2px]" />
+                  <div className="pointer-events-none absolute left-[12.6%] top-[13.6%] h-8 w-8 rounded-full bg-[#ffe69a]/80" />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-7 bg-[#5d7f58]/18" />
+                  <div className="pointer-events-none absolute inset-x-[9%] bottom-[10px] h-[10px] bg-[#5f7a55]/24" />
+                  <div className="pointer-events-none absolute inset-x-[14%] bottom-[6px] h-[8px] bg-[#78906f]/18" />
 
                   {cloudBlocks.map((cloud) => (
-                    <div key={cloud.id} className={cn('pointer-events-none absolute opacity-80', cloud.classes)}>
-                      <div className="relative h-7 w-14">
-                        <div className="absolute bottom-0 left-2 h-4 w-9 rounded-[6px] bg-white/70" />
-                        <div className="absolute left-0 top-2 h-4 w-4 rounded-[4px] bg-white/65" />
-                        <div className="absolute left-4 top-0 h-4 w-4 rounded-[4px] bg-white/75" />
-                        <div className="absolute right-0 top-2 h-4 w-4 rounded-[4px] bg-white/65" />
+                    <div
+                      key={cloud.id}
+                      className={cn('pointer-events-none absolute opacity-55', cloud.classes)}
+                      style={{
+                        animation: `journey-cloud-drift ${6 + Number(cloud.id.slice(-1)) * 0.5}s ease-in-out infinite`,
+                      }}
+                    >
+                      <div className="relative h-6 w-12">
+                        <div className="absolute bottom-0 left-2 h-3.5 w-8 rounded-[5px] bg-white/58" />
+                        <div className="absolute left-0 top-2 h-3 w-3 rounded-[4px] bg-white/48" />
+                        <div className="absolute left-4 top-0 h-3.5 w-3.5 rounded-[4px] bg-white/55" />
+                        <div className="absolute right-0 top-2 h-3 w-3 rounded-[4px] bg-white/48" />
                       </div>
                     </div>
                   ))}
@@ -363,23 +385,23 @@ const LiveMascotJourney = ({
                   {heightGuides.map((guide) => (
                     <div key={guide.id} className={cn('pointer-events-none absolute inset-x-24', guide.classes)}>
                       <div className="relative">
-                        <div className="border-t border-dashed border-[#7da18d]" />
-                        <span className="absolute -left-[72px] -top-3 text-[11px] font-semibold tracking-[0.08em] text-[#1f3d2e]">
+                        <div className="border-t border-dashed border-[#7da18d]/45" />
+                        <span className="absolute -left-[72px] -top-3 text-[10px] font-semibold tracking-[0.08em] text-[#274036]/72">
                           {guide.label}
                         </span>
                       </div>
                     </div>
                   ))}
 
-                  <div className="absolute left-1/2 top-[34%] z-10 -translate-x-1/2">
-                    <div className="relative rounded-[12px] bg-[#5d9b4d] px-4 py-2 text-center text-sm font-semibold text-white shadow-sm">
+                  <div className="absolute left-1/2 top-[35%] z-10 -translate-x-1/2">
+                    <div className="relative rounded-[12px] border border-[#7fb56d]/80 bg-[#6aa85a]/92 px-4 py-2 text-center text-sm font-semibold text-white shadow-[0_8px_16px_rgba(60,120,54,0.14)]">
                       {reachLabel}
-                      <span className="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1 rotate-45 bg-[#5d9b4d]" />
+                      <span className="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1 rotate-45 border-b border-r border-[#7fb56d]/80 bg-[#6aa85a]" />
                     </div>
                   </div>
 
                   <div
-                    className="absolute bottom-[18px] left-1/2 z-10 -translate-x-1/2 transition-transform duration-700"
+                    className="absolute bottom-[20px] left-1/2 z-10 -translate-x-1/2 transition-transform duration-700"
                     style={{
                       transform: `translateX(-50%) rotate(${isPlantSwaying ? '-1deg' : '1deg'}) scale(${isGrowthHighlighted ? 1.03 : 1})`,
                     }}
@@ -422,16 +444,24 @@ const LiveMascotJourney = ({
                           bubble.classes,
                           isCaptured && 'pointer-events-none scale-75 opacity-0'
                         )}
+                        style={{
+                          animation: `journey-co2-drift ${4.8 + bubble.requiredLevel * 0.7}s ease-in-out infinite`,
+                        }}
                       >
                         <div
                           className={cn(
-                            'relative rounded-full border px-4 py-2 text-sm font-semibold shadow-sm',
+                            'relative px-2 py-1 text-[10px] font-semibold tracking-[0.04em]',
                             isUnlocked
-                              ? 'border-[#d5e4cb] bg-white text-[#274036]'
-                              : 'border-[#dce5d6] bg-[#f4f5ef] text-slate-300'
+                              ? 'text-[#3f5a4d]'
+                              : 'text-slate-300/85'
                           )}
                         >
-                          CO2
+                          <div className="flex items-center gap-1.5 rounded-full bg-white/45 px-2.5 py-1 backdrop-blur-[1px]">
+                            <span className={cn('h-1.5 w-1.5 rounded-full', isUnlocked ? 'bg-[#8ca897]/70' : 'bg-slate-300/70')} />
+                            <span className={cn('h-2 w-2 rounded-full', isUnlocked ? 'bg-[#9db5a5]/62' : 'bg-slate-300/55')} />
+                            <span className={cn('h-1.5 w-1.5 rounded-full', isUnlocked ? 'bg-[#8ca897]/70' : 'bg-slate-300/70')} />
+                            <span>CO2</span>
+                          </div>
                         </div>
                       </button>
                     );
@@ -460,7 +490,7 @@ const LiveMascotJourney = ({
                                 isLocked && !isReached && 'text-[#9bb7a0]'
                               )}
                             >
-                              {isLocked ? <span className="text-lg">□</span> : index + 1}
+                              {isLocked ? <span className="text-base">[]</span> : index + 1}
                             </div>
                             <span
                               className={cn(
@@ -503,7 +533,7 @@ const LiveMascotJourney = ({
               </div>
 
               <div className="rounded-[22px] border border-[#29554f] bg-[#123f39] p-4">
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   {quickAccessItems.map((item) => {
                     const ItemIcon = item.icon;
                     const isActive = activeQuickAccessId === item.id;

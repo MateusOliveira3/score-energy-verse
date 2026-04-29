@@ -10,7 +10,11 @@ import {
   UserContextState,
   UserProfileData,
 } from '@/types/mvp';
-import { parseInvoiceFile } from '@/lib/invoiceParser';
+import {
+  extractInvoiceDerivedEvidence,
+  InvoiceDerivedEvidence,
+  parseInvoiceFile,
+} from '@/lib/invoiceParser';
 import { getInvoiceFlowSnapshot, logInvoiceFlow } from '@/lib/invoiceFlowDebug';
 
 type InvoiceSignalTrend = 'down' | 'up' | 'stable' | 'unknown';
@@ -20,6 +24,21 @@ interface InvoiceComparativeSignals {
   costTrend: InvoiceSignalTrend;
   costPerKwhTrend: InvoiceSignalTrend;
 }
+
+interface InsightFactItem {
+  label: string;
+  value: string;
+}
+
+interface InsightEducationItem {
+  explanation: string;
+  label: string;
+}
+
+type EnrichedAnalysisSummary = AnalysisSummary & {
+  educationItems?: InsightEducationItem[];
+  evidenceItems?: InsightFactItem[];
+};
 
 const SCORE_EVENT_POINTS = {
   profile_completed: 80,
@@ -93,6 +112,55 @@ const getInvoiceMonthLabel = (invoice: Pick<InvoiceData, 'month'>) =>
 const getUsageWindowLabel = (invoice: InvoiceData) =>
   invoice.peakHours?.trim() || 'os horarios de maior uso identificados na fatura';
 
+const formatCurrency = (value?: number) =>
+  hasNumericValue(value) ? `R$ ${value.toFixed(2)}` : undefined;
+
+const formatCurrencyPerKwh = (value?: number) =>
+  hasNumericValue(value) ? `R$ ${value.toFixed(2)}/kWh` : undefined;
+
+const formatKwhValue = (value?: number) =>
+  hasNumericValue(value) ? `${value} kWh` : undefined;
+
+const buildTariffEducation = (tariffFlag?: string) => {
+  if (!tariffFlag) {
+    return undefined;
+  }
+
+  if (tariffFlag.includes('VERDE')) {
+    return 'Bandeira verde indica menor pressao tarifaria neste ciclo.';
+  }
+
+  if (tariffFlag.includes('AMARELA')) {
+    return 'Bandeira amarela indica custo extra moderado por kWh.';
+  }
+
+  if (tariffFlag.includes('VERMELHA')) {
+    return 'Bandeira vermelha indica energia mais cara neste ciclo.';
+  }
+
+  if (tariffFlag.includes('ESCASSEZ')) {
+    return 'Escassez hidrica indica custo extra elevado para sustentar o sistema.';
+  }
+
+  return `A bandeira ${tariffFlag.toLowerCase()} mostra a condicao tarifaria deste ciclo.`;
+};
+
+const getInvoiceEvidence = (
+  invoice: InvoiceData,
+  fallbackCostPerKwh?: number
+): InvoiceDerivedEvidence => {
+  const evidence = extractInvoiceDerivedEvidence({
+    ...invoice.parser,
+    consumption: invoice.consumption,
+    totalValue: invoice.totalValue,
+  });
+
+  return {
+    ...evidence,
+    averageCostPerKwh: evidence.averageCostPerKwh ?? fallbackCostPerKwh,
+  };
+};
+
 const normalizeDateText = (value: string) =>
   value
     .normalize('NFD')
@@ -154,6 +222,11 @@ export const interpretInvoiceFile = async (
   });
   const totalValue = parser.fields.totalValue.value;
   const taxesTotal = parser.fields.taxesTotal.value;
+  const evidence = extractInvoiceDerivedEvidence({
+    ...parser,
+    consumption: parser.fields.consumptionKwh.value,
+    totalValue,
+  });
   const taxPercentage =
     hasNumericValue(totalValue) && totalValue > 0 && hasNumericValue(taxesTotal)
       ? Math.round((taxesTotal / totalValue) * 100)
@@ -167,7 +240,7 @@ export const interpretInvoiceFile = async (
     consumption: parser.fields.consumptionKwh.value,
     totalValue,
     taxPercentage,
-    peakHours: undefined,
+    peakHours: evidence.peakWindowLabel,
     month: parser.fields.referenceMonth.value ?? 'Referencia nao identificada',
     parser,
   };
@@ -350,6 +423,8 @@ export const buildAnalysisSummary = (
     ? buildConsultativeInsights(buildBasicInvoiceSignals(invoice, previousInvoiceForInsights))
     : buildConsultativeInsights();
   const resolvedProfile = getResolvedProfile(profile);
+  const averageCostPerKwh = getInvoiceCostPerKwh(invoice);
+  const invoiceEvidence = getInvoiceEvidence(invoice, averageCostPerKwh);
   const consumptionLevel = hasNumericValue(invoice.consumption)
     ? getConsumptionLevel(invoice.consumption, resolvedProfile.consumerType)
     : undefined;
@@ -362,19 +437,67 @@ export const buildAnalysisSummary = (
   const providerName = invoice.parser.fields.providerName.value;
   const dueDate = invoice.parser.fields.dueDate.value;
   const monthLabel = getInvoiceMonthLabel(invoice);
+  const evidenceItems: InsightFactItem[] = [];
+  const educationItems: InsightEducationItem[] = [];
 
-  if (consumptionLevel === 'alto') {
-    observations.push(
-      `O consumo extraido ficou alto para um perfil ${resolvedProfile.consumerType.toLowerCase()}, o que pede revisao de rotina e cargas mais pesadas.`
-    );
-  } else if (consumptionLevel === 'moderado') {
-    observations.push(
-      'O consumo extraido ficou em faixa intermediaria, com espaco para ajustes simples antes de qualquer decisao maior.'
-    );
-  } else if (consumptionLevel === 'baixo') {
-    observations.push(
-      'O consumo extraido ficou em faixa mais contida para este perfil, o que ajuda a comparar os proximos ciclos com mais clareza.'
-    );
+  if (hasNumericValue(invoice.consumption)) {
+    evidenceItems.push({
+      label: 'Consumo total',
+      value: invoiceEvidence.daysBilled
+        ? `${formatKwhValue(invoice.consumption)} em ${invoiceEvidence.daysBilled} dias`
+        : `${formatKwhValue(invoice.consumption)}`,
+    });
+  }
+
+  if (hasNumericValue(invoiceEvidence.averageCostPerKwh)) {
+    evidenceItems.push({
+      label: 'Custo medio',
+      value: formatCurrencyPerKwh(invoiceEvidence.averageCostPerKwh) || 'Indisponivel',
+    });
+  }
+
+  if (hasNumericValue(invoiceEvidence.peakConsumptionKwh)) {
+    const offPeakLabel = formatKwhValue(invoiceEvidence.offPeakConsumptionKwh);
+
+    evidenceItems.push({
+      label: 'Horario de pico',
+      value: offPeakLabel
+        ? `${formatKwhValue(invoiceEvidence.peakConsumptionKwh)} no pico e ${offPeakLabel} fora do pico`
+        : `${formatKwhValue(invoiceEvidence.peakConsumptionKwh)} no pico`,
+    });
+  }
+
+  if (invoiceEvidence.tariffFlag) {
+    evidenceItems.push({
+      label: 'Bandeira',
+      value: invoiceEvidence.tariffFlag,
+    });
+  }
+
+  if (invoiceEvidence.tariffFlag) {
+    educationItems.push({
+      label: 'Bandeira tarifaria',
+      explanation: buildTariffEducation(invoiceEvidence.tariffFlag) || '',
+    });
+  }
+
+  if (hasNumericValue(invoiceEvidence.averageCostPerKwh)) {
+    educationItems.push({
+      label: 'Custo por kWh',
+      explanation: 'Custo por kWh mostra quanto cada unidade consumida pesou no total da conta.',
+    });
+  }
+
+  if (hasNumericValue(invoiceEvidence.peakConsumptionKwh)) {
+    educationItems.push({
+      label: 'Horario de pico',
+      explanation:
+        'Horario de pico e a faixa em que a energia tende a custar mais para esse tipo de medicao.',
+    });
+  }
+
+  if (evidenceItems.length > 0) {
+    observations.push(`${evidenceItems[0].label}: ${evidenceItems[0].value}.`);
   } else {
     observations.push(
       invoice.parser.rawTextAvailable
@@ -383,54 +506,47 @@ export const buildAnalysisSummary = (
     );
   }
 
-  if (costSignal === 'elevado') {
-    observations.push(
-      'O valor total extraido pede atencao porque o custo final ficou alto para o contexto atual do usuario.'
-    );
+  if (evidenceItems.length > 1) {
+    observations.push(`${evidenceItems[1].label}: ${evidenceItems[1].value}.`);
+  } else if (costSignal === 'elevado') {
+    observations.push('O custo final ficou alto para este ciclo e pede comparacao no proximo fechamento.');
   } else if (costSignal === 'atencao') {
-    observations.push(
-      'O valor total extraido merece acompanhamento no proximo ciclo para confirmar tendencia de custo.'
-    );
+    observations.push('O custo final merece acompanhamento no proximo ciclo para confirmar tendencia.');
   } else if (costSignal === 'controlado') {
-    observations.push(
-      'O valor total extraido ficou mais controlado, entao a proxima leitura deve focar consistencia e comparacao entre ciclos.'
-    );
+    observations.push('O custo final ficou mais controlado neste ciclo.');
   } else if (dueDate) {
-    observations.push(
-      `A conta trouxe vencimento em ${dueDate}, mas o valor total nao foi identificado com seguranca.`
-    );
+    observations.push(`A conta trouxe vencimento em ${dueDate}, mas o valor total nao foi identificado com seguranca.`);
   } else {
-    observations.push(
-      'Os campos economicos ainda estao parciais; o parser preservou ausencia segura em vez de assumir valores.'
-    );
-  }
-
-  if (resolvedProfile.energyPreference === 'Solar' && costSignal && costSignal !== 'controlado') {
-    observations[1] =
-      'Como o perfil ja sinaliza interesse em energia solar, vale primeiro consolidar uma leitura confiavel do consumo antes de avaliar qualquer solucao maior.';
+    observations.push('Os campos economicos ainda estao parciais; o parser preservou ausencia segura.');
   }
 
   const whatMattersNext =
-    consumptionLevel === 'alto'
-      ? 'O que mais importa agora e reduzir desperdicios visiveis e observar os usos de maior impacto.'
-      : costSignal === 'elevado'
-        ? 'O que mais importa agora e controlar o custo no proximo ciclo com uma mudanca simples e mensuravel.'
-        : hasConsumption || hasCost
-          ? 'O que mais importa agora e manter consistencia e adicionar a proxima fatura para comparar evolucao.'
-          : 'O que mais importa agora e enviar uma fatura textual legivel ou validar manualmente os campos essenciais que nao foram encontrados.';
+    hasNumericValue(invoiceEvidence.peakConsumptionKwh)
+      ? 'Voce ja tem um sinal concreto de consumo no pico; escolha uma acao pequena para testar nesse horario.'
+      : hasNumericValue(invoiceEvidence.averageCostPerKwh) && costSignal && costSignal !== 'controlado'
+        ? 'Seu custo por kWh ja mostra pressao neste ciclo; vale testar um ajuste simples antes da proxima conta.'
+        : consumptionLevel === 'alto'
+          ? 'O que mais importa agora e reduzir desperdicios visiveis e observar os usos de maior impacto.'
+          : costSignal === 'elevado'
+            ? 'O que mais importa agora e controlar o custo no proximo ciclo com uma mudanca simples e mensuravel.'
+            : hasConsumption || hasCost
+              ? 'O que mais importa agora e manter consistencia e adicionar a proxima fatura para comparar evolucao.'
+              : 'O que mais importa agora e enviar uma fatura textual legivel ou validar manualmente os campos essenciais que nao foram encontrados.';
 
   return {
     consumptionLevel,
     costSignal,
     consultativeInsights,
     headline:
-      hasConsumption && hasCost
-        ? `Leitura real da fatura ${monthLabel}: consumo ${consumptionLevel} e sinal de custo ${costSignal}.`
-        : hasConsumption
-          ? `Leitura parcial da fatura ${monthLabel}: consumo ${consumptionLevel} identificado.`
-          : hasCost
-            ? `Leitura parcial da fatura ${monthLabel}: valor total ${costSignal} identificado.`
-            : `Leitura parcial da fatura ${monthLabel}: faltam campos suficientes para uma analise economica completa.`,
+      evidenceItems.length > 0
+        ? `Leitura da fatura ${monthLabel}: ${evidenceItems[0].value}.`
+        : hasConsumption && hasCost
+          ? `Leitura real da fatura ${monthLabel}: consumo ${consumptionLevel} e sinal de custo ${costSignal}.`
+          : hasConsumption
+            ? `Leitura parcial da fatura ${monthLabel}: consumo ${consumptionLevel} identificado.`
+            : hasCost
+              ? `Leitura parcial da fatura ${monthLabel}: valor total ${costSignal} identificado.`
+              : `Leitura parcial da fatura ${monthLabel}: faltam campos suficientes para uma analise economica completa.`,
     observations: observations.slice(0, 2),
     whatMattersNext,
     efficiencyLabel:
@@ -443,7 +559,9 @@ export const buildAnalysisSummary = (
             : providerName
               ? `Leitura parcial ${providerName}`
               : 'Leitura parcial',
-  };
+    educationItems: educationItems.slice(0, 3),
+    evidenceItems: evidenceItems.slice(0, 4),
+  } as EnrichedAnalysisSummary;
 };
 
 export const buildNextActions = (
@@ -465,6 +583,12 @@ export const buildNextActions = (
   const actions: NextAction[] = [];
   const monthLabel = invoice ? getInvoiceMonthLabel(invoice) : 'referencia nao identificada';
   const usageWindowLabel = invoice ? getUsageWindowLabel(invoice) : 'os horarios de maior uso';
+  const invoiceEvidence = invoice ? getInvoiceEvidence(invoice, getInvoiceCostPerKwh(invoice)) : undefined;
+  const costPerKwhLabel = formatCurrencyPerKwh(invoiceEvidence?.averageCostPerKwh);
+  const peakConsumptionLabel = formatKwhValue(invoiceEvidence?.peakConsumptionKwh);
+  const offPeakConsumptionLabel = formatKwhValue(invoiceEvidence?.offPeakConsumptionKwh);
+  const daysBilledLabel = invoiceEvidence?.daysBilled ? `${invoiceEvidence.daysBilled} dias` : undefined;
+  const tariffLabel = invoiceEvidence?.tariffFlag;
 
   if (invoice && !analysis) {
     actions.push({
@@ -539,10 +663,16 @@ export const buildNextActions = (
   if (analysis.consumptionLevel === 'alto') {
     actions.push({
       id: 'map-peak-usage',
-      title: 'Mapear uso no horario de pico',
-      description: `Por 3 dias, liste os principais equipamentos usados em ${usageWindowLabel} para descobrir onde o consumo pesa mais.`,
+      title: peakConsumptionLabel ? 'Reduzir uso no horario de pico' : 'Mapear uso no horario de pico',
+      description: peakConsumptionLabel
+        ? `A fatura registrou ${peakConsumptionLabel} no pico${offPeakConsumptionLabel ? ` e ${offPeakConsumptionLabel} fora do pico` : ''}.`
+        : daysBilledLabel
+          ? `Voce consumiu ${formatKwhValue(invoice.consumption)} em ${daysBilledLabel}, com leitura alta para este perfil.`
+          : `O consumo total de ${formatKwhValue(invoice.consumption)} ficou alto para este perfil.`,
       value: 'Encontrar desperdicios visiveis',
-      context: `Prioridade alta porque a fatura de ${monthLabel} mostrou consumo alto para um perfil ${profileLabel}.`,
+      context: peakConsumptionLabel
+        ? `Evidencia: ${peakConsumptionLabel} apareceram em ${usageWindowLabel}.`
+        : `Evidencia: a fatura de ${monthLabel} mostrou consumo alto para um perfil ${profileLabel}.`,
       suggestion:
         electricShowerUsage === 'daily' || electricShowerUsage === 'sometimes'
           ? 'Anote chuveiro, ar-condicionado, forno e outros usos simultaneos.'
@@ -563,7 +693,9 @@ export const buildNextActions = (
     actions.push({
       id: 'choose-one-cost-cut',
       title: 'Testar um corte de custo por 7 dias',
-      description: `Escolha uma mudanca simples para testar nesta semana, de preferencia perto de ${usageWindowLabel}.`,
+      description: costPerKwhLabel
+        ? `Seu custo medio ficou em ${costPerKwhLabel}${tariffLabel ? ` sob bandeira ${tariffLabel}` : ''}${invoice.peakHours ? `, com atencao em ${invoice.peakHours}` : ''}.`
+        : `O custo total da fatura de ${monthLabel} ficou em ${formatCurrency(invoice.totalValue)}${invoice.peakHours ? `, com atencao em ${invoice.peakHours}` : ''}.`,
       value:
         primaryGoal === 'reduce_cost'
           ? 'Buscar impacto direto na fatura'
@@ -572,7 +704,9 @@ export const buildNextActions = (
             : primaryGoal === 'both'
               ? 'Reduzir custo sem perder leitura do padrao'
               : 'Criar um teste comparavel',
-      context: `O sinal de custo esta ${analysis.costSignal}; comece por um teste pequeno.`,
+      context: costPerKwhLabel
+        ? `Evidencia: ${costPerKwhLabel} por kWh${tariffLabel ? ` e bandeira ${tariffLabel}` : ''} neste ciclo.`
+        : `Evidencia: o sinal de custo esta ${analysis.costSignal} nesta fatura.`,
       suggestion: 'Reduza uso simultaneo, encurte um uso intenso ou revise luzes recorrentes.',
       impact: `Transforma recomendacao em comportamento acompanhado (+${actionReviewPoints} pontos ao revisar).`,
       validation: 'Aplicar em pelo menos 5 dos 7 dias.',
@@ -582,32 +716,14 @@ export const buildNextActions = (
     });
   }
 
-  if (
-    resolvedProfile.energyPreference === 'Solar' ||
-    resolvedProfile.energyPreference === 'Hibrido'
-  ) {
-    actions.push({
-      id: 'record-demand-pattern',
-      title: 'Registrar padrao de demanda',
-      description:
-        'Anote quando o consumo parece mais intenso antes de avaliar energia solar, hibrida ou outro investimento.',
-      value: 'Evitar decisao sem contexto',
-      context: `O perfil indica preferencia ${resolvedProfile.energyPreference}; antes de decidir, vale entender a rotina real do imovel.`,
-      suggestion: 'Por uma semana, marque manha, tarde ou noite como periodo de maior uso.',
-      impact: `Melhora a decisao e mantem o score conectado a acoes observaveis (+${actionReviewPoints} pontos ao revisar).`,
-      validation: 'Ter pelo menos 5 dias anotados.',
-      priority: 'medium',
-      status: 'new',
-      source: 'profile',
-    });
-  }
-
-  if (actions.length < 3) {
+  if (actions.length < 2) {
     actions.push({
       id: 'return-next-bill',
       title: 'Adicionar a proxima fatura',
       description:
-        'No proximo ciclo, adicione a nova fatura para comparar consumo e custo quando esses campos estiverem disponiveis.',
+        tariffLabel || daysBilledLabel
+          ? `Esta leitura ja trouxe ${tariffLabel ? `bandeira ${tariffLabel.toLowerCase()}` : daysBilledLabel}. Compare esse sinal no proximo ciclo.`
+          : 'No proximo ciclo, adicione a nova fatura para comparar consumo e custo quando esses campos estiverem disponiveis.',
       value: 'Transformar leitura em evolucao',
       context: `A leitura atual e da fatura de ${monthLabel}; a comparacao melhora com outro ciclo.`,
       suggestion:
@@ -624,7 +740,7 @@ export const buildNextActions = (
     });
   }
 
-  return actions.slice(0, 3);
+  return actions.slice(0, 2);
 };
 
 export const buildMascotGuidance = ({

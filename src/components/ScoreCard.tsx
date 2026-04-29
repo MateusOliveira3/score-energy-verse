@@ -41,23 +41,23 @@ const ScoreCard = ({
       <div className="space-y-4 p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-50/80">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-50/72">
               Score Energy
             </p>
             <div className="mt-2 flex items-end gap-2">
               <span className="text-5xl font-bold leading-none text-white">
                 {score.toLocaleString()}
               </span>
-              <span className="pb-1 text-sm text-emerald-50/80">pontos</span>
+              <span className="pb-1 text-sm text-emerald-50/72">pontos</span>
             </div>
           </div>
 
-          <div className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white">
+          <div className="rounded-[16px] border border-white/10 bg-white/[0.08] px-3 py-1.5 text-xs font-semibold text-white/92">
             Nivel {level}
           </div>
         </div>
 
-        <div className="flex items-start gap-2 text-sm leading-5 text-emerald-50/85">
+        <div className="flex items-start gap-2 text-sm leading-5 text-emerald-50/80">
           <TrendingUp className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
             {compactText(latestScoreLabel || 'O score acompanha eventos reais da jornada.', 120)}
@@ -65,32 +65,32 @@ const ScoreCard = ({
         </div>
 
         <div className="grid grid-cols-3 gap-3 text-white">
-          <div className="rounded-[16px] border border-white/10 bg-white/10 p-3">
+          <div className="rounded-[20px] border border-white/10 bg-white/[0.08] p-3">
             <div className="text-2xl font-semibold leading-none">{completedSteps}</div>
-            <div className="mt-2 text-[11px] uppercase tracking-[0.14em] text-emerald-50/70">
+            <div className="mt-2 text-[11px] uppercase tracking-[0.14em] text-emerald-50/62">
               Etapas
             </div>
           </div>
-          <div className="rounded-[16px] border border-white/10 bg-white/10 p-3">
+          <div className="rounded-[20px] border border-white/10 bg-white/[0.08] p-3">
             <div className="text-2xl font-semibold leading-none">{activeActionsCount}</div>
-            <div className="mt-2 text-[11px] uppercase tracking-[0.14em] text-emerald-50/70">
+            <div className="mt-2 text-[11px] uppercase tracking-[0.14em] text-emerald-50/62">
               Acoes
             </div>
           </div>
-          <div className="rounded-[16px] border border-white/10 bg-white/10 p-3">
+          <div className="rounded-[20px] border border-white/10 bg-white/[0.08] p-3">
             <div className="text-sm font-semibold leading-5">{efficiencyLabel}</div>
-            <div className="mt-2 text-[11px] uppercase tracking-[0.14em] text-emerald-50/70">
+            <div className="mt-2 text-[11px] uppercase tracking-[0.14em] text-emerald-50/62">
               Eficiencia
             </div>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-2 text-sm text-emerald-50/90">
-          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5">
+          <div className="flex items-center gap-2 rounded-[16px] border border-white/10 bg-white/[0.08] px-3 py-1.5">
             <Flag className="h-4 w-4 shrink-0" />
             <span>{consumerType}</span>
           </div>
-          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5">
+          <div className="flex items-center gap-2 rounded-[16px] border border-white/10 bg-white/[0.08] px-3 py-1.5">
             <ClipboardList className="h-4 w-4 shrink-0" />
             <span>{activeActionsCount} frentes ativas</span>
           </div>

@@ -18,6 +18,14 @@ interface AnalysisSummaryProps {
 
 type AnalysisSummaryWithInsights = AnalysisSummaryType & {
   consultativeInsights?: string[];
+  educationItems?: Array<{
+    explanation: string;
+    label: string;
+  }>;
+  evidenceItems?: Array<{
+    label: string;
+    value: string;
+  }>;
 };
 
 const consumptionVariant = {
@@ -342,7 +350,10 @@ const AnalysisSummary = ({
 
   const referenceLabel = getInvoiceReferenceLabel(invoice);
   const averageCostPerKwh = getAverageCostPerKwh(invoice);
-  const consultativeInsights = (analysis as AnalysisSummaryWithInsights).consultativeInsights ?? [];
+  const enrichedAnalysis = analysis as AnalysisSummaryWithInsights;
+  const consultativeInsights = enrichedAnalysis.consultativeInsights ?? [];
+  const educationItems = enrichedAnalysis.educationItems ?? [];
+  const evidenceItems = enrichedAnalysis.evidenceItems ?? [];
   const consumptionTrendMessage = buildConsumptionTrendMessage(history, contextInvoice);
   const historyContextMessage =
     invoiceCount >= 3
@@ -464,6 +475,25 @@ const AnalysisSummary = ({
             </div>
           </div>
 
+          {evidenceItems.length > 0 && (
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="text-sm font-semibold text-slate-800">Leitura baseada em evidencia</div>
+              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                {evidenceItems.slice(0, 4).map((item) => (
+                  <div
+                    key={`${item.label}-${item.value}`}
+                    className="rounded-lg border border-slate-100 bg-slate-50 p-3"
+                  >
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      {item.label}
+                    </div>
+                    <div className="mt-1 text-sm font-medium text-slate-800">{item.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-3">
             <p className="text-base font-semibold text-slate-800">{analysis.headline}</p>
             <div className="space-y-2">
@@ -492,6 +522,19 @@ const AnalysisSummary = ({
               </div>
             )}
           </div>
+
+          {educationItems.length > 0 && (
+            <div className="rounded-xl border border-blue-100 bg-blue-50/80 p-4">
+              <div className="text-sm font-semibold text-blue-900">Micro-educacao</div>
+              <div className="mt-3 space-y-2">
+                {educationItems.slice(0, 3).map((item) => (
+                  <div key={item.label} className="text-sm leading-6 text-blue-900">
+                    <span className="font-semibold">{item.label}:</span> {item.explanation}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="rounded-xl border border-amber-100 bg-amber-50 p-4">
             <div className="text-sm font-semibold text-amber-800">O que vale observar agora</div>

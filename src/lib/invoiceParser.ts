@@ -168,6 +168,15 @@ const buildSearchText = (normalizedText: string) => {
   return [normalizedText, lines.join(' '), ...windows].join('\n');
 };
 
+export interface InvoiceDerivedEvidence {
+  averageCostPerKwh?: number;
+  daysBilled?: number;
+  offPeakConsumptionKwh?: number;
+  peakConsumptionKwh?: number;
+  peakWindowLabel?: string;
+  tariffFlag?: string;
+}
+
 const parseBrazilianNumber = (value: string): number | undefined => {
   const compact = value.replace(/[^\d,.-]/g, '');
 
@@ -191,6 +200,94 @@ const parseBrazilianNumber = (value: string): number | undefined => {
 
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const extractKwhValueFromLine = (line: string) => {
+  const beforeKwhMatch = line.match(/([\d.,]+)\s*KWH\b/);
+
+  if (beforeKwhMatch) {
+    return parseBrazilianNumber(beforeKwhMatch[1]);
+  }
+
+  const afterKwhMatch = line.match(/\bKWH\b[^0-9]{0,8}([\d.,]+)/);
+  return afterKwhMatch ? parseBrazilianNumber(afterKwhMatch[1]) : undefined;
+};
+
+const extractPeakWindowLabel = (searchText: string) => {
+  const normalizedWindowMatch = searchText.match(
+    /\b(?:HORARIO|HORA|PONTA)\b[^0-9]{0,24}(\d{1,2})[:H](\d{2})\s*(?:A|AS|ATE|-)\s*(\d{1,2})[:H](\d{2})/
+  );
+
+  if (!normalizedWindowMatch) {
+    return undefined;
+  }
+
+  const [, startHour, startMinute, endHour, endMinute] = normalizedWindowMatch;
+  return `${startHour.padStart(2, '0')}:${startMinute}-${endHour.padStart(2, '0')}:${endMinute}`;
+};
+
+const extractPeakAndOffPeakConsumption = (normalizedText: string) => {
+  const lines = buildSearchText(normalizedText)
+    .split('\n')
+    .map((line) => normalizeInlineWhitespace(line))
+    .filter(Boolean);
+  const peakCandidates: number[] = [];
+  const offPeakCandidates: number[] = [];
+
+  lines.forEach((line) => {
+    if (!/\bKWH\b/.test(line)) {
+      return;
+    }
+
+    const kwhValue = extractKwhValueFromLine(line);
+
+    if (!isFiniteNumber(kwhValue)) {
+      return;
+    }
+
+    if (/\b(FORA PONTA|FORA-DE-PONTA|FP)\b/.test(line)) {
+      offPeakCandidates.push(kwhValue);
+      return;
+    }
+
+    if (/\bPONTA\b/.test(line)) {
+      peakCandidates.push(kwhValue);
+    }
+  });
+
+  return {
+    offPeakConsumptionKwh:
+      offPeakCandidates.length > 0 ? offPeakCandidates[0] : undefined,
+    peakConsumptionKwh: peakCandidates.length > 0 ? peakCandidates[0] : undefined,
+  };
+};
+
+export const extractInvoiceDerivedEvidence = (
+  source: Pick<InvoiceParserResult, 'fields' | 'normalizedText'> & {
+    consumption?: number;
+    totalValue?: number;
+  }
+): InvoiceDerivedEvidence => {
+  const totalValue = source.totalValue ?? source.fields.totalValue.value;
+  const consumption = source.consumption ?? source.fields.consumptionKwh.value;
+  const { peakConsumptionKwh, offPeakConsumptionKwh } = extractPeakAndOffPeakConsumption(
+    source.normalizedText
+  );
+  const averageCostPerKwh =
+    isFiniteNumber(totalValue) && isFiniteNumber(consumption) && consumption > 0
+      ? totalValue / consumption
+      : undefined;
+
+  return {
+    averageCostPerKwh,
+    daysBilled: source.fields.daysBilled.value,
+    offPeakConsumptionKwh,
+    peakConsumptionKwh,
+    peakWindowLabel:
+      extractPeakWindowLabel(source.normalizedText) ||
+      (isFiniteNumber(peakConsumptionKwh) ? 'o horario de ponta indicado na fatura' : undefined),
+    tariffFlag: source.fields.tariffFlag.value,
+  };
 };
 
 const parseIntegerValue = (value: string): number | undefined => {

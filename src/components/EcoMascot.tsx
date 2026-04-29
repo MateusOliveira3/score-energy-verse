@@ -135,13 +135,13 @@ const EcoMascot = ({
   const palette = getPalette(customization?.colorPalette);
   const frameSize =
     variant === 'scene'
-      ? 'h-[152px] w-[132px]'
+      ? 'h-[114px] w-[94px]'
       : variant === 'compact'
         ? 'h-[148px] w-[114px]'
         : 'h-[192px] w-[152px] sm:h-[208px] sm:w-[164px]';
-  const stemWidth = variant === 'scene' ? 'w-[10px]' : variant === 'compact' ? 'w-[9px]' : 'w-[10px]';
-  const leafSize = variant === 'scene' ? 'h-9 w-5' : variant === 'compact' ? 'h-8 w-4' : 'h-10 w-5';
-  const budSize = variant === 'scene' ? 'h-4.5 w-4.5' : variant === 'compact' ? 'h-4 w-4' : 'h-5 w-5';
+  const stemWidth = variant === 'scene' ? 'w-[7px]' : variant === 'compact' ? 'w-[9px]' : 'w-[10px]';
+  const leafSize = variant === 'scene' ? 'h-7 w-4' : variant === 'compact' ? 'h-8 w-4' : 'h-10 w-5';
+  const budSize = variant === 'scene' ? 'h-3.5 w-3.5' : variant === 'compact' ? 'h-4 w-4' : 'h-5 w-5';
   const stateBadge = {
     wake: 'Base',
     observe: 'Broto',
@@ -163,23 +163,23 @@ const EcoMascot = ({
 
   const plantArt = (
     <div className={cn('relative', frameSize)}>
-      <div className="absolute bottom-0 left-1/2 h-7 w-20 -translate-x-1/2">
-        <div className="absolute inset-x-0 bottom-0 h-2 rounded-[2px] bg-[#6d4224]" />
-        <div className="absolute inset-x-2 bottom-2 h-2 rounded-[2px] bg-[#86502c]" />
-        <div className="absolute inset-x-5 bottom-4 h-2 rounded-[2px] bg-[#a56737]" />
-        <div className="absolute left-1/2 bottom-5 h-[3px] -translate-x-1/2 rounded-[2px] bg-[#c98f58]/50" />
+      <div className="absolute bottom-0 left-1/2 h-5 w-[74px] -translate-x-1/2">
+        <div className="absolute inset-x-0 bottom-0 h-[7px] rounded-[2px] bg-[#6e4527]" />
+        <div className="absolute inset-x-2 bottom-[6px] h-[6px] rounded-[2px] bg-[#895430]" />
+        <div className="absolute inset-x-5 bottom-[11px] h-[5px] rounded-[2px] bg-[#a86c3b]" />
+        <div className="absolute inset-x-[18px] bottom-[15px] h-[2px] rounded-[2px] bg-[#c7925c]/50" />
       </div>
 
-      <div className="absolute bottom-[18px] left-1/2 h-8 w-12 -translate-x-1/2">
-        <div className="absolute left-1/2 top-1 h-5 w-px -translate-x-1/2 rotate-[18deg] bg-[#9e6439]/35" />
-        <div className="absolute left-[14px] top-[10px] h-4 w-px rotate-[48deg] bg-[#9e6439]/30" />
-        <div className="absolute right-[14px] top-[10px] h-4 w-px -rotate-[48deg] bg-[#9e6439]/30" />
+      <div className="absolute bottom-[11px] left-1/2 h-6 w-10 -translate-x-1/2">
+        <div className="absolute left-1/2 top-1 h-4 w-px -translate-x-1/2 rotate-[18deg] bg-[#9e6439]/26" />
+        <div className="absolute left-[12px] top-[8px] h-3 w-px rotate-[48deg] bg-[#9e6439]/22" />
+        <div className="absolute right-[12px] top-[8px] h-3 w-px -rotate-[48deg] bg-[#9e6439]/22" />
       </div>
 
-      <div className="absolute bottom-[24px] left-1/2 flex h-[98px] w-[82px] -translate-x-1/2 items-end justify-center">
+      <div className="absolute bottom-[14px] left-1/2 flex h-[76px] w-[58px] -translate-x-1/2 items-end justify-center">
         <div
           className={cn('absolute bottom-0 rounded-[3px] transition-all duration-500', palette.stem, stemWidth)}
-          style={{ height: `${stage.stemHeight}px` }}
+          style={{ height: `${Math.max(stage.stemHeight - 12, 24)}px` }}
         />
 
         {leaves.slice(0, stage.leafCount).map((leafClassName, index) => (
@@ -200,7 +200,7 @@ const EcoMascot = ({
         {stage.budVisible && (
           <div
             className={cn(
-              'absolute left-1/2 top-[10px] -translate-x-1/2 rotate-45 rounded-[2px] border border-white/70 transition-transform duration-500',
+              'absolute left-1/2 top-[10px] -translate-x-1/2 rotate-45 rounded-[2px] border border-white/60 transition-transform duration-500',
               palette.bud,
               budSize
             )}

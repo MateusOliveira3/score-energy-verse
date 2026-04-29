@@ -53,6 +53,17 @@ interface FeedbackContext {
   electricShowerUsage?: ReturnType<typeof getAnsweredContextValue>;
 }
 
+type EnrichedAnalysisSummary = AnalysisSummary & {
+  educationItems?: Array<{
+    explanation: string;
+    label: string;
+  }>;
+  evidenceItems?: Array<{
+    label: string;
+    value: string;
+  }>;
+};
+
 const priorityClasses = {
   high: 'border-red-200 bg-red-50/90',
   medium: 'border-amber-200 bg-amber-50/90',
@@ -429,7 +440,7 @@ const buildContextFooter = ({
 };
 
 const buildActionPreview = (action: NextAction, actionContextLine: string) => {
-  return getCompactText(action.context || action.description || actionContextLine, 88);
+  return getCompactText(action.description || action.context || actionContextLine, 88);
 };
 
 const SmartRecommendations = ({
@@ -452,6 +463,9 @@ const SmartRecommendations = ({
   >({});
   const contextInvoice = selectedInvoice;
   const contextInvoiceLabel = contextInvoice ? getInvoiceReferenceLabel(contextInvoice) : undefined;
+  const enrichedAnalysis = analysis as EnrichedAnalysisSummary | undefined;
+  const educationItems = enrichedAnalysis?.educationItems ?? [];
+  const evidenceItems = enrichedAnalysis?.evidenceItems ?? [];
   const showInvoiceSelector = Boolean(contextInvoice && invoiceHistory && invoiceHistory.length > 1 && onSelectInvoice);
   const ExpansionIcon = isExpanded ? ChevronDown : ChevronRight;
   const blockOrientation = buildBlockOrientation({
@@ -579,6 +593,27 @@ const SmartRecommendations = ({
               </div>
             </div>
           </div>
+
+          {evidenceItems.length > 0 && (
+            <div className="rounded-[24px] border border-emerald-100 bg-white/90 p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                Evidencia antes da acao
+              </p>
+              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                {evidenceItems.slice(0, 2).map((item) => (
+                  <div
+                    key={`${item.label}-${item.value}`}
+                    className="rounded-2xl border border-emerald-100 bg-emerald-50/80 px-3 py-3"
+                  >
+                    <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                      {item.label}
+                    </div>
+                    <div className="mt-1 text-sm font-medium text-slate-800">{item.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-4">
             {actions.map((action, index) => {
@@ -780,6 +815,19 @@ const SmartRecommendations = ({
           <p className="text-sm text-slate-500">
             Guarde o detalhe para quando precisar. No dia a dia, acompanhe estas acoes pela proxima fatura.
           </p>
+
+          {educationItems.length > 0 && (
+            <div className="rounded-[24px] border border-blue-100 bg-blue-50/70 p-4">
+              <p className="text-sm font-semibold text-blue-900">Entenda o sinal da conta</p>
+              <div className="mt-3 space-y-2">
+                {educationItems.slice(0, 2).map((item) => (
+                  <p key={item.label} className="text-sm leading-6 text-blue-900">
+                    <span className="font-semibold">{item.label}:</span> {item.explanation}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
 
           {contextInvoice && (
             <div className="rounded-[24px] bg-gradient-to-r from-emerald-50 via-white to-blue-50 p-4">

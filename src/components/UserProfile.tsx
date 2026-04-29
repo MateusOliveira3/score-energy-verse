@@ -3,6 +3,7 @@ import { User, MapPin, Building, Users, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 import { UserProfileData } from '@/types/mvp';
 
 interface UserProfileProps {
@@ -10,6 +11,8 @@ interface UserProfileProps {
   completionPercent: number;
   isComplete: boolean;
   onProfileUpdate: (data: UserProfileData) => void;
+  triggerClassName?: string;
+  triggerLabel?: string;
 }
 
 const UserProfile = ({
@@ -17,6 +20,8 @@ const UserProfile = ({
   completionPercent,
   isComplete,
   onProfileUpdate,
+  triggerClassName,
+  triggerLabel,
 }: UserProfileProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [profileData, setProfileData] = useState<UserProfileData>(value);
@@ -57,9 +62,19 @@ const UserProfile = ({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="text-emerald-600 hover:text-emerald-700">
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn(
+            'text-emerald-600 hover:text-emerald-700',
+            triggerClassName
+          )}
+        >
           <User className="h-4 w-4 mr-2" />
-          {isComplete ? `Editar Perfil (${completionPercent}%)` : `Completar Perfil (${completionPercent}%)`}
+          {triggerLabel ||
+            (isComplete
+              ? `Editar Perfil (${completionPercent}%)`
+              : `Completar Perfil (${completionPercent}%)`)}
         </Button>
       </DialogTrigger>
 

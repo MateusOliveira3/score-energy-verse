@@ -19,7 +19,6 @@ import LiveMascotJourney, {
 } from '../components/LiveMascotJourney';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
 import { useMvpJourney } from '@/hooks/useMvpJourney';
 import { getInvoiceFlowSnapshot, logInvoiceFlow } from '@/lib/invoiceFlowDebug';
 import { buildAnalysisSummary } from '@/lib/mvpCoreFlow';
@@ -69,7 +68,6 @@ const detailSectionMeta: Record<
 };
 
 const panelViewByShortcut: Record<JourneyQuickAccessId, DynamicContextPanelView> = {
-  score: 'score',
   history: 'history',
   actions: 'actions',
   summary: 'summary',
@@ -92,7 +90,6 @@ const detailButtons: Array<{ id: DashboardSectionKey; label: string }> = [
 ];
 
 const Index = () => {
-  const { toast } = useToast();
   const {
     profile,
     mascotCustomization,
@@ -123,10 +120,11 @@ const Index = () => {
       ? 'actions'
       : latestAnalysis
         ? 'summary'
-        : 'score';
+        : 'history';
   const [selectedInvoice, setSelectedInvoice] = React.useState<InvoiceData | undefined>(latestInvoice);
-  const [activeSection, setActiveSection] = React.useState<DashboardSectionKey>('score');
+  const [activeSection, setActiveSection] = React.useState<DashboardSectionKey>('summary');
   const [showLegacyDetails, setShowLegacyDetails] = React.useState(false);
+  const [isHistoryUploadVisible, setIsHistoryUploadVisible] = React.useState(invoiceHistory.length === 0);
   const [interactionFeedback, setInteractionFeedback] = React.useState<InteractionFeedbackEvent | null>(null);
   const [contextPanel, setContextPanel] = React.useState<ContextPanelState>({
     view: initialPanelView,
@@ -205,6 +203,10 @@ const Index = () => {
 
   const focusContextPanel = React.useCallback(
     (view: DynamicContextPanelView, payload?: Omit<ContextPanelState, 'view'>) => {
+      if (view !== 'history') {
+        setIsHistoryUploadVisible(false);
+      }
+
       setContextPanel({
         view,
         ...payload,
@@ -215,28 +217,34 @@ const Index = () => {
 
   const handleQuickAccessSelect = React.useCallback(
     (shortcutId: JourneyQuickAccessId) => {
+      if (shortcutId === 'history') {
+        setIsHistoryUploadVisible(invoiceHistory.length === 0);
+      }
+
       focusContextPanel(panelViewByShortcut[shortcutId]);
     },
-    [focusContextPanel]
+    [focusContextPanel, invoiceHistory.length]
   );
 
   const focusJourneyTarget = React.useCallback(
     (target: JourneyTarget) => {
       if (target === 'upload') {
-        document.getElementById('section-mvp')?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-        });
+        setIsHistoryUploadVisible(true);
+        focusContextPanel('history');
         return;
       }
 
       const nextView = panelViewByTarget[target];
 
       if (nextView) {
+        if (nextView === 'history') {
+          setIsHistoryUploadVisible(invoiceHistory.length === 0);
+        }
+
         focusContextPanel(nextView);
       }
     },
-    [focusContextPanel]
+    [focusContextPanel, invoiceHistory.length]
   );
 
   const activeQuickAccessId = React.useMemo<JourneyQuickAccessId>(() => {
@@ -256,27 +264,26 @@ const Index = () => {
       return 'profile';
     }
 
-    return 'score';
+    return 'history';
   }, [contextPanel.view]);
 
   const handleInvoiceProcessed = async (file: File) => {
-    return completeInvoiceFlow(file);
+    const processedInvoice = await completeInvoiceFlow(file);
+
+    if (processedInvoice) {
+      setSelectedInvoice(processedInvoice);
+      setIsHistoryUploadVisible(false);
+      focusContextPanel('history');
+    }
+
+    return processedInvoice;
   };
 
   const handleActionStatusChange = (
     action: NextAction,
     status: Extract<NextActionStatus, 'in_progress' | 'completed'>
   ) => {
-    triggerInteractionFeedback(status === 'completed' ? 'action_completed' : 'action_started');
     updateActionStatus(action, status);
-
-    toast({
-      title: status === 'completed' ? 'Acao testada' : 'Acao iniciada',
-      description:
-        status === 'completed'
-          ? `Voce marcou "${action.title}" como testada na jornada.`
-          : `Voce comecou "${action.title}" e registrou progresso real na jornada.`,
-    });
   };
 
   const handleContextQuestionAnswer = (
@@ -289,10 +296,6 @@ const Index = () => {
 
   const handleInvoiceRemoved = (fingerprint: string) => {
     removeInvoiceFromHistory(fingerprint);
-    toast({
-      title: 'Fatura removida',
-      description: 'O historico da jornada MVP foi atualizado sem depender do fluxo legado.',
-    });
   };
 
   return (
@@ -347,46 +350,40 @@ const Index = () => {
               selectedInvoice={selectedInvoice}
               profileCompletion={profileCompletion}
               profile={profile}
-              scoreState={scoreState}
-              scoreExplanation={scoreExplanation}
+              isProfileComplete={isProfileComplete}
               onOpenActions={() => focusContextPanel('actions')}
               onOpenHistory={() => focusContextPanel('history')}
               onOpenSummary={() => focusContextPanel('summary')}
               onOpenProfileDetails={() => focusContextPanel('profile')}
-              onOpenScoreDetails={() => focusContextPanel('score')}
               onSelectInvoice={(invoice) => {
                 setSelectedInvoice(invoice);
                 focusContextPanel('history');
               }}
+              onActionStatusChange={handleActionStatusChange}
+              onProfileUpdate={updateProfile}
+              isHistoryUploadVisible={isHistoryUploadVisible}
+              onToggleHistoryUpload={() =>
+                setIsHistoryUploadVisible((currentValue) => !currentValue)
+              }
+              historyUploadContent={
+                <InvoiceUpload
+                  profile={profile}
+                  onUploadStarted={startInvoiceProcessing}
+                  onInvoiceProcessed={handleInvoiceProcessed}
+                  onUploadCompleted={(invoice) => {
+                    if (invoice) {
+                      setSelectedInvoice(invoice);
+                    }
+                  }}
+                  variant="embedded"
+                />
+              }
               contextQuestion={mascotContextQuestion}
               onContextQuestionAnswer={handleContextQuestionAnswer}
               onContextQuestionIgnore={ignoreMascotContextQuestion}
             />
           }
         />
-
-        <section
-          id="section-mvp"
-          className="rounded-[24px] border border-[#264c46] bg-[#0d332f]/90 p-5 text-white shadow-[0_14px_34px_rgba(0,0,0,0.16)]"
-        >
-          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9dbfa6]">
-                Fluxo complementar
-              </p>
-              <h2 className="text-xl font-semibold text-[#f5f8f3]">Enviar fatura</h2>
-            </div>
-            <div className="text-sm text-[#c5d8c8]">
-              O hub continua sendo o destino principal; o upload fica abaixo como etapa operacional.
-            </div>
-          </div>
-
-          <InvoiceUpload
-            profile={profile}
-            onUploadStarted={startInvoiceProcessing}
-            onInvoiceProcessed={handleInvoiceProcessed}
-          />
-        </section>
 
         <section className="rounded-[24px] border border-[#264c46] bg-[#0a2c28]/85 p-5 text-white">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -396,7 +393,7 @@ const Index = () => {
               </p>
               <h2 className="text-xl font-semibold text-[#f5f8f3]">Detalhes completos abaixo do hub</h2>
               <p className="mt-1 text-sm text-[#c5d8c8]">
-                Estes paineis continuam disponiveis, mas foram rebaixados para nao competir com a macroestrutura principal.
+                O hub agora concentra historico, leitura, acoes e perfil. Estes paineis ficam abaixo apenas como leitura complementar.
               </p>
             </div>
 

@@ -3,24 +3,28 @@ import { Upload, FileText, Zap, Eye, CheckCircle, Database } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 import { InvoiceData, UserProfileData } from '@/types/mvp';
 
 interface InvoiceUploadProps {
   profile: UserProfileData;
   onUploadStarted: () => void;
   onInvoiceProcessed: (file: File) => Promise<InvoiceData | void>;
+  onUploadCompleted?: (invoice?: InvoiceData) => void;
+  variant?: 'default' | 'embedded';
+  showJourneyAnchors?: boolean;
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const scrollToSection = (sectionId: string) => {
-  document.getElementById(sectionId)?.scrollIntoView({
-    behavior: 'smooth',
-    block: 'start',
-  });
-};
-
-const InvoiceUpload = ({ profile, onUploadStarted, onInvoiceProcessed }: InvoiceUploadProps) => {
+const InvoiceUpload = ({
+  profile,
+  onUploadStarted,
+  onInvoiceProcessed,
+  onUploadCompleted,
+  variant = 'default',
+  showJourneyAnchors = false,
+}: InvoiceUploadProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -50,6 +54,7 @@ const InvoiceUpload = ({ profile, onUploadStarted, onInvoiceProcessed }: Invoice
         await wait(1200);
         const extractedInvoice = await onInvoiceProcessed(file);
         setSavedInJourney(true);
+        onUploadCompleted?.(extractedInvoice);
 
         const extractedMonth = extractedInvoice?.month ?? 'referencia nao identificada';
         const extractedConsumption =
@@ -95,10 +100,6 @@ const InvoiceUpload = ({ profile, onUploadStarted, onInvoiceProcessed }: Invoice
     }
   };
 
-  const handleStepNavigation = (sectionId: string) => {
-    scrollToSection(sectionId);
-  };
-
   const stepAnchors = [
     {
       title: 'MVP',
@@ -141,24 +142,44 @@ const InvoiceUpload = ({ profile, onUploadStarted, onInvoiceProcessed }: Invoice
       sectionId: 'section-score',
     },
   ] as const;
+  const isEmbedded = variant === 'embedded';
 
   return (
-    <Card className="border-2 border-emerald-100 shadow-md hover:shadow-lg transition-all duration-300">
+    <Card
+      className={cn(
+        'transition-all duration-300',
+        isEmbedded
+          ? 'border border-[#365f58] bg-[#0f342f] text-white shadow-none'
+          : 'border-2 border-emerald-100 shadow-md hover:shadow-lg'
+      )}
+    >
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center space-x-2 text-emerald-700">
+        <CardTitle
+          className={cn(
+            'flex items-center space-x-2',
+            isEmbedded ? 'text-[#f5f8f3]' : 'text-emerald-700'
+          )}
+        >
           <FileText className="h-5 w-5" />
           <span>Adicionar fatura ao historico</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0">
         <div
-          className={`relative rounded-lg border-2 border-dashed px-5 py-5 text-center transition-all duration-300 md:px-6 md:py-6 ${
+          className={cn(
+            'relative rounded-lg border-2 border-dashed px-5 py-5 text-center transition-all duration-300 md:px-6 md:py-6',
             isDragActive
-              ? 'border-emerald-500 bg-emerald-50'
+              ? isEmbedded
+                ? 'border-[#7eb77b] bg-[#17443d]'
+                : 'border-emerald-500 bg-emerald-50'
               : uploadedFile
-                ? 'border-emerald-300 bg-emerald-25'
-                : 'border-gray-300 hover:border-emerald-400 hover:bg-emerald-25'
-          }`}
+                ? isEmbedded
+                  ? 'border-[#6ea96d] bg-[#123933]'
+                  : 'border-emerald-300 bg-emerald-25'
+                : isEmbedded
+                  ? 'border-[#365f58] bg-[#133d37] hover:border-[#5d8e72] hover:bg-[#184741]'
+                  : 'border-gray-300 hover:border-emerald-400 hover:bg-emerald-25'
+          )}
           onDrop={handleDrop}
           onDragOver={(event) => {
             event.preventDefault();
@@ -175,7 +196,7 @@ const InvoiceUpload = ({ profile, onUploadStarted, onInvoiceProcessed }: Invoice
                 <p className="text-base font-medium text-emerald-700">
                   Lendo a fatura e montando o resumo...
                 </p>
-                <p className="text-sm text-gray-600">
+                <p className={cn('text-sm', isEmbedded ? 'text-[#c5d8c8]' : 'text-gray-600')}>
                   A proxima etapa sera uma analise simples com score e resumo do momento.
                 </p>
               </div>
@@ -187,7 +208,9 @@ const InvoiceUpload = ({ profile, onUploadStarted, onInvoiceProcessed }: Invoice
                 <p className="text-base font-medium text-emerald-700">
                   Fatura recebida e adicionada a jornada
                 </p>
-                <p className="text-sm text-gray-600">{uploadedFile.name}</p>
+                <p className={cn('text-sm', isEmbedded ? 'text-[#c5d8c8]' : 'text-gray-600')}>
+                  {uploadedFile.name}
+                </p>
                 <div className="mt-1.5 flex items-center justify-center text-xs text-emerald-600">
                   <Database className="h-3 w-3 mr-1" />
                   {savedInJourney
@@ -217,7 +240,7 @@ const InvoiceUpload = ({ profile, onUploadStarted, onInvoiceProcessed }: Invoice
                 <p className="mb-1.5 text-base font-medium text-gray-700">
                   Arraste sua fatura aqui ou clique para adicionar ao historico
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className={cn('text-sm', isEmbedded ? 'text-[#c5d8c8]' : 'text-gray-500')}>
                   Suporta PDF, JPG e PNG. A adicao atualiza a analise, o score e os proximos passos.
                 </p>
               </div>
@@ -233,36 +256,32 @@ const InvoiceUpload = ({ profile, onUploadStarted, onInvoiceProcessed }: Invoice
               <Button
                 onClick={() => document.getElementById('file-upload')?.click()}
                 size="sm"
-                className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700"
+                className={cn(
+                  isEmbedded
+                    ? 'bg-[#5f925c] text-white hover:bg-[#517d4f]'
+                    : 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700'
+                )}
               >
                 <Eye className="h-4 w-4 mr-2" />
-                Selecionar Arquivo
+                Selecionar fatura
               </Button>
             </div>
           )}
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2 text-center md:grid-cols-5 md:gap-3">
-          {stepAnchors.map((step) => (
-            <div
-              key={step.title}
-              role="button"
-              tabIndex={0}
-              aria-label={`Ir para a secao ${step.title}`}
-              className={`cursor-pointer rounded-lg px-2.5 py-2 ${step.containerClassName}`}
-              onClick={() => handleStepNavigation(step.sectionId)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  handleStepNavigation(step.sectionId);
-                }
-              }}
-            >
-              <div className={`text-base font-bold ${step.titleClassName}`}>{step.title}</div>
-              <div className={`text-xs ${step.descriptionClassName}`}>{step.description}</div>
-            </div>
-          ))}
-        </div>
+        {showJourneyAnchors && (
+          <div className="mt-3 grid grid-cols-2 gap-2 text-center md:grid-cols-5 md:gap-3">
+            {stepAnchors.map((step) => (
+              <div
+                key={step.title}
+                className={`rounded-lg px-2.5 py-2 ${step.containerClassName}`}
+              >
+                <div className={`text-base font-bold ${step.titleClassName}`}>{step.title}</div>
+                <div className={`text-xs ${step.descriptionClassName}`}>{step.description}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
