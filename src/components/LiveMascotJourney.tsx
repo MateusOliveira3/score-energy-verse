@@ -27,6 +27,7 @@ interface LiveMascotJourneyProps {
   nextActions: NextAction[];
   invoiceCount: number;
   isProfileComplete: boolean;
+  currentScore: number;
   latestAnalysis?: AnalysisSummary;
   customization?: MascotCustomizationData;
   profile: UserProfileData;
@@ -62,28 +63,33 @@ const heightGuides = [
 ] as const;
 
 const cloudBlocks = [
-  { id: 'cloud-1', classes: 'left-[5%] top-[29%]' },
-  { id: 'cloud-2', classes: 'left-[16%] top-[25%]' },
-  { id: 'cloud-3', classes: 'right-[16%] top-[18%]' },
-  { id: 'cloud-4', classes: 'right-[6%] top-[33%]' },
-  { id: 'cloud-5', classes: 'right-[24%] top-[27%]' },
+  { id: 'cloud-1', classes: 'left-[7%] top-[15%]', width: 74, height: 24, opacity: 0.36, duration: 48 },
+  { id: 'cloud-2', classes: 'left-[24%] top-[27%]', width: 60, height: 18, opacity: 0.28, duration: 54 },
+  { id: 'cloud-3', classes: 'right-[16%] top-[13%]', width: 78, height: 25, opacity: 0.33, duration: 52 },
+  { id: 'cloud-4', classes: 'right-[5%] top-[29%]', width: 54, height: 18, opacity: 0.26, duration: 58 },
 ] as const;
 
 const co2Bubbles = [
   {
     id: 'bubble-high',
     requiredLevel: 4,
-    classes: 'right-[4.2%] top-[17%]',
+    classes: 'right-[12%] top-[16.5%]',
+    size: 28,
+    duration: 19,
   },
   {
     id: 'bubble-mid',
     requiredLevel: 2,
-    classes: 'right-[4.2%] top-[48.5%]',
+    classes: 'right-[8.5%] top-[47%]',
+    size: 31,
+    duration: 20,
   },
   {
     id: 'bubble-low',
     requiredLevel: 1,
-    classes: 'right-[4.2%] top-[79.5%]',
+    classes: 'right-[15%] top-[73.5%]',
+    size: 26,
+    duration: 18,
   },
 ] as const;
 
@@ -122,6 +128,49 @@ const compactSentence = (value: string, maxLength = 108) => {
 
   return `${normalizedValue.slice(0, maxLength).trimEnd()}...`;
 };
+
+const getReachTier = (score?: number) => {
+  if (typeof score !== 'number' || !Number.isFinite(score)) {
+    return 'low' as const;
+  }
+
+  if (score > 2000) {
+    return 'high' as const;
+  }
+
+  if (score > 1000) {
+    return 'medium' as const;
+  }
+
+  return 'low' as const;
+};
+
+const reachVisualByTier = {
+  low: {
+    beamHeight: 98,
+    label: 'ALCANCE BAIXO',
+    mascotLift: 0,
+    plantScale: 1.1,
+    top: 'top-[74%]',
+    visualLevel: 2,
+  },
+  medium: {
+    beamHeight: 188,
+    label: 'ALCANCE MEDIO',
+    mascotLift: -10,
+    plantScale: 1.14,
+    top: 'top-[46%]',
+    visualLevel: 4,
+  },
+  high: {
+    beamHeight: 276,
+    label: 'ALCANCE ALTO',
+    mascotLift: -24,
+    plantScale: 1.18,
+    top: 'top-[16%]',
+    visualLevel: 7,
+  },
+} as const;
 
 const getJourneyTarget = ({
   invoiceCount,
@@ -196,6 +245,7 @@ const LiveMascotJourney = ({
   nextActions,
   invoiceCount,
   isProfileComplete,
+  currentScore,
   latestAnalysis,
   customization,
   profile,
@@ -209,11 +259,7 @@ const LiveMascotJourney = ({
 }: LiveMascotJourneyProps) => {
   const [capturedBubbleIds, setCapturedBubbleIds] = React.useState<string[]>([]);
   const [tipIndex, setTipIndex] = React.useState(0);
-  const [isPlantSwaying, setIsPlantSwaying] = React.useState(false);
-  const [isGrowthHighlighted, setIsGrowthHighlighted] = React.useState(false);
   const timeoutIdsRef = React.useRef<number[]>([]);
-  const feedbackTimeoutRef = React.useRef<number | null>(null);
-  const previousJourneyLevelRef = React.useRef(1);
   const nextAction = nextActions.find((action) => action.status !== 'completed') || nextActions[0];
   const currentTarget = getJourneyTarget({
     invoiceCount,
@@ -232,50 +278,18 @@ const LiveMascotJourney = ({
       ? 'action'
       : trailTargetId === 'summary'
         ? 'understand'
-        : trailTargetId === 'upload'
+      : trailTargetId === 'upload'
           ? 'observe'
           : 'wake';
-  const reachLabel =
-    journeyLevel >= 4 ? 'ALCANCE MEDIO' : journeyLevel >= 2 ? 'ALCANCE MEDIO' : 'ALCANCE BAIXO';
+  const reachTier = getReachTier(currentScore);
+  const reachVisual = reachVisualByTier[reachTier];
+  const sceneMascotLevel = Math.max(journeyLevel, reachVisual.visualLevel);
 
   React.useEffect(() => {
-    previousJourneyLevelRef.current = journeyLevel;
-  }, []);
-
-  React.useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      setIsPlantSwaying((currentValue) => !currentValue);
-    }, 1700);
-
     return () => {
-      window.clearInterval(intervalId);
       timeoutIdsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
-
-      if (feedbackTimeoutRef.current !== null) {
-        window.clearTimeout(feedbackTimeoutRef.current);
-      }
     };
   }, []);
-
-  React.useEffect(() => {
-    if (journeyLevel <= previousJourneyLevelRef.current) {
-      previousJourneyLevelRef.current = journeyLevel;
-      return;
-    }
-
-    setIsGrowthHighlighted(true);
-
-    if (feedbackTimeoutRef.current !== null) {
-      window.clearTimeout(feedbackTimeoutRef.current);
-    }
-
-    feedbackTimeoutRef.current = window.setTimeout(() => {
-      setIsGrowthHighlighted(false);
-      feedbackTimeoutRef.current = null;
-    }, 2200);
-
-    previousJourneyLevelRef.current = journeyLevel;
-  }, [journeyLevel]);
 
   const handleCaptureBubble = (bubbleId: string) => {
     const bubble = co2Bubbles.find((currentBubble) => currentBubble.id === bubbleId);
@@ -311,6 +325,8 @@ const LiveMascotJourney = ({
 
     timeoutIdsRef.current.push(timeoutId);
   };
+  const mascotBottom =
+    reachTier === 'high' ? 'bottom-[39px]' : reachTier === 'medium' ? 'bottom-[37px]' : 'bottom-[35px]';
 
   return (
     <Card className="overflow-hidden border border-[#29554f] bg-transparent shadow-none">
@@ -318,13 +334,19 @@ const LiveMascotJourney = ({
         <style>
           {`
             @keyframes journey-cloud-drift {
-              0%, 100% { transform: translate3d(0, 0, 0); }
-              50% { transform: translate3d(8px, -4px, 0); }
+              0% { transform: translate3d(0, 0, 0); }
+              50% { transform: translate3d(12px, -1px, 0); }
+              100% { transform: translate3d(24px, 0, 0); }
             }
 
             @keyframes journey-co2-drift {
-              0%, 100% { transform: translate3d(0, 0, 0); }
-              50% { transform: translate3d(0, -7px, 0); }
+              0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+              50% { transform: translate3d(4px, -8px, 0) scale(1.04); }
+            }
+
+            @keyframes journey-air-pulse {
+              0%, 100% { opacity: 0.18; transform: translate3d(0, 0, 0); }
+              50% { opacity: 0.28; transform: translate3d(0, -4px, 0); }
             }
           `}
         </style>
@@ -356,54 +378,88 @@ const LiveMascotJourney = ({
               </div>
 
               <div className="rounded-[24px] border border-[#29554f] bg-[#0f342f] p-4">
-                <div className="relative h-[366px] overflow-hidden rounded-[20px] border border-[#c8dbc0]/70 bg-[linear-gradient(180deg,#e4efdc_0%,#eef5e8_56%,#f5f9f1_100%)]">
-                  <div className="pointer-events-none absolute inset-[12px] rounded-[14px] border border-white/35 shadow-[inset_0_0_0_1px_rgba(181,210,179,0.18)]" />
-                  <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[linear-gradient(180deg,rgba(255,255,255,0.18),rgba(255,255,255,0))]" />
-                  <div className="pointer-events-none absolute left-[11%] top-[12%] h-14 w-14 rounded-full bg-[#fff2b8]/60 blur-[2px]" />
-                  <div className="pointer-events-none absolute left-[12.6%] top-[13.6%] h-8 w-8 rounded-full bg-[#ffe69a]/80" />
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-7 bg-[#5d7f58]/18" />
-                  <div className="pointer-events-none absolute inset-x-[9%] bottom-[10px] h-[10px] bg-[#5f7a55]/24" />
-                  <div className="pointer-events-none absolute inset-x-[14%] bottom-[6px] h-[8px] bg-[#78906f]/18" />
+                <div className="relative h-[366px] overflow-hidden rounded-[20px] border border-[#c8d9d4]/80 bg-[linear-gradient(180deg,#EEF7FF_0%,#F1F8F7_44%,#EAF4EE_100%)]">
+                  <div className="pointer-events-none absolute inset-[10px] rounded-[16px] border border-white/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.32)]" />
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-[52%] bg-[linear-gradient(180deg,rgba(255,255,255,0.18),rgba(255,255,255,0.02)_58%,rgba(255,255,255,0))]" />
+                  <div className="pointer-events-none absolute left-[9.8%] top-[9.8%] h-[58px] w-[58px] rounded-full bg-[#fff6d7]/32 blur-[10px]" />
+                  <div className="pointer-events-none absolute left-[10.8%] top-[10.8%] h-[50px] w-[50px] rounded-full bg-[#fff3c9]/82">
+                    <div className="absolute inset-[10px] rounded-full bg-white/48 blur-[3px]" />
+                  </div>
+
+                  <div className="pointer-events-none absolute left-[-10%] bottom-[54px] h-[98px] w-[58%] rounded-[100%] bg-[linear-gradient(180deg,rgba(212,227,217,0.92),rgba(212,227,217,0.78)_64%,rgba(212,227,217,0.08)_100%)] blur-[8px]" />
+                  <div className="pointer-events-none absolute left-[23%] bottom-[58px] h-[68px] w-[32%] rounded-[100%] bg-[linear-gradient(180deg,rgba(214,229,220,0.74),rgba(214,229,220,0.18)_100%)] blur-[10px]" />
+                  <div className="pointer-events-none absolute right-[-11%] bottom-[52px] h-[88px] w-[55%] rounded-[100%] bg-[linear-gradient(180deg,rgba(208,223,214,0.9),rgba(208,223,214,0.74)_66%,rgba(208,223,214,0.08)_100%)] blur-[9px]" />
+
+                  <div
+                    className="pointer-events-none absolute left-[18%] top-[44%] h-2.5 w-2.5 rounded-full bg-white/20"
+                    style={{ animation: 'journey-air-pulse 9s ease-in-out infinite' }}
+                  />
+                  <div
+                    className="pointer-events-none absolute right-[21%] top-[51%] h-2 w-2 rounded-full bg-[#edf7f0]/24"
+                    style={{ animation: 'journey-air-pulse 11s ease-in-out infinite 1.5s' }}
+                  />
+                  <div
+                    className="pointer-events-none absolute left-[33%] top-[58%] h-1.5 w-1.5 rounded-full bg-white/18"
+                    style={{ animation: 'journey-air-pulse 10s ease-in-out infinite 0.9s' }}
+                  />
 
                   {cloudBlocks.map((cloud) => (
                     <div
                       key={cloud.id}
-                      className={cn('pointer-events-none absolute opacity-55', cloud.classes)}
+                      className={cn('pointer-events-none absolute', cloud.classes)}
                       style={{
-                        animation: `journey-cloud-drift ${6 + Number(cloud.id.slice(-1)) * 0.5}s ease-in-out infinite`,
+                        width: `${cloud.width}px`,
+                        height: `${cloud.height}px`,
+                        opacity: cloud.opacity,
+                        animation: `journey-cloud-drift ${cloud.duration}s linear infinite`,
                       }}
                     >
-                      <div className="relative h-6 w-12">
-                        <div className="absolute bottom-0 left-2 h-3.5 w-8 rounded-[5px] bg-white/58" />
-                        <div className="absolute left-0 top-2 h-3 w-3 rounded-[4px] bg-white/48" />
-                        <div className="absolute left-4 top-0 h-3.5 w-3.5 rounded-[4px] bg-white/55" />
-                        <div className="absolute right-0 top-2 h-3 w-3 rounded-[4px] bg-white/48" />
+                      <div className="relative h-full w-full">
+                        <div className="absolute bottom-0 left-[14%] h-[45%] w-[56%] rounded-[6px] bg-white/90" />
+                        <div className="absolute left-0 top-[34%] h-[40%] w-[24%] rounded-[5px] bg-white/82" />
+                        <div className="absolute left-[28%] top-0 h-[52%] w-[26%] rounded-[6px] bg-white/88" />
+                        <div className="absolute right-0 top-[30%] h-[38%] w-[22%] rounded-[5px] bg-white/80" />
                       </div>
                     </div>
                   ))}
 
                   {heightGuides.map((guide) => (
-                    <div key={guide.id} className={cn('pointer-events-none absolute inset-x-24', guide.classes)}>
+                    <div key={guide.id} className={cn('pointer-events-none absolute inset-x-[17%]', guide.classes)}>
                       <div className="relative">
-                        <div className="border-t border-dashed border-[#7da18d]/45" />
-                        <span className="absolute -left-[72px] -top-3 text-[10px] font-semibold tracking-[0.08em] text-[#274036]/72">
+                        <div className="border-t border-dashed border-[#8ea799]/28" />
+                        <span className="absolute -left-[68px] -top-3 text-[10px] font-semibold tracking-[0.08em] text-[#536c61]/55">
                           {guide.label}
                         </span>
                       </div>
                     </div>
                   ))}
 
-                  <div className="absolute left-1/2 top-[35%] z-10 -translate-x-1/2">
-                    <div className="relative rounded-[12px] border border-[#7fb56d]/80 bg-[#6aa85a]/92 px-4 py-2 text-center text-sm font-semibold text-white shadow-[0_8px_16px_rgba(60,120,54,0.14)]">
-                      {reachLabel}
-                      <span className="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1 rotate-45 border-b border-r border-[#7fb56d]/80 bg-[#6aa85a]" />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[58px] bg-[#937158]" />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[24px] bg-[#84614b]/84" />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-[47px] h-[18px] bg-[#91b780]" />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-[60px] h-[8px] bg-[#c0dca7]" />
+                  <div className="pointer-events-none absolute left-[8%] right-[8%] bottom-[54px] h-[18px] rounded-[100%] bg-[#88b075]/34 blur-[2px]" />
+                  <div className="pointer-events-none absolute left-[36%] bottom-[46px] h-[16px] w-[28%] rounded-[100%] bg-[#684c3b]/14 blur-[7px]" />
+
+                  <div className="pointer-events-none absolute bottom-[58px] left-1/2 z-[1] -translate-x-1/2">
+                    <div
+                      className="w-[14px] rounded-full bg-[linear-gradient(180deg,rgba(158,203,161,0.02),rgba(121,177,125,0.18)_56%,rgba(94,149,97,0.04)_100%)]"
+                      style={{ height: `${reachVisual.beamHeight}px` }}
+                    />
+                  </div>
+
+                  <div className={cn('absolute left-1/2 z-10 -translate-x-1/2', reachVisual.top)}>
+                    <div className="relative rounded-full bg-white/58 px-3 py-1.5 text-center text-[10px] font-semibold tracking-[0.08em] text-[#5f7565] shadow-[0_3px_8px_rgba(96,128,106,0.08)] backdrop-blur-[2px]">
+                      {reachVisual.label}
+                      <span className="absolute left-1/2 top-full h-2.5 w-2.5 -translate-x-1/2 -translate-y-1 rotate-45 bg-white/58" />
                     </div>
                   </div>
 
                   <div
-                    className="absolute bottom-[20px] left-1/2 z-10 -translate-x-1/2 transition-transform duration-700"
+                    className={cn('absolute left-1/2 z-10 -translate-x-1/2', mascotBottom)}
                     style={{
-                      transform: `translateX(-50%) rotate(${isPlantSwaying ? '-1deg' : '1deg'}) scale(${isGrowthHighlighted ? 1.03 : 1})`,
+                      transform: `translateX(-50%) translateY(${reachVisual.mascotLift}px) scale(${reachVisual.plantScale})`,
+                      transformOrigin: 'center bottom',
                     }}
                   >
                     <button
@@ -416,11 +472,11 @@ const LiveMascotJourney = ({
 
                         onNavigate(currentTarget.target);
                       }}
-                      className="rounded-[8px] p-1"
+                      className="rounded-[8px] px-1 py-0"
                     >
                       <EcoMascot
-                        score={Math.max(journeyLevel * 200, 200)}
-                        level={journeyLevel}
+                        score={currentScore}
+                        level={sceneMascotLevel}
                         consumerType={profile.consumerType}
                         customization={customization}
                         variant="scene"
@@ -445,27 +501,37 @@ const LiveMascotJourney = ({
                           isCaptured && 'pointer-events-none scale-75 opacity-0'
                         )}
                         style={{
-                          animation: `journey-co2-drift ${4.8 + bubble.requiredLevel * 0.7}s ease-in-out infinite`,
+                          animation: `journey-co2-drift ${bubble.duration}s ease-in-out infinite`,
                         }}
                       >
                         <div
                           className={cn(
-                            'relative px-2 py-1 text-[10px] font-semibold tracking-[0.04em]',
+                            'relative',
                             isUnlocked
-                              ? 'text-[#3f5a4d]'
-                              : 'text-slate-300/85'
+                              ? 'text-[#60786d]/52'
+                              : 'text-slate-400/48'
                           )}
                         >
-                          <div className="flex items-center gap-1.5 rounded-full bg-white/45 px-2.5 py-1 backdrop-blur-[1px]">
-                            <span className={cn('h-1.5 w-1.5 rounded-full', isUnlocked ? 'bg-[#8ca897]/70' : 'bg-slate-300/70')} />
-                            <span className={cn('h-2 w-2 rounded-full', isUnlocked ? 'bg-[#9db5a5]/62' : 'bg-slate-300/55')} />
-                            <span className={cn('h-1.5 w-1.5 rounded-full', isUnlocked ? 'bg-[#8ca897]/70' : 'bg-slate-300/70')} />
-                            <span>CO2</span>
+                          <div
+                            className={cn(
+                              'relative rounded-full bg-white/14 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-[2px]',
+                              isUnlocked ? 'opacity-85' : 'opacity-58'
+                            )}
+                            style={{ height: `${bubble.size}px`, width: `${bubble.size}px` }}
+                          >
+                            <div className="absolute left-[22%] top-[18%] h-[28%] w-[28%] rounded-full bg-white/20 blur-[2px]" />
+                            <div className="absolute -left-[2px] bottom-[7px] h-2.5 w-2.5 rounded-full bg-white/8" />
+                            <div className="absolute -right-[3px] top-[9px] h-2 w-2 rounded-full bg-white/8" />
+                            <div className="absolute inset-0 flex items-center justify-center text-[7px] font-medium uppercase tracking-[0.08em]">
+                              CO2
+                            </div>
                           </div>
                         </div>
                       </button>
                     );
                   })}
+
+                  <div className="pointer-events-none absolute left-1/2 bottom-[49px] z-[11] h-[10px] w-[42px] -translate-x-1/2 rounded-[100%] bg-[#8eb57c]/76 blur-[1px]" />
                 </div>
               </div>
 

@@ -8,6 +8,7 @@ import {
   Target,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { buildAnalysisSummary, buildNextActions } from '@/lib/mvpCoreFlow';
 import {
   AnalysisSummary,
   InvoiceData,
@@ -53,17 +54,6 @@ interface FeedbackContext {
   electricShowerUsage?: ReturnType<typeof getAnsweredContextValue>;
 }
 
-type EnrichedAnalysisSummary = AnalysisSummary & {
-  educationItems?: Array<{
-    explanation: string;
-    label: string;
-  }>;
-  evidenceItems?: Array<{
-    label: string;
-    value: string;
-  }>;
-};
-
 const priorityClasses = {
   high: 'border-red-200 bg-red-50/90',
   medium: 'border-amber-200 bg-amber-50/90',
@@ -108,6 +98,34 @@ const formatConsumption = (value?: number) =>
 
 const formatCurrencyPerKwh = (value?: number) =>
   typeof value === 'number' ? `R$ ${value.toFixed(2)}/kWh` : undefined;
+
+const getInsightContextLines = (consultiveInsight?: AnalysisSummary['consultiveInsight']) => {
+  const contextLines: string[] = [];
+  const season = consultiveInsight?.environmentContext?.season;
+  const profileContext = consultiveInsight?.profileContext;
+
+  if (profileContext?.warnings[0]) {
+    contextLines.push(profileContext.warnings[0]);
+  } else if (profileContext?.hasSolar) {
+    contextLines.push('Perfil com energia solar indicada');
+  } else if (profileContext?.profileType === 'Residencial' && profileContext.householdSize) {
+    contextLines.push(`Perfil: residencia com ${profileContext.householdSize} ${profileContext.householdSize === 1 ? 'pessoa' : 'pessoas'}`);
+  } else if (profileContext?.profileType) {
+    contextLines.push(`Perfil: ${profileContext.profileType.toLowerCase()}`);
+  }
+
+  if (profileContext?.locationLabel) {
+    contextLines.push(`Contexto local informado: ${profileContext.locationLabel}.`);
+  } else if (season === 'inverno') {
+    contextLines.push('Contexto: inverno na sua regiao');
+  } else if (season === 'verao') {
+    contextLines.push('Contexto: verao na sua regiao');
+  } else if (season === 'meia_estacao') {
+    contextLines.push('Contexto: meia estacao na sua regiao');
+  }
+
+  return contextLines.slice(0, 2);
+};
 
 const getCompactText = (value: string, maxLength = 120) => {
   if (value.length <= maxLength) {
@@ -176,11 +194,16 @@ const buildBlockOrientation = ({
   profile: UserProfileData;
   userContext?: Partial<UserContextState>;
 }) => {
+  const consultiveInsight = analysis?.consultiveInsight;
   const averageCostPerKwh = getAverageCostPerKwh(invoice);
   const primaryGoal = getAnsweredContextValue(userContext, 'primary_goal');
 
+  if (consultiveInsight) {
+    return `${consultiveInsight.conclusion} ${consultiveInsight.evidence}`;
+  }
+
   if (profile.consumerType === 'Residencial' && analysis?.consumptionLevel === 'alto') {
-    return 'Neste perfil, vale priorizar habitos de maior impacto antes de pensar em troca de equipamento.';
+    return 'Neste perfil, habitos de maior impacto devem vir antes de troca de equipamento.';
   }
 
   if (averageCostPerKwh !== undefined && analysis?.costSignal && analysis.costSignal !== 'controlado') {
@@ -188,7 +211,7 @@ const buildBlockOrientation = ({
   }
 
   if (hasSolarInterest(profile)) {
-    return 'Antes de simular energia solar, vale firmar uma leitura melhor do uso atual.';
+    return 'Antes de simular energia solar, confirme primeiro o que realmente pesa nesta fatura.';
   }
 
   if (primaryGoal === 'reduce_cost') {
@@ -200,10 +223,10 @@ const buildBlockOrientation = ({
   }
 
   if (analysis?.consumptionLevel === 'baixo') {
-    return 'O consumo parece mais contido; mantenha a leitura leve e acompanhe o proximo ciclo.';
+    return 'O consumo ficou mais contido e o proximo ciclo deve confirmar se esse padrao se sustenta.';
   }
 
-  return 'Use esta fatura como referencia e observe uma mudanca por vez.';
+  return 'Use esta fatura como referencia e compare uma mudanca por vez.';
 };
 
 const buildActionContextLine = ({
@@ -219,13 +242,17 @@ const buildActionContextLine = ({
   profile: UserProfileData;
   userContext?: Partial<UserContextState>;
 }) => {
+  if (action.context?.trim().toLowerCase().startsWith('escolhida porque')) {
+    return action.context.trim();
+  }
+
   const averageCostPerKwh = getAverageCostPerKwh(invoice);
   const primaryGoal = getAnsweredContextValue(userContext, 'primary_goal');
 
   if (analysis?.consumptionLevel === 'alto' && profile.consumerType === 'Residencial') {
     return action.priority === 'high'
-      ? 'Neste perfil residencial, esta frente pode revelar habitos que puxam o consumo.'
-      : 'Neste perfil residencial, use esta frente como apoio para reduzir desperdicios mais visiveis.';
+      ? 'Neste perfil residencial, esta frente revela primeiro os habitos que puxam o consumo.'
+      : 'Neste perfil residencial, execute esta frente depois da principal para reduzir desperdicios visiveis.';
   }
 
   if (averageCostPerKwh !== undefined && analysis?.costSignal && analysis.costSignal !== 'controlado') {
@@ -233,7 +260,7 @@ const buildActionContextLine = ({
   }
 
   if (hasSolarInterest(profile)) {
-    return 'Mesmo com interesse em energia solar, comece pelos sinais mais visiveis da rotina atual.';
+    return 'Mesmo com interesse em energia solar, compare primeiro os usos que mais pesam nesta fatura.';
   }
 
   if (primaryGoal === 'reduce_cost') {
@@ -249,10 +276,10 @@ const buildActionContextLine = ({
   }
 
   if (action.priority === 'medium') {
-    return 'Vale observar esta frente depois da principal, sem mudar muitas variaveis ao mesmo tempo.';
+    return 'Execute esta frente depois da principal para nao misturar variaveis na comparacao.';
   }
 
-  return 'Trate esta frente como ajuste complementar e veja se o sinal se repete.';
+  return 'Trate esta frente como ajuste complementar e confirme o sinal no proximo ciclo.';
 };
 
 const buildActionQuickTip = ({
@@ -361,7 +388,7 @@ const buildFeedbackMessage = (
       low: 'Bom passo. Comece quando fizer sentido.',
     },
     done: {
-      high: 'Perfeito. Se ja aplicou, vale atencao agora.',
+      high: 'Perfeito. Se ja aplicou, acompanhe o efeito agora.',
       medium: 'Perfeito. Se ja aplicou, acompanhe o proximo ciclo.',
       low: 'Bom passo. Se ja aplicou, acompanhe quando possivel.',
     },
@@ -425,7 +452,7 @@ const buildContextFooter = ({
   }
 
   if (hasSolarInterest(profile)) {
-    return 'Com preferencia por energia solar, vale primeiro confirmar quais usos realmente pesam nesta fatura.';
+    return 'Com preferencia por energia solar, confirme primeiro quais usos realmente pesam nesta fatura.';
   }
 
   if (primaryGoal === 'both') {
@@ -433,10 +460,10 @@ const buildContextFooter = ({
   }
 
   if (analysis?.consumptionLevel === 'baixo') {
-    return 'A leitura atual parece mais neutra; mantenha esta fatura em foco como referencia para a proxima comparacao.';
+    return 'O resumo atual esta mais neutro e esta fatura deve seguir como referencia para a proxima comparacao.';
   }
 
-  return 'Use esta leitura como base e acompanhe o proximo ciclo antes de ampliar qualquer decisao.';
+  return 'Use este resumo como base e acompanhe o proximo ciclo antes de ampliar qualquer decisao.';
 };
 
 const buildActionPreview = (action: NextAction, actionContextLine: string) => {
@@ -455,7 +482,7 @@ const SmartRecommendations = ({
   isExpanded = false,
   onToggle,
   showHeader = true,
-  onActionStatusChange: _onActionStatusChange,
+  onActionStatusChange,
 }: SmartRecommendationsProps) => {
   const [expandedDetailIds, setExpandedDetailIds] = React.useState<string[]>([]);
   const [actionFeedbackById, setActionFeedbackById] = React.useState<
@@ -463,24 +490,39 @@ const SmartRecommendations = ({
   >({});
   const contextInvoice = selectedInvoice;
   const contextInvoiceLabel = contextInvoice ? getInvoiceReferenceLabel(contextInvoice) : undefined;
-  const enrichedAnalysis = analysis as EnrichedAnalysisSummary | undefined;
-  const educationItems = enrichedAnalysis?.educationItems ?? [];
-  const evidenceItems = enrichedAnalysis?.evidenceItems ?? [];
+  const contextAnalysis = React.useMemo(
+    () =>
+      contextInvoice
+        ? buildAnalysisSummary(contextInvoice, profile, invoiceHistory ?? [])
+        : analysis,
+    [analysis, contextInvoice, invoiceHistory, profile]
+  );
+  const recommendedActions = React.useMemo(
+    () =>
+      contextInvoice && contextAnalysis
+        ? buildNextActions(contextInvoice, contextAnalysis, profile, userContext).slice(0, 2)
+        : actions,
+    [actions, contextAnalysis, contextInvoice, profile, userContext]
+  );
+  const educationItems = contextAnalysis?.educationItems ?? [];
+  const evidenceItems = contextAnalysis?.evidenceItems ?? [];
+  const consultiveInsight = contextAnalysis?.consultiveInsight;
+  const contextLines = getInsightContextLines(consultiveInsight);
   const showInvoiceSelector = Boolean(contextInvoice && invoiceHistory && invoiceHistory.length > 1 && onSelectInvoice);
   const ExpansionIcon = isExpanded ? ChevronDown : ChevronRight;
   const blockOrientation = buildBlockOrientation({
-    analysis,
+    analysis: contextAnalysis,
     invoice: contextInvoice,
     profile,
     userContext,
   });
   const footerContext = buildContextFooter({
-    analysis,
+    analysis: contextAnalysis,
     invoice: contextInvoice,
     profile,
     userContext,
   });
-  const contextHints = getContextHints(contextInvoice, analysis, profile);
+  const contextHints = getContextHints(contextInvoice, contextAnalysis, profile);
   const feedbackContext: FeedbackContext = {
     hints: contextHints,
     primaryGoal: getAnsweredContextValue(userContext, 'primary_goal'),
@@ -501,6 +543,11 @@ const SmartRecommendations = ({
   };
 
   const handleActionFeedback = (action: NextAction, choice: ActionEngagementChoice) => {
+    const nextStatus =
+      choice === 'done'
+        ? 'completed'
+        : 'in_progress';
+
     setActionFeedbackById((currentFeedback) => ({
       ...currentFeedback,
       [action.id]: {
@@ -508,6 +555,8 @@ const SmartRecommendations = ({
         message: buildFeedbackMessage(action, choice, feedbackContext),
       },
     }));
+
+    onActionStatusChange(action, nextStatus);
   };
 
   return (
@@ -587,12 +636,37 @@ const SmartRecommendations = ({
               </div>
               <div className="space-y-1">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
-                  Leitura da vez
+                  Resumo da vez
                 </p>
                 <p className="text-sm font-medium leading-6 text-slate-800">{blockOrientation}</p>
               </div>
             </div>
           </div>
+
+          {consultiveInsight && (
+            <div className="rounded-[24px] border border-emerald-100 bg-emerald-50/90 p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                Acao escolhida primeiro
+              </p>
+              <p className="mt-2 text-sm font-medium leading-6 text-slate-800">
+                {consultiveInsight.primaryAction.title}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-700">
+                {consultiveInsight.primaryAction.reason}
+              </p>
+              {contextLines.map((line) => (
+                <p
+                  key={line}
+                  className="mt-3 text-xs font-medium uppercase tracking-[0.12em] text-emerald-700"
+                >
+                  {line}
+                </p>
+              ))}
+              <p className="mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-emerald-700">
+                CTA: {consultiveInsight.primaryAction.ctaLabel}
+              </p>
+            </div>
+          )}
 
           {evidenceItems.length > 0 && (
             <div className="rounded-[24px] border border-emerald-100 bg-white/90 p-4 shadow-sm">
@@ -616,20 +690,20 @@ const SmartRecommendations = ({
           )}
 
           <div className="space-y-4">
-            {actions.map((action, index) => {
+            {recommendedActions.map((action, index) => {
               const status = action.status ?? (viewedActionIds.includes(action.id) ? 'viewed' : 'new');
               const isCompleted = status === 'completed';
               const isInProgress = status === 'in_progress';
               const isDetailsExpanded = expandedDetailIds.includes(action.id);
               const actionContextLine = buildActionContextLine({
                 action,
-                analysis,
+                analysis: contextAnalysis,
                 invoice: contextInvoice,
                 profile,
                 userContext,
               });
               const actionQuickTip = buildActionQuickTip({
-                analysis,
+                analysis: contextAnalysis,
                 userContext,
               });
               const actionFeedback = actionFeedbackById[action.id];
@@ -692,6 +766,11 @@ const SmartRecommendations = ({
                             Impacto: {compactImpact}
                           </span>
                         )}
+                        {action.suggestion && (
+                          <span className="rounded-full border border-white/90 bg-white/80 px-3 py-1 text-xs font-medium text-blue-700">
+                            CTA: {getCompactText(action.suggestion, 52)}
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -746,7 +825,7 @@ const SmartRecommendations = ({
 
                             <div className="space-y-1">
                               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                Leitura contextual
+                                Motivo da acao
                               </span>
                               <p className="break-words text-sm leading-relaxed text-slate-700">
                                 {actionContextLine}
@@ -833,7 +912,7 @@ const SmartRecommendations = ({
             <div className="rounded-[24px] bg-gradient-to-r from-emerald-50 via-white to-blue-50 p-4">
               <div className="space-y-2 text-sm">
                 <p className="font-medium text-slate-800">Fatura em foco: {contextInvoiceLabel}</p>
-                {analysis && (
+                {contextAnalysis && (
                   <div className="flex flex-wrap gap-2 text-slate-600">
                     <span className="rounded-full bg-white/80 px-3 py-1">
                       Consumo: {formatConsumption(contextInvoice.consumption)}
@@ -841,7 +920,7 @@ const SmartRecommendations = ({
                     <span className="rounded-full bg-white/80 px-3 py-1">
                       Custo: {formatCurrency(contextInvoice.totalValue)}
                     </span>
-                    <span className="rounded-full bg-white/80 px-3 py-1">{analysis.efficiencyLabel}</span>
+                    <span className="rounded-full bg-white/80 px-3 py-1">{contextAnalysis.efficiencyLabel}</span>
                   </div>
                 )}
                 <p className="leading-6 text-slate-600">{footerContext}</p>

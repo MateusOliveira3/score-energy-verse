@@ -2,6 +2,7 @@ import React from 'react';
 import { ChevronDown, ChevronRight, FileBarChart, ScanSearch, Wallet } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { buildAnalysisSummary } from '@/lib/mvpCoreFlow';
 import { AnalysisSummary as AnalysisSummaryType, InvoiceData, UserProfileData } from '@/types/mvp';
 
 interface AnalysisSummaryProps {
@@ -15,18 +16,6 @@ interface AnalysisSummaryProps {
   onToggle?: () => void;
   showHeader?: boolean;
 }
-
-type AnalysisSummaryWithInsights = AnalysisSummaryType & {
-  consultativeInsights?: string[];
-  educationItems?: Array<{
-    explanation: string;
-    label: string;
-  }>;
-  evidenceItems?: Array<{
-    label: string;
-    value: string;
-  }>;
-};
 
 const consumptionVariant = {
   baixo: 'bg-emerald-100 text-emerald-700',
@@ -42,15 +31,46 @@ const costVariant = {
 
 const costLabel = {
   controlado: 'controlado',
-  atencao: 'sob atenção',
+  atencao: 'sob atencao',
   elevado: 'elevado',
 } as const;
 
 const formatCurrency = (value?: number) =>
-  typeof value === 'number' ? `R$ ${value.toFixed(2)}` : 'Não identificado';
+  typeof value === 'number' ? `R$ ${value.toFixed(2)}` : 'Nao identificado';
 
 const formatConsumption = (value?: number) =>
-  typeof value === 'number' ? `${value} kWh` : 'Não identificado';
+  typeof value === 'number' ? `${value} kWh` : 'Nao identificado';
+
+const formatCurrencyPerKwh = (value?: number) =>
+  typeof value === 'number' ? `R$ ${value.toFixed(2)}/kWh` : undefined;
+
+const getInsightContextLines = (consultiveInsight?: AnalysisSummaryType['consultiveInsight']) => {
+  const contextLines: string[] = [];
+  const season = consultiveInsight?.environmentContext?.season;
+  const profileContext = consultiveInsight?.profileContext;
+
+  if (profileContext?.warnings[0]) {
+    contextLines.push(profileContext.warnings[0]);
+  } else if (profileContext?.hasSolar) {
+    contextLines.push('Perfil com energia solar indicada');
+  } else if (profileContext?.profileType === 'Residencial' && profileContext.householdSize) {
+    contextLines.push(`Perfil: residencia com ${profileContext.householdSize} ${profileContext.householdSize === 1 ? 'pessoa' : 'pessoas'}`);
+  } else if (profileContext?.profileType) {
+    contextLines.push(`Perfil: ${profileContext.profileType.toLowerCase()}`);
+  }
+
+  if (profileContext?.locationLabel) {
+    contextLines.push(`Contexto local informado: ${profileContext.locationLabel}.`);
+  } else if (season === 'inverno') {
+    contextLines.push('Contexto: inverno na sua regiao');
+  } else if (season === 'verao') {
+    contextLines.push('Contexto: verao na sua regiao');
+  } else if (season === 'meia_estacao') {
+    contextLines.push('Contexto: meia estacao na sua regiao');
+  }
+
+  return contextLines.slice(0, 2);
+};
 
 const getInvoiceReferenceLabel = (invoice: InvoiceData) => {
   const month = invoice.month?.trim();
@@ -65,7 +85,7 @@ const getInvoiceReferenceLabel = (invoice: InvoiceData) => {
     return referenceMonth;
   }
 
-  return invoice.month || 'Referência não identificada';
+  return 'Referencia nao identificada';
 };
 
 const getAverageCostPerKwh = (invoice: InvoiceData) => {
@@ -81,9 +101,6 @@ const getAverageCostPerKwh = (invoice: InvoiceData) => {
 
   return invoice.totalValue / invoice.consumption;
 };
-
-const formatCurrencyPerKwh = (value?: number) =>
-  typeof value === 'number' ? `R$ ${value.toFixed(2)}/kWh` : undefined;
 
 const PT_BR_MONTH_INDEX: Record<string, number> = {
   janeiro: 0,
@@ -238,18 +255,52 @@ const buildConsumptionTrendMessage = (
     typeof previousInvoice.consumption !== 'number' ||
     !Number.isFinite(previousInvoice.consumption)
   ) {
-    return 'Ainda não há dados suficientes para tendência segura.';
+    return 'Ainda nao ha dados suficientes para tendencia segura.';
   }
 
   if (currentInvoice.consumption > previousInvoice.consumption) {
-    return 'Seu consumo está em tendência de alta.';
+    return 'Seu consumo esta em tendencia de alta.';
   }
 
   if (currentInvoice.consumption < previousInvoice.consumption) {
-    return 'Seu consumo está em tendência de queda.';
+    return 'Seu consumo esta em tendencia de queda.';
   }
 
-  return 'Seu consumo está estável.';
+  return 'Seu consumo esta estavel.';
+};
+
+const buildHistoryAverageMessage = (
+  invoiceHistory: InvoiceData[],
+  currentInvoice?: InvoiceData
+) => {
+  if (!currentInvoice || typeof currentInvoice.consumption !== 'number') {
+    return undefined;
+  }
+
+  const comparableConsumptions = invoiceHistory
+    .map((invoice) => invoice.consumption)
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+
+  if (comparableConsumptions.length < 2) {
+    return undefined;
+  }
+
+  const averageConsumption =
+    comparableConsumptions.reduce((sum, value) => sum + value, 0) / comparableConsumptions.length;
+
+  if (!Number.isFinite(averageConsumption) || averageConsumption <= 0) {
+    return undefined;
+  }
+
+  const variation = (currentInvoice.consumption - averageConsumption) / averageConsumption;
+
+  if (Math.abs(variation) <= 0.05) {
+    return 'Este ciclo ficou proximo da media do historico.';
+  }
+
+  return variation > 0
+    ? 'Este ciclo ficou acima da media do historico.'
+    : 'Este ciclo ficou abaixo da media do historico.';
 };
 
 const AnalysisSummary = ({
@@ -263,7 +314,7 @@ const AnalysisSummary = ({
   onToggle,
   showHeader = true,
 }: AnalysisSummaryProps) => {
-  const ExpansionIcon = isExpanded ? ChevronDown : ChevronRight;
+  const expansionIcon = isExpanded ? ChevronDown : ChevronRight;
   const contextInvoice = selectedInvoice ?? invoice;
   const invoiceCount = invoiceHistory?.length ?? 0;
   const history = invoiceHistory ?? [];
@@ -271,7 +322,7 @@ const AnalysisSummary = ({
     contextInvoice && invoiceHistory && invoiceHistory.length > 1 && onSelectInvoice
   );
 
-  if (!invoice || !analysis) {
+  if (!invoice || !analysis || !contextInvoice) {
     return (
       <Card className="border-2 border-slate-100 shadow-lg">
         {showHeader && (
@@ -291,15 +342,13 @@ const AnalysisSummary = ({
               <div className="space-y-1">
                 <CardTitle className="flex items-center space-x-2 text-slate-700">
                   <ScanSearch className="h-5 w-5" />
-                  <span>Resumo da análise</span>
+                  <span>Resumo da analise</span>
                 </CardTitle>
-                <p className="text-sm text-slate-500">
-                  Leitura consolidada da fatura em foco.
-                </p>
+                <p className="text-sm text-slate-500">Resumo consolidado da fatura em foco.</p>
               </div>
               <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
                 <span>{isExpanded ? 'Fechar' : 'Ver mais'}</span>
-                <ExpansionIcon className="h-4 w-4" />
+                {React.createElement(expansionIcon, { className: 'h-4 w-4' })}
               </div>
             </div>
           </CardHeader>
@@ -311,7 +360,7 @@ const AnalysisSummary = ({
                 <label className="flex flex-col gap-1 text-sm text-slate-600">
                   <span className="font-medium text-slate-700">Fatura em foco</span>
                   <select
-                    aria-label="Selecionar fatura para resumir a análise"
+                    aria-label="Selecionar fatura para resumir a analise"
                     className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
                     value={contextInvoice.fingerprint}
                     onClick={(event) => event.stopPropagation()}
@@ -335,12 +384,12 @@ const AnalysisSummary = ({
               </div>
             )}
             <p>
-              A análise fica disponível após adicionar uma fatura ao histórico. Ela organiza o
-              arquivo em campos reais quando a leitura da conta é confiável.
+              A analise fica disponivel apos adicionar uma fatura ao historico. Ela organiza o
+              arquivo em campos reais quando o resumo da conta e confiavel.
             </p>
             <p>
-              O perfil {profile.consumerType.toLowerCase()} ajuda a interpretar a leitura, sem
-              estimar números ausentes.
+              O perfil {profile.consumerType.toLowerCase()} ajuda a interpretar o resumo, sem
+              estimar numeros ausentes.
             </p>
           </CardContent>
         )}
@@ -348,20 +397,26 @@ const AnalysisSummary = ({
     );
   }
 
-  const referenceLabel = getInvoiceReferenceLabel(invoice);
-  const averageCostPerKwh = getAverageCostPerKwh(invoice);
-  const enrichedAnalysis = analysis as AnalysisSummaryWithInsights;
-  const consultativeInsights = enrichedAnalysis.consultativeInsights ?? [];
-  const educationItems = enrichedAnalysis.educationItems ?? [];
-  const evidenceItems = enrichedAnalysis.evidenceItems ?? [];
+  const referenceLabel = getInvoiceReferenceLabel(contextInvoice);
+  const averageCostPerKwh = getAverageCostPerKwh(contextInvoice);
+  const contextAnalysis = React.useMemo(
+    () => buildAnalysisSummary(contextInvoice, profile, history),
+    [contextInvoice, history, profile]
+  );
+  const consultativeInsights = contextAnalysis.consultativeInsights ?? [];
+  const educationItems = contextAnalysis.educationItems ?? [];
+  const evidenceItems = contextAnalysis.evidenceItems ?? [];
+  const consultiveInsight = contextAnalysis.consultiveInsight;
+  const contextLines = getInsightContextLines(consultiveInsight);
   const consumptionTrendMessage = buildConsumptionTrendMessage(history, contextInvoice);
+  const historyAverageMessage = buildHistoryAverageMessage(history, contextInvoice);
   const historyContextMessage =
     invoiceCount >= 3
-      ? `Você já tem ${invoiceCount} meses de histórico. Continue acompanhando para entender seu padrão.`
+      ? `Voce ja tem ${invoiceCount} meses de historico. Continue acompanhando para entender seu padrao.`
       : invoiceCount === 2
-        ? 'No próximo ciclo, vale observar se esse padrão se mantém ou muda.'
+        ? 'No proximo ciclo, compare se esse padrao se mantem ou muda.'
         : invoiceCount === 1
-          ? 'Adicione a próxima fatura para começar a ver evolução.'
+          ? 'Adicione a proxima fatura para comecar a ver evolucao.'
           : undefined;
 
   return (
@@ -383,17 +438,17 @@ const AnalysisSummary = ({
             <div className="space-y-1">
               <CardTitle className="flex items-center space-x-2 text-slate-700">
                 <FileBarChart className="h-5 w-5" />
-                <span>Resumo da análise</span>
+                <span>Resumo da analise</span>
               </CardTitle>
               <p className="text-sm text-slate-500">
                 {referenceLabel
                   ? `Fatura em foco: ${referenceLabel}.`
-                  : 'Leitura consolidada da fatura em foco.'}
+                  : 'Resumo consolidado da fatura em foco.'}
               </p>
             </div>
             <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
               <span>{isExpanded ? 'Fechar' : 'Ver mais'}</span>
-              <ExpansionIcon className="h-4 w-4" />
+              {React.createElement(expansionIcon, { className: 'h-4 w-4' })}
             </div>
           </div>
         </CardHeader>
@@ -402,19 +457,19 @@ const AnalysisSummary = ({
         <CardContent className="space-y-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex flex-wrap items-center gap-2">
-              {analysis.consumptionLevel && (
-                <Badge className={consumptionVariant[analysis.consumptionLevel]}>
-                  Consumo {analysis.consumptionLevel}
+              {contextAnalysis.consumptionLevel && (
+                <Badge className={consumptionVariant[contextAnalysis.consumptionLevel]}>
+                  Consumo {contextAnalysis.consumptionLevel}
                 </Badge>
               )}
-              {analysis.costSignal && (
-                <Badge className={costVariant[analysis.costSignal]}>
-                  Custo {costLabel[analysis.costSignal]}
+              {contextAnalysis.costSignal && (
+                <Badge className={costVariant[contextAnalysis.costSignal]}>
+                  Custo {costLabel[contextAnalysis.costSignal]}
                 </Badge>
               )}
               <Badge variant="outline">{referenceLabel}</Badge>
-              {invoice.parser.fields.providerName.value && (
-                <Badge variant="outline">{invoice.parser.fields.providerName.value}</Badge>
+              {contextInvoice.parser.fields.providerName.value && (
+                <Badge variant="outline">{contextInvoice.parser.fields.providerName.value}</Badge>
               )}
             </div>
 
@@ -422,7 +477,7 @@ const AnalysisSummary = ({
               <label className="flex w-full flex-col gap-1 text-sm text-slate-600 lg:w-auto lg:min-w-56">
                 <span className="font-medium text-slate-700">Fatura em foco</span>
                 <select
-                  aria-label="Selecionar fatura para resumir a análise"
+                  aria-label="Selecionar fatura para resumir a analise"
                   className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
                   value={contextInvoice.fingerprint}
                   onClick={(event) => event.stopPropagation()}
@@ -446,26 +501,28 @@ const AnalysisSummary = ({
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="rounded-xl bg-emerald-50 p-4">
               <div className="text-sm text-emerald-700">Consumo</div>
               <div className="text-3xl font-bold text-emerald-900">
-                {formatConsumption(invoice.consumption)}
+                {formatConsumption(contextInvoice.consumption)}
               </div>
               <div className="text-sm text-emerald-700">
                 Perfil {profile.consumerType.toLowerCase()}
               </div>
             </div>
             <div className="rounded-xl bg-blue-50 p-4">
-              <div className="text-sm text-blue-700 flex items-center gap-2">
+              <div className="flex items-center gap-2 text-sm text-blue-700">
                 <Wallet className="h-4 w-4" />
                 Custo
               </div>
-              <div className="text-3xl font-bold text-blue-900">{formatCurrency(invoice.totalValue)}</div>
+              <div className="text-3xl font-bold text-blue-900">
+                {formatCurrency(contextInvoice.totalValue)}
+              </div>
               <div className="text-sm text-blue-700">
-                {invoice.parser.fields.dueDate.value
-                  ? `Vencimento ${invoice.parser.fields.dueDate.value}`
-                  : 'Vencimento não identificado'}
+                {contextInvoice.parser.fields.dueDate.value
+                  ? `Vencimento ${contextInvoice.parser.fields.dueDate.value}`
+                  : 'Vencimento nao identificado'}
               </div>
               {averageCostPerKwh !== undefined && (
                 <div className="mt-2 text-sm text-blue-700">
@@ -477,7 +534,7 @@ const AnalysisSummary = ({
 
           {evidenceItems.length > 0 && (
             <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="text-sm font-semibold text-slate-800">Leitura baseada em evidencia</div>
+              <div className="text-sm font-semibold text-slate-800">Resumo baseado em evidencia</div>
               <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                 {evidenceItems.slice(0, 4).map((item) => (
                   <div
@@ -494,34 +551,59 @@ const AnalysisSummary = ({
             </div>
           )}
 
-          <div className="space-y-3">
-            <p className="text-base font-semibold text-slate-800">{analysis.headline}</p>
-            <div className="space-y-2">
-              {analysis.observations.map((observation) => (
-                <div
-                  key={observation}
-                  className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm text-slate-700"
-                >
-                  {observation}
-                </div>
-              ))}
-            </div>
-            {consultativeInsights.length > 0 && (
-              <div className="space-y-2">
+          {consultiveInsight && (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Leitura consultiva
+                  Conclusao
                 </div>
-                {consultativeInsights.map((insight) => (
+                <p className="mt-2 text-sm leading-6 text-slate-800">{consultiveInsight.conclusion}</p>
+                {contextLines.map((line) => (
+                  <p key={line} className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-500">
+                    {line}
+                  </p>
+                ))}
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Evidencia
+                </div>
+                <p className="mt-2 text-sm leading-6 text-slate-800">{consultiveInsight.evidence}</p>
+              </div>
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                  Acao recomendada
+                </div>
+                <p className="mt-2 text-sm font-semibold text-emerald-900">
+                  {consultiveInsight.primaryAction.title}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-emerald-900">
+                  {consultiveInsight.primaryAction.reason}
+                </p>
+                <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                  CTA: {consultiveInsight.primaryAction.ctaLabel}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {consultiveInsights.length > 0 && (
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Resumo consultivo
+              </div>
+              <div className="mt-3 space-y-2">
+                {consultativeInsights.slice(0, 2).map((insight) => (
                   <div
                     key={insight}
-                    className="rounded-lg border border-slate-100 bg-white px-3 py-2 text-xs text-slate-600"
+                    className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600"
                   >
                     {insight}
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {educationItems.length > 0 && (
             <div className="rounded-xl border border-blue-100 bg-blue-50/80 p-4">
@@ -537,14 +619,25 @@ const AnalysisSummary = ({
           )}
 
           <div className="rounded-xl border border-amber-100 bg-amber-50 p-4">
-            <div className="text-sm font-semibold text-amber-800">O que vale observar agora</div>
-            <p className="mt-1 text-sm text-amber-900">{analysis.whatMattersNext}</p>
+            <div className="text-sm font-semibold text-amber-800">Acao principal agora</div>
+            <p className="mt-1 text-sm text-amber-900">{contextAnalysis.whatMattersNext}</p>
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
             {consumptionTrendMessage && <p>{consumptionTrendMessage}</p>}
-            {historyContextMessage && (
+            {historyAverageMessage && (
               <p className={consumptionTrendMessage ? 'mt-2 text-slate-500' : 'text-slate-500'}>
+                {historyAverageMessage}
+              </p>
+            )}
+            {historyContextMessage && (
+              <p
+                className={
+                  consumptionTrendMessage || historyAverageMessage
+                    ? 'mt-2 text-slate-500'
+                    : 'text-slate-500'
+                }
+              >
                 {historyContextMessage}
               </p>
             )}

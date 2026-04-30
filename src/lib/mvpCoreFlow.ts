@@ -1,6 +1,13 @@
 import {
   AnalysisSummary,
+  ConsultiveInsight,
+  ConsultiveInsightAction,
+  ConsultiveInsightDriver,
+  ConsultiveInsightProfileContext,
   InvoiceData,
+  InsightSeason,
+  InsightEducationItem,
+  InsightFactItem,
   JourneyStage,
   MascotGuidance,
   NextAction,
@@ -24,21 +31,6 @@ interface InvoiceComparativeSignals {
   costTrend: InvoiceSignalTrend;
   costPerKwhTrend: InvoiceSignalTrend;
 }
-
-interface InsightFactItem {
-  label: string;
-  value: string;
-}
-
-interface InsightEducationItem {
-  explanation: string;
-  label: string;
-}
-
-type EnrichedAnalysisSummary = AnalysisSummary & {
-  educationItems?: InsightEducationItem[];
-  evidenceItems?: InsightFactItem[];
-};
 
 const SCORE_EVENT_POINTS = {
   profile_completed: 80,
@@ -110,7 +102,7 @@ const getInvoiceMonthLabel = (invoice: Pick<InvoiceData, 'month'>) =>
   invoice.month || 'Referencia nao identificada';
 
 const getUsageWindowLabel = (invoice: InvoiceData) =>
-  invoice.peakHours?.trim() || 'os horarios de maior uso identificados na fatura';
+  invoice.peakHours?.trim() || 'a faixa de uso que merece mais atencao neste ciclo';
 
 const formatCurrency = (value?: number) =>
   hasNumericValue(value) ? `R$ ${value.toFixed(2)}` : undefined;
@@ -185,6 +177,203 @@ const getInvoiceCompetenceTime = (invoice: InvoiceData) => {
   }
 
   return Date.UTC(year, PT_BR_MONTH_INDEX[monthKey], 1);
+};
+
+const getMonthIndexFromReference = (referenceMonth?: string) => {
+  if (!referenceMonth) {
+    return undefined;
+  }
+
+  const normalizedMonth = normalizeDateText(referenceMonth);
+  const numericMatch = normalizedMonth.match(/\b(0[1-9]|1[0-2])\/(\d{4})\b/);
+
+  if (numericMatch) {
+    return Number(numericMatch[1]) - 1;
+  }
+
+  const monthKey = Object.keys(PT_BR_MONTH_INDEX).find((month) =>
+    normalizedMonth.includes(month)
+  );
+
+  return monthKey ? PT_BR_MONTH_INDEX[monthKey] : undefined;
+};
+
+export const getSeasonFromMonth = (referenceMonth?: string): InsightSeason => {
+  const monthIndex = getMonthIndexFromReference(referenceMonth);
+
+  if (monthIndex === 11 || monthIndex === 0 || monthIndex === 1) {
+    return 'verao';
+  }
+
+  if (monthIndex === 5 || monthIndex === 6 || monthIndex === 7) {
+    return 'inverno';
+  }
+
+  return 'meia_estacao';
+};
+
+const getSeasonalMicroEducation = (season: InsightSeason) => {
+  if (season === 'inverno') {
+    return 'No inverno, aquecimento costuma elevar o consumo em alguns perfis.';
+  }
+
+  if (season === 'verao') {
+    return 'No verao, refrigeracao costuma elevar o consumo em alguns perfis.';
+  }
+
+  return 'Em meia estacao, o clima tende a pressionar menos o consumo termico.';
+};
+
+const getSeasonalConsumptionContext = (season: InsightSeason) => {
+  if (season === 'inverno') {
+    return 'Isso indica que aquecimento deve entrar primeiro na comparacao da rotina.';
+  }
+
+  if (season === 'verao') {
+    return 'Isso indica que refrigeracao deve entrar primeiro na comparacao da rotina.';
+  }
+
+  return 'A estacao atual ajuda a contextualizar a variacao sem substituir a evidencia da fatura.';
+};
+
+const hasSolarPreference = (profile?: Partial<UserProfileData>) =>
+  profile?.energyPreference === 'Solar' || profile?.energyPreference === 'Hibrido';
+
+const buildProfileContextSentence = ({
+  profileType,
+  householdSize,
+  hasSolar,
+}: {
+  profileType?: string;
+  householdSize?: number;
+  hasSolar: boolean;
+}) => {
+  if (hasSolar) {
+    return 'Como ha indicacao de energia solar, a comparacao deve verificar se o consumo ainda fica fora dos horarios de geracao.';
+  }
+
+  if (profileType === 'Residencial' && householdSize) {
+    return `Para uma residencia com ${householdSize} ${householdSize === 1 ? 'pessoa' : 'pessoas'}, a rotina diaria deve entrar primeiro na comparacao.`;
+  }
+
+  if (profileType === 'Comercial') {
+    return 'Para um perfil comercial, cargas fixas podem pesar mais no consumo.';
+  }
+
+  if (profileType === 'Restaurante') {
+    return 'Para um restaurante, equipamentos de uso continuo podem pesar mais no consumo.';
+  }
+
+  if (profileType === 'Escola') {
+    return 'Para um perfil escolar, a rotina de ocupacao ajuda a contextualizar variacoes entre ciclos.';
+  }
+
+  if (profileType === 'Industria') {
+    return 'Para um perfil industrial, cargas fixas e operacao concentrada podem pesar mais no consumo.';
+  }
+
+  if (profileType) {
+    return `Considerando o perfil informado de ${profileType.toLowerCase()}, esse dado reforca a necessidade de comparar a rotina com a fatura.`;
+  }
+
+  return undefined;
+};
+
+export const buildProfileContext = (
+  profile?: Partial<UserProfileData>
+): ConsultiveInsightProfileContext => {
+  const resolvedProfile = getResolvedProfile(profile);
+  const profileCompletion = getProfileCompletion(profile);
+  const locationLabel = resolvedProfile.location.trim() || undefined;
+  const hasCompleteProfile = profileCompletion >= 80;
+  const hasSolar = hasSolarPreference(profile);
+  const householdSize =
+    hasCompleteProfile && resolvedProfile.peopleCount > 0 ? resolvedProfile.peopleCount : undefined;
+  const contextSentence = hasCompleteProfile
+    ? buildProfileContextSentence({
+        profileType: resolvedProfile.consumerType,
+        householdSize,
+        hasSolar,
+      })
+    : undefined;
+  const warnings =
+    hasCompleteProfile
+      ? []
+      : ['Complete o perfil para recomendacoes mais precisas'];
+
+  return {
+    profileType: resolvedProfile.consumerType || undefined,
+    locationLabel,
+    householdSize,
+    hasSolar,
+    contextSentence,
+    warnings,
+  };
+};
+
+const appendContextClause = (baseSentence: string, clause?: string) =>
+  clause ? `${baseSentence} ${clause}` : baseSentence;
+
+const normalizeSentenceClause = (value: string) => value.trim().replace(/[.;:\s]+$/g, '');
+
+const joinMicroEducation = (baseConcept: string, extraClause?: string) => {
+  if (!extraClause) {
+    return baseConcept;
+  }
+
+  return `${normalizeSentenceClause(baseConcept)}; ${normalizeSentenceClause(extraClause)}.`;
+};
+
+const getProfileMicroEducationClause = (
+  profileContext: ConsultiveInsightProfileContext
+) => {
+  if (profileContext.warnings.length > 0) {
+    return 'complete o perfil para recomendacoes mais precisas';
+  }
+
+  if (profileContext.hasSolar) {
+    return 'com indicacao de energia solar, observe os horarios fora da geracao';
+  }
+
+  if (profileContext.profileType === 'Residencial' && profileContext.householdSize) {
+    return `para uma residencia com ${profileContext.householdSize} ${profileContext.householdSize === 1 ? 'pessoa' : 'pessoas'}, a rotina diaria pesa mais no resumo`;
+  }
+
+  if (profileContext.profileType === 'Comercial') {
+    return 'para perfil comercial, cargas fixas merecem comparacao';
+  }
+
+  return undefined;
+};
+
+const getProfileActionReasonClause = (
+  profileContext: ConsultiveInsightProfileContext
+) => {
+  if (profileContext.warnings.length > 0) {
+    return undefined;
+  }
+
+  if (profileContext.hasSolar) {
+    return 'Como ha indicacao de energia solar, a comparacao deve verificar se o uso segue concentrado fora da geracao.';
+  }
+
+  if (profileContext.profileType === 'Residencial' && profileContext.householdSize) {
+    return `Para esse perfil residencial com ${profileContext.householdSize} ${profileContext.householdSize === 1 ? 'pessoa' : 'pessoas'}, a comparacao da rotina diaria deve vir primeiro.`;
+  }
+
+  if (profileContext.profileType === 'Comercial') {
+    return 'Para esse perfil comercial, a revisao de cargas fixas deve vir primeiro.';
+  }
+
+  if (profileContext.profileType === 'Restaurante') {
+    return 'Para esse perfil, a revisao de equipamentos de uso continuo deve vir primeiro.';
+  }
+
+  if (profileContext.profileType === 'Industria') {
+    return 'Para esse perfil, a revisao de cargas fixas e concentracao operacional deve vir primeiro.';
+  }
+
+  return undefined;
 };
 
 export const getProfileCompletion = (profile?: Partial<UserProfileData>) => {
@@ -335,6 +524,450 @@ export const buildConsultativeInsights = (
   return insights.length > 0 ? insights.slice(0, 3) : ['Dados insuficientes para comparacao segura.'];
 };
 
+const buildInsightAction = (
+  title: ConsultiveInsightAction['title'],
+  reason: string,
+  evidence: string,
+  ctaLabel = 'Abrir acao principal'
+): ConsultiveInsightAction => ({
+  ctaLabel,
+  evidence,
+  reason: reason.trim().toLowerCase().startsWith('escolhida porque')
+    ? reason
+    : `Escolhida porque ${reason}`,
+  title,
+});
+
+const buildHistoryTrendSummary = (
+  currentInvoice: InvoiceData,
+  previousInvoice?: InvoiceData,
+  signals?: InvoiceComparativeSignals
+) => {
+  if (!previousInvoice || !signals) {
+    return undefined;
+  }
+
+  const previousMonthLabel = getInvoiceMonthLabel(previousInvoice);
+
+  if (
+    signals.consumptionTrend === 'up' &&
+    hasNumericValue(currentInvoice.consumption) &&
+    hasNumericValue(previousInvoice.consumption)
+  ) {
+    return `O consumo deste ciclo ficou acima de ${formatKwhValue(previousInvoice.consumption)} em ${previousMonthLabel}.`;
+  }
+
+  if (
+    signals.consumptionTrend === 'down' &&
+    hasNumericValue(currentInvoice.consumption) &&
+    hasNumericValue(previousInvoice.consumption)
+  ) {
+    return `O consumo deste ciclo ficou abaixo de ${formatKwhValue(previousInvoice.consumption)} em ${previousMonthLabel}.`;
+  }
+
+  if (signals.costPerKwhTrend === 'up') {
+    return `O custo medio por kWh ficou acima do ciclo anterior em ${previousMonthLabel}.`;
+  }
+
+  if (signals.costTrend === 'up') {
+    return `O custo total ficou acima do ciclo anterior em ${previousMonthLabel}.`;
+  }
+
+  return undefined;
+};
+
+const getComparableHistory = (invoice: InvoiceData, invoiceHistory: InvoiceData[]) =>
+  sortInvoicesByCompetence(upsertInvoiceInHistory(invoice, invoiceHistory)).filter(
+    (historyInvoice) => historyInvoice.fingerprint !== invoice.fingerprint
+  );
+
+const getAverageFromHistory = (
+  values: Array<number | undefined>
+) => {
+  const numericValues = values.filter(hasNumericValue);
+
+  if (numericValues.length === 0) {
+    return undefined;
+  }
+
+  return numericValues.reduce((sum, value) => sum + value, 0) / numericValues.length;
+};
+
+const getHistoricalConsumptionAverage = (invoice: InvoiceData, invoiceHistory: InvoiceData[]) =>
+  getAverageFromHistory(
+    getComparableHistory(invoice, invoiceHistory).map((historyInvoice) => historyInvoice.consumption)
+  );
+
+const getHistoricalAverageCostPerKwh = (invoice: InvoiceData, invoiceHistory: InvoiceData[]) =>
+  getAverageFromHistory(
+    getComparableHistory(invoice, invoiceHistory).map((historyInvoice) =>
+      getInvoiceCostPerKwh(historyInvoice)
+    )
+  );
+
+const getPercentChange = (currentValue?: number, previousValue?: number) => {
+  if (!hasNumericValue(currentValue) || !hasNumericValue(previousValue) || previousValue <= 0) {
+    return undefined;
+  }
+
+  return ((currentValue - previousValue) / previousValue) * 100;
+};
+
+const buildConsumptionTotalConclusion = (
+  currentConsumption: number,
+  historyAverageConsumption: number
+) => {
+  const variation = (currentConsumption - historyAverageConsumption) / historyAverageConsumption;
+
+  if (variation > 0.05) {
+    return 'Este ciclo ficou acima da media do seu historico.';
+  }
+
+  if (variation < -0.05) {
+    return 'Este ciclo ficou abaixo da media recente.';
+  }
+
+  return 'Este ciclo ficou proximo do seu padrao recente.';
+};
+
+const buildConsumptionTotalInterpretation = (
+  currentConsumption: number,
+  historyAverageConsumption: number
+) => {
+  const variation = (currentConsumption - historyAverageConsumption) / historyAverageConsumption;
+
+  if (variation > 0.05) {
+    return 'A comparacao com a media recente mostra um consumo acima do padrao.';
+  }
+
+  if (variation < -0.05) {
+    return 'A comparacao com a media recente mostra um consumo abaixo do padrao.';
+  }
+
+  return 'A comparacao com a media recente mostra estabilidade no padrao de consumo.';
+};
+
+export const buildConsultiveInsight = (
+  invoice: InvoiceData,
+  invoiceHistory: InvoiceData[] = [],
+  profile?: Partial<UserProfileData>
+): ConsultiveInsight => {
+  const averageCostPerKwh = getInvoiceCostPerKwh(invoice);
+  const invoiceEvidence = getInvoiceEvidence(invoice, averageCostPerKwh);
+  const previousInvoice = getPreviousInvoice(invoice, invoiceHistory);
+  const comparisonSignals = previousInvoice
+    ? buildBasicInvoiceSignals(invoice, previousInvoice)
+    : undefined;
+  const historyTrend = buildHistoryTrendSummary(invoice, previousInvoice, comparisonSignals);
+  const historyAverageConsumption = getHistoricalConsumptionAverage(invoice, invoiceHistory);
+  const historyAverageCostPerKwh = getHistoricalAverageCostPerKwh(invoice, invoiceHistory);
+  const previousAverageCostPerKwh = previousInvoice ? getInvoiceCostPerKwh(previousInvoice) : undefined;
+  const monthLabel = getInvoiceMonthLabel(invoice);
+  const season = getSeasonFromMonth(monthLabel);
+  const profileContext = buildProfileContext(profile);
+  const warnings: string[] = [];
+
+  if (!hasNumericValue(invoice.consumption)) {
+    warnings.push('Consumo total indisponivel na fatura em foco.');
+  }
+
+  if (!previousInvoice) {
+    warnings.push('Sem fatura anterior comparavel para tendencia imediata.');
+  }
+
+  if (!hasNumericValue(invoiceEvidence.averageCostPerKwh)) {
+    warnings.push('Custo medio por kWh indisponivel nesta fatura.');
+  }
+
+  if (!hasNumericValue(invoiceEvidence.peakConsumptionKwh) && invoiceEvidence.peakWindowLabel) {
+    warnings.push('Janela de pico identificada sem consumo confirmado no pico.');
+  }
+
+  if (!invoiceEvidence.tariffFlag) {
+    warnings.push('Bandeira tarifaria ausente na fatura em foco.');
+  }
+
+  warnings.push(...profileContext.warnings);
+
+  if (
+    hasNumericValue(invoiceEvidence.peakConsumptionKwh) &&
+    invoiceEvidence.peakConsumptionKwh > 0
+  ) {
+    const peakEvidence = `A fatura registrou ${formatKwhValue(invoiceEvidence.peakConsumptionKwh)} no pico.`;
+    const interpretation = invoiceEvidence.peakWindowLabel
+      ? `Isso indica concentracao real de uso no pico, com janela ${invoiceEvidence.peakWindowLabel} confirmada pela propria fatura.`
+      : 'Isso indica concentracao real de uso no pico confirmada pela propria fatura.';
+    const conclusion = 'O principal fator neste ciclo foi o consumo no horario de pico.';
+    const reason = invoiceEvidence.peakWindowLabel
+      ? `${formatKwhValue(invoiceEvidence.peakConsumptionKwh)} no pico tornam o deslocamento de uso a acao mais direta deste ciclo.`
+      : `${formatKwhValue(invoiceEvidence.peakConsumptionKwh)} no pico tornam o deslocamento de uso a acao mais direta deste ciclo.`;
+
+    return {
+      environmentContext: { season },
+      profileContext,
+      mainDriver: 'pico',
+      headline: conclusion,
+      evidence: peakEvidence,
+      interpretation: appendContextClause(interpretation, profileContext.contextSentence),
+      conclusion,
+      microEducation: invoiceEvidence.peakWindowLabel
+        ? joinMicroEducation(
+            `Horario de pico identificado: ${invoiceEvidence.peakWindowLabel}`,
+            getProfileMicroEducationClause(profileContext)
+          )
+        : joinMicroEducation(
+            'Horario de pico e a faixa em que cada kWh tende a custar mais.',
+            getProfileMicroEducationClause(profileContext)
+          ),
+      primaryAction: buildInsightAction(
+        'Deslocar uso fora do pico',
+        appendContextClause(reason, getProfileActionReasonClause(profileContext)),
+        peakEvidence
+      ),
+      secondaryAction: buildInsightAction(
+        'Comparar proxima fatura',
+        appendContextClause(
+          'Comparar a proxima fatura deve confirmar se a reducao no pico apareceu no ciclo seguinte.',
+          profileContext.warnings[0]
+        ),
+        peakEvidence,
+        'Comparar no proximo ciclo'
+      ),
+      warnings,
+      historyTrend,
+    };
+  }
+
+  if (
+    previousInvoice &&
+    hasNumericValue(invoice.consumption) &&
+    hasNumericValue(previousInvoice.consumption) &&
+    invoice.consumption > previousInvoice.consumption * 1.1
+  ) {
+    const evidence = `O consumo subiu de ${formatKwhValue(previousInvoice.consumption)} para ${formatKwhValue(invoice.consumption)}.`;
+
+    return {
+      environmentContext: { season },
+      profileContext,
+      mainDriver: 'aumento_historico',
+      headline: 'O principal fator neste ciclo foi o aumento de consumo.',
+      evidence,
+      interpretation: appendContextClause(
+        `Isso indica uma mudanca concreta de rotina entre os dois ciclos. ${getSeasonalConsumptionContext(season)}`,
+        profileContext.contextSentence
+      ),
+      conclusion: 'O principal fator neste ciclo foi o aumento de consumo.',
+      microEducation: joinMicroEducation(
+        getSeasonalMicroEducation(season),
+        getProfileMicroEducationClause(profileContext)
+      ),
+      primaryAction: buildInsightAction(
+        'Revisar rotina de consumo',
+        appendContextClause(
+          `Comparar este ciclo com o anterior deve revelar a causa mais provavel do aumento em ${monthLabel}.`,
+          getProfileActionReasonClause(profileContext)
+        ),
+        evidence
+      ),
+      secondaryAction: buildInsightAction(
+        'Comparar proxima fatura',
+        appendContextClause(
+          'Comparar a proxima fatura deve confirmar se o aumento foi pontual ou se virou tendencia.',
+          profileContext.warnings[0]
+        ),
+        evidence,
+        'Comparar no proximo ciclo'
+      ),
+      warnings,
+      historyTrend,
+    };
+  }
+
+  const averageCostPerKwhIsRelevant =
+    hasNumericValue(invoiceEvidence.averageCostPerKwh) &&
+    (
+      (hasNumericValue(previousAverageCostPerKwh) &&
+        invoiceEvidence.averageCostPerKwh > previousAverageCostPerKwh * 1.08) ||
+      (hasNumericValue(historyAverageCostPerKwh) &&
+        invoiceEvidence.averageCostPerKwh > historyAverageCostPerKwh * 1.08) ||
+      invoiceEvidence.averageCostPerKwh >= 1.1
+    );
+
+  if (averageCostPerKwhIsRelevant && hasNumericValue(invoiceEvidence.averageCostPerKwh)) {
+    const evidence = `O custo medio ficou em ${formatCurrencyPerKwh(invoiceEvidence.averageCostPerKwh)}.`;
+    const comparisonLine = hasNumericValue(historyAverageCostPerKwh)
+      ? ` Ele ficou acima da media recente de ${formatCurrencyPerKwh(historyAverageCostPerKwh)}.`
+      : hasNumericValue(previousAverageCostPerKwh)
+        ? ` Ele ficou acima da fatura anterior, que estava em ${formatCurrencyPerKwh(previousAverageCostPerKwh)}.`
+        : '';
+
+    return {
+      environmentContext: { season },
+      profileContext,
+      mainDriver: 'custo_medio',
+      headline: 'O principal fator neste ciclo foi o custo por kWh.',
+      evidence: `${evidence}${comparisonLine}`.trim(),
+      interpretation: appendContextClause(
+        'Isso indica que o custo por unidade consumida explica melhor a pressao desta conta.',
+        profileContext.contextSentence
+      ),
+      conclusion: 'A prioridade agora e testar economia por 7 dias.',
+      microEducation: joinMicroEducation(
+        'Custo por kWh mostra quanto cada unidade consumida pesou no total da conta.',
+        getProfileMicroEducationClause(profileContext)
+      ),
+      primaryAction: buildInsightAction(
+        'Testar economia por 7 dias',
+        appendContextClause(
+          `O custo por kWh em ${formatCurrencyPerKwh(invoiceEvidence.averageCostPerKwh)} torna um teste curto de economia a resposta mais util deste ciclo.`,
+          getProfileActionReasonClause(profileContext)
+        ),
+        evidence
+      ),
+      secondaryAction: buildInsightAction(
+        'Comparar proxima fatura',
+        appendContextClause(
+          'Comparar a proxima fatura deve mostrar se o teste mexeu no custo medio por kWh.',
+          profileContext.warnings[0]
+        ),
+        evidence,
+        'Comparar no proximo ciclo'
+      ),
+      warnings,
+      historyTrend,
+    };
+  }
+
+  if (invoiceEvidence.tariffFlag) {
+    const evidence = `A fatura em foco veio com bandeira ${invoiceEvidence.tariffFlag.toLowerCase()}.`;
+
+    return {
+      environmentContext: { season },
+      profileContext,
+      mainDriver: 'bandeira',
+      headline: 'O principal fator neste ciclo foi o contexto tarifario.',
+      evidence,
+      interpretation: appendContextClause(
+        'Isso indica pressao tarifaria adicional neste ciclo, sem substituir a evidencia principal da fatura.',
+        profileContext.contextSentence
+      ),
+      conclusion: 'O principal fator neste ciclo foi o contexto tarifario.',
+      microEducation: joinMicroEducation(
+        'Bandeira tarifaria indica custo adicional na geracao de energia.',
+        getProfileMicroEducationClause(profileContext)
+      ),
+      primaryAction: buildInsightAction(
+        'Testar economia por 7 dias',
+        appendContextClause(
+          `A bandeira ${invoiceEvidence.tariffFlag.toLowerCase()} torna um teste curto de economia a melhor resposta deste ciclo.`,
+          getProfileActionReasonClause(profileContext)
+        ),
+        evidence
+      ),
+      secondaryAction: buildInsightAction(
+        'Comparar proxima fatura',
+        appendContextClause(
+          'Comparar a proxima fatura deve mostrar se o contexto tarifario continua no ciclo seguinte.',
+          profileContext.warnings[0]
+        ),
+        evidence,
+        'Comparar no proximo ciclo'
+      ),
+      warnings,
+      historyTrend,
+    };
+  }
+
+  if (
+    hasNumericValue(invoice.consumption) &&
+    hasNumericValue(historyAverageConsumption)
+  ) {
+    const evidence = `A media recente ficou em ${formatKwhValue(historyAverageConsumption)}, enquanto ${monthLabel} registrou ${formatKwhValue(invoice.consumption)}.`;
+    const conclusion = buildConsumptionTotalConclusion(
+      invoice.consumption,
+      historyAverageConsumption
+    );
+    const interpretation = buildConsumptionTotalInterpretation(
+      invoice.consumption,
+      historyAverageConsumption
+    );
+    const primaryActionTitle =
+      invoice.consumption > historyAverageConsumption * 1.05
+        ? 'Mapear cargas fixas'
+        : 'Comparar proxima fatura';
+    const secondaryActionTitle =
+      primaryActionTitle === 'Mapear cargas fixas'
+        ? 'Revisar rotina de consumo'
+        : 'Revisar rotina de consumo';
+
+    return {
+      environmentContext: { season },
+      profileContext,
+      mainDriver: 'consumo_total',
+      headline: conclusion,
+      evidence,
+      interpretation: appendContextClause(interpretation, profileContext.contextSentence),
+      conclusion,
+      microEducation: joinMicroEducation(
+        'Media historica ajuda a comparar este ciclo com o seu padrao recente.',
+        getProfileMicroEducationClause(profileContext)
+      ),
+      primaryAction: buildInsightAction(
+        primaryActionTitle,
+        appendContextClause(
+          primaryActionTitle === 'Mapear cargas fixas'
+            ? 'O consumo atual ficou acima da media recente e mapear cargas fixas deve revelar a principal fonte dessa diferenca.'
+            : 'Comparar a proxima fatura deve confirmar se este ciclo representa mudanca real de padrao.',
+          getProfileActionReasonClause(profileContext)
+        ),
+        evidence
+      ),
+      secondaryAction: buildInsightAction(
+        secondaryActionTitle,
+        appendContextClause(
+          'Revisar a rotina deve isolar a causa antes de ampliar qualquer mudanca.',
+          profileContext.warnings[0]
+        ),
+        evidence,
+        'Abrir acao secundaria'
+      ),
+      warnings,
+      historyTrend,
+    };
+  }
+
+  const evidence = invoice.parser.rawTextAvailable
+    ? `A fatura de ${monthLabel} ainda nao reuniu ciclos suficientes ou campos comparaveis para uma conclusao forte.`
+    : `A fatura de ${monthLabel} nao encontrou texto suficiente para comparacao segura.`;
+
+  return {
+    environmentContext: { season },
+    profileContext,
+    mainDriver: 'acompanhamento',
+    headline: 'Ainda faltam ciclos suficientes para uma conclusao forte.',
+    evidence,
+    interpretation: appendContextClause(
+      'Sem historico comparavel ou sem campos essenciais, qualquer diagnostico mais forte agora seria inventado.',
+      profileContext.contextSentence
+    ),
+    conclusion: 'Ainda faltam ciclos suficientes para uma conclusao forte.',
+    microEducation: joinMicroEducation(
+      'Media historica so fica confiavel quando existe mais de um ciclo comparavel.',
+      getProfileMicroEducationClause(profileContext)
+    ),
+    primaryAction: buildInsightAction(
+      'Adicionar proxima fatura',
+      appendContextClause(
+        'Adicionar a proxima fatura deve liberar a comparacao que falta para decidir o proximo passo.',
+        profileContext.warnings[0]
+      ),
+      evidence
+    ),
+    warnings,
+    historyTrend,
+  };
+};
+
 const sortInvoicesByCompetence = (invoiceHistory: InvoiceData[]) =>
   [...invoiceHistory]
     .map((invoice, index) => ({
@@ -419,8 +1052,11 @@ export const buildAnalysisSummary = (
   invoiceHistory: InvoiceData[] = []
 ): AnalysisSummary => {
   const previousInvoiceForInsights = getPreviousInvoice(invoice, invoiceHistory);
+  const comparisonSignals = previousInvoiceForInsights
+    ? buildBasicInvoiceSignals(invoice, previousInvoiceForInsights)
+    : undefined;
   const consultativeInsights = previousInvoiceForInsights
-    ? buildConsultativeInsights(buildBasicInvoiceSignals(invoice, previousInvoiceForInsights))
+    ? buildConsultativeInsights(comparisonSignals)
     : buildConsultativeInsights();
   const resolvedProfile = getResolvedProfile(profile);
   const averageCostPerKwh = getInvoiceCostPerKwh(invoice);
@@ -436,9 +1072,9 @@ export const buildAnalysisSummary = (
   const observations: string[] = [];
   const providerName = invoice.parser.fields.providerName.value;
   const dueDate = invoice.parser.fields.dueDate.value;
-  const monthLabel = getInvoiceMonthLabel(invoice);
   const evidenceItems: InsightFactItem[] = [];
   const educationItems: InsightEducationItem[] = [];
+  const consultiveInsight = buildConsultiveInsight(invoice, invoiceHistory, profile);
 
   if (hasNumericValue(invoice.consumption)) {
     evidenceItems.push({
@@ -456,14 +1092,17 @@ export const buildAnalysisSummary = (
     });
   }
 
-  if (hasNumericValue(invoiceEvidence.peakConsumptionKwh)) {
-    const offPeakLabel = formatKwhValue(invoiceEvidence.offPeakConsumptionKwh);
-
+  if (invoiceEvidence.peakWindowLabel) {
     evidenceItems.push({
-      label: 'Horario de pico',
-      value: offPeakLabel
-        ? `${formatKwhValue(invoiceEvidence.peakConsumptionKwh)} no pico e ${offPeakLabel} fora do pico`
-        : `${formatKwhValue(invoiceEvidence.peakConsumptionKwh)} no pico`,
+      label: 'Horario de pico identificado',
+      value: invoiceEvidence.peakWindowLabel,
+    });
+  }
+
+  if (hasNumericValue(invoiceEvidence.peakConsumptionKwh)) {
+    evidenceItems.push({
+      label: 'Consumo no pico',
+      value: formatKwhValue(invoiceEvidence.peakConsumptionKwh) || 'Indisponivel',
     });
   }
 
@@ -474,80 +1113,52 @@ export const buildAnalysisSummary = (
     });
   }
 
-  if (invoiceEvidence.tariffFlag) {
+  if (consultiveInsight.mainDriver === 'bandeira' && invoiceEvidence.tariffFlag) {
     educationItems.push({
       label: 'Bandeira tarifaria',
-      explanation: buildTariffEducation(invoiceEvidence.tariffFlag) || '',
+      explanation: consultiveInsight.microEducation,
     });
-  }
-
-  if (hasNumericValue(invoiceEvidence.averageCostPerKwh)) {
+  } else if (consultiveInsight.mainDriver === 'custo_medio') {
     educationItems.push({
       label: 'Custo por kWh',
-      explanation: 'Custo por kWh mostra quanto cada unidade consumida pesou no total da conta.',
+      explanation: consultiveInsight.microEducation,
     });
-  }
-
-  if (hasNumericValue(invoiceEvidence.peakConsumptionKwh)) {
+  } else if (consultiveInsight.mainDriver === 'pico') {
     educationItems.push({
       label: 'Horario de pico',
-      explanation:
-        'Horario de pico e a faixa em que a energia tende a custar mais para esse tipo de medicao.',
+      explanation: consultiveInsight.microEducation,
+    });
+  } else {
+    educationItems.push({
+      label: 'Resumo consultivo',
+      explanation: consultiveInsight.microEducation,
     });
   }
 
-  if (evidenceItems.length > 0) {
-    observations.push(`${evidenceItems[0].label}: ${evidenceItems[0].value}.`);
-  } else {
-    observations.push(
-      invoice.parser.rawTextAvailable
-        ? 'A leitura encontrou texto na fatura, mas nao identificou consumo com confianca suficiente.'
-        : 'A leitura nao encontrou texto aproveitavel na fatura; nenhum consumo foi assumido.'
-    );
-  }
+  observations.push(consultiveInsight.conclusion);
+  observations.push(consultiveInsight.evidence);
+  observations.push(consultiveInsight.interpretation);
 
-  if (evidenceItems.length > 1) {
-    observations.push(`${evidenceItems[1].label}: ${evidenceItems[1].value}.`);
-  } else if (costSignal === 'elevado') {
-    observations.push('O custo final ficou alto para este ciclo e pede comparacao no proximo fechamento.');
-  } else if (costSignal === 'atencao') {
-    observations.push('O custo final merece acompanhamento no proximo ciclo para confirmar tendencia.');
+  if (consultiveInsight.historyTrend) {
+    observations.push(consultiveInsight.historyTrend);
   } else if (costSignal === 'controlado') {
-    observations.push('O custo final ficou mais controlado neste ciclo.');
-  } else if (dueDate) {
+    observations.push('O custo deste ciclo ficou mais controlado e deve servir como base para a proxima comparacao.');
+  } else if (dueDate && !hasCost) {
     observations.push(`A conta trouxe vencimento em ${dueDate}, mas o valor total nao foi identificado com seguranca.`);
-  } else {
+  } else if (!hasConsumption && !hasCost) {
     observations.push('Os campos economicos ainda estao parciais; o parser preservou ausencia segura.');
   }
 
-  const whatMattersNext =
-    hasNumericValue(invoiceEvidence.peakConsumptionKwh)
-      ? 'Voce ja tem um sinal concreto de consumo no pico; escolha uma acao pequena para testar nesse horario.'
-      : hasNumericValue(invoiceEvidence.averageCostPerKwh) && costSignal && costSignal !== 'controlado'
-        ? 'Seu custo por kWh ja mostra pressao neste ciclo; vale testar um ajuste simples antes da proxima conta.'
-        : consumptionLevel === 'alto'
-          ? 'O que mais importa agora e reduzir desperdicios visiveis e observar os usos de maior impacto.'
-          : costSignal === 'elevado'
-            ? 'O que mais importa agora e controlar o custo no proximo ciclo com uma mudanca simples e mensuravel.'
-            : hasConsumption || hasCost
-              ? 'O que mais importa agora e manter consistencia e adicionar a proxima fatura para comparar evolucao.'
-              : 'O que mais importa agora e enviar uma fatura textual legivel ou validar manualmente os campos essenciais que nao foram encontrados.';
+  const primaryActionReason = consultiveInsight.primaryAction.reason.replace(/^Escolhida porque\s*/i, '');
+  const whatMattersNext = `A melhor acao agora e ${consultiveInsight.primaryAction.title.toLowerCase()}. ${primaryActionReason}`;
+  const readingHeadline = `${getInvoiceMonthLabel(invoice)}: ${consultiveInsight.headline}`;
 
   return {
     consumptionLevel,
     costSignal,
     consultativeInsights,
-    headline:
-      evidenceItems.length > 0
-        ? `Leitura da fatura ${monthLabel}: ${evidenceItems[0].value}.`
-        : hasConsumption && hasCost
-          ? `Leitura real da fatura ${monthLabel}: consumo ${consumptionLevel} e sinal de custo ${costSignal}.`
-          : hasConsumption
-            ? `Leitura parcial da fatura ${monthLabel}: consumo ${consumptionLevel} identificado.`
-            : hasCost
-              ? `Leitura parcial da fatura ${monthLabel}: valor total ${costSignal} identificado.`
-              : `Leitura parcial da fatura ${monthLabel}: faltam campos suficientes para uma analise economica completa.`,
-    observations: observations.slice(0, 2),
+    headline: readingHeadline,
+    observations: observations.slice(0, 3),
     whatMattersNext,
     efficiencyLabel:
       consumptionLevel === 'baixo'
@@ -557,11 +1168,12 @@ export const buildAnalysisSummary = (
           : consumptionLevel === 'alto'
             ? 'Eficiencia sob atencao'
             : providerName
-              ? `Leitura parcial ${providerName}`
-              : 'Leitura parcial',
+              ? `Resumo parcial ${providerName}`
+              : 'Resumo parcial',
     educationItems: educationItems.slice(0, 3),
     evidenceItems: evidenceItems.slice(0, 4),
-  } as EnrichedAnalysisSummary;
+    consultiveInsight,
+  };
 };
 
 export const buildNextActions = (
@@ -589,13 +1201,23 @@ export const buildNextActions = (
   const offPeakConsumptionLabel = formatKwhValue(invoiceEvidence?.offPeakConsumptionKwh);
   const daysBilledLabel = invoiceEvidence?.daysBilled ? `${invoiceEvidence.daysBilled} dias` : undefined;
   const tariffLabel = invoiceEvidence?.tariffFlag;
+  const consultiveInsight = analysis?.consultiveInsight;
+  const pushUniqueAction = (nextAction: NextAction) => {
+    const normalizedTitle = nextAction.title.trim().toLowerCase();
+
+    if (actions.some((action) => action.title.trim().toLowerCase() === normalizedTitle)) {
+      return;
+    }
+
+    actions.push(nextAction);
+  };
 
   if (invoice && !analysis) {
     actions.push({
       id: 'continue-after-analysis',
       title: 'Continuar quando o resumo estiver pronto',
       description: 'Fatura adicionada ao historico. Revise o resumo antes de mudar a rotina.',
-      value: 'Mantem envio e leitura alinhados',
+      value: 'Mantem envio e resumo alinhados',
       context: `Use na fatura de ${monthLabel}, enquanto o resumo ainda nao estiver pronto.`,
       suggestion: 'Confira consumo, custo e campos essenciais extraidos antes de iniciar uma acao.',
       impact: `Prepara a proxima acao revisada (+${actionReviewPoints} pontos ao revisar).`,
@@ -617,7 +1239,7 @@ export const buildNextActions = (
       description: hasCompleteProfile
         ? 'Adicione uma fatura para iniciar sua analise de consumo.'
         : 'Preencha local, tipo de consumidor, tamanho do imovel e pessoas.',
-      value: hasCompleteProfile ? 'Inicia a leitura do seu consumo e evolucao' : 'Personaliza a jornada',
+      value: hasCompleteProfile ? 'Inicia o resumo do seu consumo e evolucao' : 'Personaliza a jornada',
       context: hasCompleteProfile
         ? `Perfil ${profileLabel} ja tem contexto; falta adicionar uma fatura ao historico.`
         : 'Use antes de alimentar o historico, enquanto o contexto ainda e minimo.',
@@ -638,17 +1260,49 @@ export const buildNextActions = (
     return actions;
   }
 
-  if (!analysis.consumptionLevel && !analysis.costSignal) {
-    actions.push({
+  if (consultiveInsight) {
+    pushUniqueAction({
+      id: `driver-${consultiveInsight.mainDriver}`,
+      title: consultiveInsight.primaryAction.title,
+      description: consultiveInsight.conclusion,
+      value: consultiveInsight.primaryAction.evidence,
+      context: consultiveInsight.primaryAction.reason,
+      suggestion: consultiveInsight.primaryAction.ctaLabel,
+      impact: consultiveInsight.historyTrend || consultiveInsight.microEducation,
+      validation: 'Compare o resultado na proxima fatura.',
+      priority: 'high',
+      status: 'new',
+      source: 'analysis',
+    });
+
+    if (consultiveInsight.secondaryAction) {
+      pushUniqueAction({
+        id: `driver-${consultiveInsight.mainDriver}-follow-up`,
+        title: consultiveInsight.secondaryAction.title,
+        description: consultiveInsight.secondaryAction.reason,
+        value: 'Confirmar se o ajuste aparece no proximo ciclo.',
+        context: consultiveInsight.secondaryAction.reason,
+        suggestion: consultiveInsight.secondaryAction.ctaLabel,
+        impact: consultiveInsight.historyTrend || `Use a fatura de ${monthLabel} como base da comparacao.`,
+        validation: 'A nova conta precisa entrar no historico para a comparacao.',
+        priority: 'medium',
+        status: 'new',
+        source: 'journey',
+      });
+    }
+  }
+
+  if (actions.length === 0 && !analysis.consumptionLevel && !analysis.costSignal) {
+    pushUniqueAction({
       id: 'confirm-core-fields',
       title: invoice.parser.rawTextAvailable
         ? 'Revisar campos essenciais extraidos'
         : 'Enviar PDF textual da fatura',
       description: invoice.parser.rawTextAvailable
-        ? 'A fatura trouxe leitura parcial. Confirme referencia, vencimento, total e consumo antes de tirar conclusoes.'
-        : 'A leitura nao encontrou texto aproveitavel. Para parser deterministico, priorize um PDF textual da conta.',
-      value: 'Evitar leitura inventada',
-      context: `A leitura atual da fatura ${monthLabel} esta parcial e foi preservada sem simulacao de numeros.`,
+        ? 'A fatura trouxe resumo parcial. Confirme referencia, vencimento, total e consumo antes de tirar conclusoes.'
+        : 'O resumo nao encontrou texto aproveitavel. Para parser deterministico, priorize um PDF textual da conta.',
+      value: 'Evitar resumo inventado',
+      context: `O resumo atual da fatura ${monthLabel} esta parcial e foi preservado sem simulacao de numeros.`,
       suggestion: invoice.parser.rawTextAvailable
         ? 'Compare os campos essenciais com a propria conta e envie o proximo ciclo em PDF textual quando possivel.'
         : 'Se houver PDF exportado pela distribuidora, use esse arquivo no proximo envio em vez de imagem.',
@@ -660,14 +1314,14 @@ export const buildNextActions = (
     });
   }
 
-  if (analysis.consumptionLevel === 'alto') {
-    actions.push({
+  if (actions.length === 0 && analysis.consumptionLevel === 'alto') {
+    pushUniqueAction({
       id: 'map-peak-usage',
-      title: peakConsumptionLabel ? 'Reduzir uso no horario de pico' : 'Mapear uso no horario de pico',
+      title: peakConsumptionLabel ? 'Reduzir uso no horario de pico' : 'Mapear cargas fixas',
       description: peakConsumptionLabel
         ? `A fatura registrou ${peakConsumptionLabel} no pico${offPeakConsumptionLabel ? ` e ${offPeakConsumptionLabel} fora do pico` : ''}.`
         : daysBilledLabel
-          ? `Voce consumiu ${formatKwhValue(invoice.consumption)} em ${daysBilledLabel}, com leitura alta para este perfil.`
+          ? `Voce consumiu ${formatKwhValue(invoice.consumption)} em ${daysBilledLabel}, com resumo de consumo alto para este perfil.`
           : `O consumo total de ${formatKwhValue(invoice.consumption)} ficou alto para este perfil.`,
       value: 'Encontrar desperdicios visiveis',
       context: peakConsumptionLabel
@@ -689,8 +1343,8 @@ export const buildNextActions = (
     });
   }
 
-  if (analysis.costSignal && analysis.costSignal !== 'controlado') {
-    actions.push({
+  if (actions.length < 2 && analysis.costSignal && analysis.costSignal !== 'controlado') {
+    pushUniqueAction({
       id: 'choose-one-cost-cut',
       title: 'Testar um corte de custo por 7 dias',
       description: costPerKwhLabel
@@ -702,7 +1356,7 @@ export const buildNextActions = (
           : primaryGoal === 'understand_consumption'
             ? 'Observar padrao com um teste comparavel'
             : primaryGoal === 'both'
-              ? 'Reduzir custo sem perder leitura do padrao'
+              ? 'Reduzir custo sem perder a comparacao do padrao'
               : 'Criar um teste comparavel',
       context: costPerKwhLabel
         ? `Evidencia: ${costPerKwhLabel} por kWh${tariffLabel ? ` e bandeira ${tariffLabel}` : ''} neste ciclo.`
@@ -717,15 +1371,15 @@ export const buildNextActions = (
   }
 
   if (actions.length < 2) {
-    actions.push({
+    pushUniqueAction({
       id: 'return-next-bill',
       title: 'Adicionar a proxima fatura',
       description:
         tariffLabel || daysBilledLabel
-          ? `Esta leitura ja trouxe ${tariffLabel ? `bandeira ${tariffLabel.toLowerCase()}` : daysBilledLabel}. Compare esse sinal no proximo ciclo.`
+          ? `Este resumo ja trouxe ${tariffLabel ? `bandeira ${tariffLabel.toLowerCase()}` : daysBilledLabel}. Compare esse sinal no proximo ciclo.`
           : 'No proximo ciclo, adicione a nova fatura para comparar consumo e custo quando esses campos estiverem disponiveis.',
-      value: 'Transformar leitura em evolucao',
-      context: `A leitura atual e da fatura de ${monthLabel}; a comparacao melhora com outro ciclo.`,
+      value: 'Transformar resumo em evolucao',
+      context: `O resumo atual e da fatura de ${monthLabel}; a comparacao melhora com outro ciclo.`,
       suggestion:
         primaryGoal === 'reduce_cost'
           ? 'Adicione a proxima fatura para ver se o custo responde ao ajuste.'
@@ -768,7 +1422,7 @@ export const buildMascotGuidance = ({
       stage,
       title: 'Retomando sua jornada',
       message: analysis
-        ? `Ja existe uma leitura recente para o perfil ${profileLabel}. O proximo foco e acompanhar a acao atual e comparar o proximo ciclo.`
+        ? `Ja existe um resumo recente para o perfil ${profileLabel}. O proximo foco e acompanhar a acao atual e comparar o proximo ciclo.`
         : `Que bom ver voce de volta. O passo mais util agora e adicionar uma fatura ao historico para construir um resumo simples do perfil ${profileLabel}.`,
     };
   }
@@ -788,7 +1442,7 @@ export const buildMascotGuidance = ({
         ? `o consumo ficou ${analysis.consumptionLevel}`
         : analysis.costSignal
           ? `o custo ficou ${analysis.costSignal}`
-          : 'a leitura ficou parcial';
+          : 'o resumo ficou parcial';
 
     return {
       stage,
@@ -801,7 +1455,7 @@ export const buildMascotGuidance = ({
     return {
       stage: 'before-upload',
       title: 'Contexto suficiente',
-      message: `O perfil ${profileLabel} ja permite uma leitura mais justa. Adicione uma fatura ao historico para ver apenas dados reais extraidos da conta.`,
+      message: `O perfil ${profileLabel} ja permite um resumo mais justo. Adicione uma fatura ao historico para ver apenas dados reais extraidos da conta.`,
     };
   }
 

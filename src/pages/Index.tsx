@@ -306,6 +306,7 @@ const Index = () => {
           nextActions={nextActions}
           invoiceCount={invoiceHistory.length}
           isProfileComplete={isProfileComplete}
+          currentScore={scoreState.score}
           latestAnalysis={latestAnalysis}
           customization={mascotCustomization}
           profile={profile}

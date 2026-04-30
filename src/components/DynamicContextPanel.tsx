@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { buildAnalysisSummary, buildNextActions } from '@/lib/mvpCoreFlow';
 import {
   AnalysisSummary,
   InvoiceData,
@@ -67,22 +68,11 @@ interface DynamicContextPanelProps {
   historyUploadContent?: React.ReactNode;
 }
 
-type EnrichedAnalysisSummary = AnalysisSummary & {
-  educationItems?: Array<{
-    explanation: string;
-    label: string;
-  }>;
-  evidenceItems?: Array<{
-    label: string;
-    value: string;
-  }>;
-};
-
 const stageLabels = {
   onboarding: 'Comeco',
   'before-upload': 'Preparacao',
-  'invoice-uploaded': 'Subindo leitura',
-  'analysis-ready': 'Leitura pronta',
+  'invoice-uploaded': 'Subindo resumo',
+  'analysis-ready': 'Resumo pronto',
   'return-visit': 'Retomada',
 } as const;
 
@@ -100,7 +90,7 @@ const panelMeta = {
   },
   co2: {
     title: 'Painel ativo',
-    label: 'Leitura ambiental',
+    label: 'Resumo ambiental',
     icon: Zap,
   },
   history: {
@@ -115,7 +105,7 @@ const panelMeta = {
   },
   summary: {
     title: 'Painel ativo',
-    label: 'Leitura',
+    label: 'Resumo',
     icon: Sparkles,
   },
   profile: {
@@ -169,6 +159,34 @@ const formatCurrency = (value?: number) =>
 const formatConsumption = (value?: number) =>
   typeof value === 'number' ? `${value} kWh` : 'Consumo indisponivel';
 
+const getInsightContextLines = (consultiveInsight?: AnalysisSummary['consultiveInsight']) => {
+  const contextLines: string[] = [];
+  const season = consultiveInsight?.environmentContext?.season;
+  const profileContext = consultiveInsight?.profileContext;
+
+  if (profileContext?.warnings[0]) {
+    contextLines.push(profileContext.warnings[0]);
+  } else if (profileContext?.hasSolar) {
+    contextLines.push('Perfil com energia solar indicada');
+  } else if (profileContext?.profileType === 'Residencial' && profileContext.householdSize) {
+    contextLines.push(`Perfil: residencia com ${profileContext.householdSize} ${profileContext.householdSize === 1 ? 'pessoa' : 'pessoas'}`);
+  } else if (profileContext?.profileType) {
+    contextLines.push(`Perfil: ${profileContext.profileType.toLowerCase()}`);
+  }
+
+  if (profileContext?.locationLabel) {
+    contextLines.push(`Contexto local informado: ${profileContext.locationLabel}.`);
+  } else if (season === 'inverno') {
+    contextLines.push('Contexto: inverno na sua regiao');
+  } else if (season === 'verao') {
+    contextLines.push('Contexto: verao na sua regiao');
+  } else if (season === 'meia_estacao') {
+    contextLines.push('Contexto: meia estacao na sua regiao');
+  }
+
+  return contextLines.slice(0, 2);
+};
+
 const normalizeActionTitle = (action: NextAction, index: number) => {
   const rawTitle = action.title.trim();
   const searchableText = [action.title, action.description, action.value, action.context]
@@ -212,15 +230,19 @@ const buildActionReason = ({
   latestAnalysis?: AnalysisSummary;
   focusedInvoice?: InvoiceData;
 }) => {
-  const referenceLabel = focusedInvoice ? getInvoiceReferenceLabel(focusedInvoice) : 'a leitura atual';
-  const evidenceLead = action.description || action.context;
+  const referenceLabel = focusedInvoice ? getInvoiceReferenceLabel(focusedInvoice) : 'o resumo atual';
+  const explicitReason =
+    action.context && action.context.trim().toLowerCase().startsWith('escolhida porque')
+      ? action.context.trim()
+      : undefined;
+  const evidenceLead = explicitReason || action.description || action.context;
 
   if (evidenceLead) {
     return compactText(evidenceLead, 110);
   }
 
   if (latestAnalysis?.costSignal && latestAnalysis.costSignal !== 'controlado') {
-    return `A leitura de ${referenceLabel} mostra pressao de custo neste ciclo.`;
+    return `O resumo de ${referenceLabel} mostra pressao de custo neste ciclo.`;
   }
 
   if (latestAnalysis?.consumptionLevel === 'alto') {
@@ -228,39 +250,43 @@ const buildActionReason = ({
   }
 
   return compactText(
-    action.value || action.context || action.description || 'Vale testar esta frente e comparar o proximo ciclo.',
+    action.value || action.context || action.description || 'A proxima comparacao deve confirmar o efeito desta acao.',
     88
   );
 };
 
-const buildSummaryBridge = ({
-  latestAnalysis,
-  focusedInvoice,
-  evidenceItems,
-}: {
-  latestAnalysis?: AnalysisSummary;
-  focusedInvoice?: InvoiceData;
-  evidenceItems?: Array<{ label: string; value: string }>;
-}) => {
-  const topEvidence = evidenceItems?.[0];
-
-  if (topEvidence) {
-    return `${topEvidence.label}: ${topEvidence.value}. Use esse sinal para escolher uma acao simples no proximo ciclo.`;
+const buildHistoryTrendLine = (
+  history: InvoiceData[],
+  focusedInvoice?: InvoiceData
+) => {
+  if (!focusedInvoice || history.length < 2 || typeof focusedInvoice.consumption !== 'number') {
+    return undefined;
   }
 
-  if (latestAnalysis?.costSignal && latestAnalysis.costSignal !== 'controlado') {
-    return 'Transforme esta leitura em um teste de economia antes da proxima conta.';
+  const comparableConsumptions = history
+    .map((invoice) => invoice.consumption)
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+
+  if (comparableConsumptions.length < 2) {
+    return undefined;
   }
 
-  if (latestAnalysis?.consumptionLevel === 'alto') {
-    return 'A melhor resposta agora e escolher uma acao simples e observar o proximo ciclo.';
+  const averageConsumption =
+    comparableConsumptions.reduce((sum, value) => sum + value, 0) / comparableConsumptions.length;
+
+  if (!Number.isFinite(averageConsumption) || averageConsumption <= 0) {
+    return undefined;
   }
 
-  if (focusedInvoice) {
-    return `Use ${getInvoiceReferenceLabel(focusedInvoice)} como base e leve a leitura para uma acao observavel.`;
+  const variation = (focusedInvoice.consumption - averageConsumption) / averageConsumption;
+
+  if (Math.abs(variation) <= 0.05) {
+    return 'Este ciclo ficou proximo da media do historico.';
   }
 
-  return 'Escolha uma acao pequena para transformar a leitura em comportamento observavel.';
+  return variation > 0
+    ? 'Este ciclo ficou acima da media do historico.'
+    : 'Este ciclo ficou abaixo da media do historico.';
 };
 
 const DynamicContextPanel = ({
@@ -292,6 +318,8 @@ const DynamicContextPanel = ({
 }: DynamicContextPanelProps) => {
   const [isVisible, setIsVisible] = React.useState(true);
   const [localActionFeedback, setLocalActionFeedback] = React.useState<Record<string, string>>({});
+  const [historyFeedback, setHistoryFeedback] = React.useState<string | null>(null);
+  const previousInvoiceCountRef = React.useRef(invoiceHistory.length);
   const panelSignature = [
     activeView,
     activeTip,
@@ -323,10 +351,6 @@ const DynamicContextPanel = ({
   );
   const panelConfig = panelMeta[activeView];
   const PanelIcon = panelConfig.icon;
-  const prioritizedActions = actions.slice(0, 2);
-  const enrichedAnalysis = latestAnalysis as EnrichedAnalysisSummary | undefined;
-  const evidenceItems = enrichedAnalysis?.evidenceItems ?? [];
-  const educationItems = enrichedAnalysis?.educationItems ?? [];
   const historyAverageConsumption =
     invoiceHistory.length > 0
       ? Math.round(
@@ -334,6 +358,24 @@ const DynamicContextPanel = ({
             invoiceHistory.length
         )
       : undefined;
+  const historyTrendLine = buildHistoryTrendLine(invoiceHistory, focusedInvoice);
+  const contextAnalysis = React.useMemo(() => {
+    if (!focusedInvoice) {
+      return latestAnalysis;
+    }
+
+    return buildAnalysisSummary(focusedInvoice, profile, invoiceHistory);
+  }, [focusedInvoice, invoiceHistory, latestAnalysis, profile]);
+  const prioritizedActions = React.useMemo(() => {
+    if (!focusedInvoice || !contextAnalysis) {
+      return actions.slice(0, 2);
+    }
+
+    return buildNextActions(focusedInvoice, contextAnalysis, profile).slice(0, 2);
+  }, [actions, contextAnalysis, focusedInvoice, profile]);
+  const educationItems = contextAnalysis?.educationItems ?? [];
+  const consultiveInsight = contextAnalysis?.consultiveInsight;
+  const contextLines = getInsightContextLines(consultiveInsight);
 
   React.useEffect(() => {
     setIsVisible(false);
@@ -347,11 +389,33 @@ const DynamicContextPanel = ({
     };
   }, [panelSignature]);
 
+  React.useEffect(() => {
+    if (invoiceHistory.length > previousInvoiceCountRef.current) {
+      setHistoryFeedback('Fatura adicionada ao historico');
+    }
+
+    previousInvoiceCountRef.current = invoiceHistory.length;
+  }, [invoiceHistory.length]);
+
+  React.useEffect(() => {
+    if (!historyFeedback) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setHistoryFeedback(null);
+    }, 3600);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [historyFeedback]);
+
   const renderHistoryBars = () => {
     if (sortedInvoices.length === 0) {
       return (
         <div className="rounded-[16px] border border-[#365f58] bg-[#163f39] px-4 py-5 text-sm text-[#c5d8c8]">
-          Seu historico ainda esta vazio. Adicione a primeira fatura por aqui para iniciar a leitura.
+          Seu historico ainda esta vazio. Adicione a primeira fatura por aqui para iniciar o resumo.
         </div>
       );
     }
@@ -485,7 +549,7 @@ const DynamicContextPanel = ({
             }}
             className="mt-auto w-full justify-between rounded-[16px] border border-[#365f58] bg-[#0f342f] text-[#f5f8f3] hover:bg-[#18453f]"
           >
-            {nextAction ? 'Abrir acao atual' : latestAnalysis ? 'Abrir leitura' : 'Editar perfil'}
+            {nextAction ? 'Abrir acao atual' : latestAnalysis ? 'Abrir resumo' : 'Editar perfil'}
             <Lightbulb className="h-4 w-4" />
           </Button>
         </div>
@@ -497,7 +561,7 @@ const DynamicContextPanel = ({
         <div className="flex h-full flex-col gap-4">
           <div className="rounded-[18px] border border-[#365f58] bg-[#163f39] p-5">
             <p className="text-xl font-semibold leading-tight text-[#f5f8f3]">
-              {activeTip || 'Toque em um CO2 para ver a leitura do momento.'}
+              {activeTip || 'Toque em um CO2 para ver o resumo do momento.'}
             </p>
             <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9dbfa6]">
               {activeObjective || 'Acompanhe o proximo passo da jornada'}
@@ -505,7 +569,7 @@ const DynamicContextPanel = ({
           </div>
 
           <div className="rounded-[18px] border border-[#365f58] bg-[#113731] p-5 text-sm leading-6 text-[#c5d8c8]">
-            {compactText(latestAnalysis?.whatMattersNext || guidance.message, 148)}
+            {compactText(contextAnalysis?.whatMattersNext || guidance.message, 148)}
           </div>
 
           <div className="grid grid-cols-2 gap-2">
@@ -514,7 +578,7 @@ const DynamicContextPanel = ({
               className="rounded-[14px] border-[#365f58] bg-[#163f39] text-[#f5f8f3] hover:bg-[#1b4a43]"
               onClick={onOpenSummary}
             >
-              Abrir leitura
+              Abrir resumo
             </Button>
             <Button
               className="rounded-[14px] bg-[#5f925c] text-white hover:bg-[#517d4f]"
@@ -530,6 +594,12 @@ const DynamicContextPanel = ({
     if (activeView === 'history') {
       return (
         <div className="flex h-full flex-col gap-4">
+          {historyFeedback && (
+            <div className="rounded-[18px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">
+              {historyFeedback}
+            </div>
+          )}
+
           <div className="rounded-[18px] border border-[#365f58] bg-[#163f39] p-4">
             {renderHistoryBars()}
           </div>
@@ -578,10 +648,15 @@ const DynamicContextPanel = ({
                   </div>
                 </div>
               </div>
+              {historyTrendLine && (
+                <div className="mt-4 rounded-[14px] border border-[#365f58] bg-[#163f39] px-3 py-3 text-sm leading-6 text-[#d9ead8]">
+                  {historyTrendLine}
+                </div>
+              )}
             </div>
           ) : (
             <div className="rounded-[18px] border border-[#365f58] bg-[#113731] p-4 text-sm leading-6 text-[#c5d8c8]">
-              A primeira fatura enviada passa a ser o ponto de partida da leitura e das proximas acoes.
+              A primeira fatura enviada passa a ser o ponto de partida do resumo e das proximas acoes.
             </div>
           )}
 
@@ -599,7 +674,7 @@ const DynamicContextPanel = ({
                 onClick={onOpenSummary}
                 className="justify-between rounded-[14px] border-[#365f58] bg-[#163f39] text-[#f5f8f3] hover:bg-[#1b4a43]"
               >
-                Abrir leitura da fatura
+                Abrir resumo da fatura
                 <Sparkles className="h-4 w-4" />
               </Button>
             )}
@@ -617,7 +692,7 @@ const DynamicContextPanel = ({
             <div className="rounded-[18px] border border-[#365f58] bg-[#163f39] p-5">
               <p className="text-xl font-semibold text-[#f5f8f3]">Sem acao prioritaria agora</p>
               <p className="mt-3 text-sm leading-6 text-[#c5d8c8]">
-                Volte para a leitura atual ou envie uma nova fatura para gerar contexto.
+                Volte para o resumo atual ou envie uma nova fatura para gerar contexto.
               </p>
             </div>
           ) : (
@@ -626,12 +701,13 @@ const DynamicContextPanel = ({
               const displayTitle = normalizeActionTitle(action, index);
               const displayReason = buildActionReason({
                 action,
-                latestAnalysis,
+                latestAnalysis: contextAnalysis,
                 focusedInvoice,
               });
               const supportingContext = action.context && action.context !== action.description
                 ? compactText(action.context, 112)
                 : null;
+              const clearCta = action.suggestion ? compactText(action.suggestion, 84) : null;
 
               return (
                 <div
@@ -647,13 +723,18 @@ const DynamicContextPanel = ({
                     <div className="space-y-2">
                       {index === 0 && (
                         <Badge className="border-none bg-[#8fd08e] text-[#14352f]">
-                          Mais coerente com a leitura atual
+                          Acao principal
                         </Badge>
                       )}
                       <p className="text-lg font-semibold leading-tight text-[#f5f8f3]">
                         {displayTitle}
                       </p>
                       <p className="text-sm leading-6 text-[#c5d8c8]">{displayReason}</p>
+                      {clearCta && (
+                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#bfe7bc]">
+                          CTA: {clearCta}
+                        </p>
+                      )}
                       {supportingContext && (
                         <p className="text-xs leading-5 text-[#9dbfa6]">
                           Base da recomendacao: {supportingContext}
@@ -692,16 +773,17 @@ const DynamicContextPanel = ({
                             ...currentFeedback,
                             [action.id]: 'Acompanharemos no proximo ciclo',
                           }));
+                          onActionStatusChange(action, 'in_progress');
                         }}
                         className="rounded-[14px] border-[#365f58] bg-[#163f39] text-[#f5f8f3] hover:bg-[#1b4a43]"
                       >
-                        Marcar para testar
+                        Preparar teste
                       </Button>
                     )}
                   </div>
 
                   {localActionFeedback[action.id] && (
-                    <div className="mt-3 rounded-[14px] border border-[#365f58] bg-[#0f342f] px-3 py-3 text-sm leading-6 text-[#c5d8c8]">
+                    <div className="mt-3 rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm font-medium leading-6 text-emerald-900">
                       {localActionFeedback[action.id]}
                     </div>
                   )}
@@ -723,27 +805,41 @@ const DynamicContextPanel = ({
       return (
         <div className="flex h-full flex-col gap-4">
           <div className="rounded-[18px] border border-[#365f58] bg-[#163f39] p-5">
-            <p className="text-xl font-semibold text-[#f5f8f3]">
-              {latestAnalysis?.whatMattersNext || guidance.title}
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9dbfa6]">
+              Resumo guiado
+            </p>
+            <p className="mt-2 text-xl font-semibold text-[#f5f8f3]">
+              {consultiveInsight?.conclusion || contextAnalysis?.headline || guidance.title}
             </p>
             <p className="mt-3 text-sm leading-6 text-[#c5d8c8]">
-              {compactText(latestAnalysis?.headline || guidance.message, 148)}
+              {consultiveInsight?.evidence || contextAnalysis?.whatMattersNext || guidance.message}
             </p>
+            {contextLines.map((line) => (
+              <p
+                key={line}
+                className="mt-3 text-xs font-medium uppercase tracking-[0.12em] text-[#9dbfa6]"
+              >
+                {line}
+              </p>
+            ))}
           </div>
 
-          {evidenceItems.length > 0 && (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {evidenceItems.slice(0, 2).map((item) => (
-                <div
-                  key={`${item.label}-${item.value}`}
-                  className="rounded-[18px] border border-[#365f58] bg-[#113731] p-4"
-                >
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9dbfa6]">
-                    {item.label}
-                  </div>
-                  <div className="mt-2 text-base font-semibold text-[#f5f8f3]">{item.value}</div>
+          {consultiveInsight && (
+            <div className="grid grid-cols-1 gap-3">
+              <div className="rounded-[18px] border border-[#7eb77b] bg-[#123f39] p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#bfe7bc]">
+                  Acao recomendada
                 </div>
-              ))}
+                <div className="mt-2 text-base font-semibold text-[#f5f8f3]">
+                  {consultiveInsight.primaryAction.title}
+                </div>
+                <div className="mt-2 text-sm leading-6 text-[#d9ead8]">
+                  {consultiveInsight.primaryAction.reason}
+                </div>
+                <div className="mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-[#bfe7bc]">
+                  CTA: {consultiveInsight.primaryAction.ctaLabel}
+                </div>
+              </div>
             </div>
           )}
 
@@ -764,14 +860,6 @@ const DynamicContextPanel = ({
             </div>
           )}
 
-          <div className="rounded-[18px] border border-[#365f58] bg-[#113731] p-4 text-sm leading-6 text-[#c5d8c8]">
-            {buildSummaryBridge({
-              latestAnalysis,
-              focusedInvoice,
-              evidenceItems,
-            })}
-          </div>
-
           {educationItems[0] && (
             <div className="rounded-[18px] border border-[#365f58] bg-[#113731] p-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9dbfa6]">
@@ -789,7 +877,7 @@ const DynamicContextPanel = ({
               onClick={onOpenActions}
               className="justify-between rounded-[14px] bg-[#5f925c] text-white hover:bg-[#517d4f]"
             >
-              Transformar em acao
+              Abrir acao principal
               <Lightbulb className="h-4 w-4" />
             </Button>
             <Button
@@ -813,8 +901,8 @@ const DynamicContextPanel = ({
               <p className="text-xl font-semibold text-[#f5f8f3]">{profile.consumerType}</p>
               <p className="mt-2 text-sm leading-6 text-[#c5d8c8]">
                 {isProfileComplete
-                  ? 'Seu contexto ja apoia a leitura da fatura. Se quiser, voce pode editar esse perfil por aqui.'
-                  : 'Complete o perfil para deixar leitura, historico e acoes mais coerentes com a sua realidade.'}
+                  ? 'Seu contexto ja apoia o resumo da fatura. Se quiser, voce pode editar esse perfil por aqui.'
+                  : 'Complete o perfil para deixar resumo, historico e acoes mais coerentes com a sua realidade.'}
               </p>
             </div>
             <Badge className="border border-[#365f58] bg-[#143d37] text-[#f5f8f3]">

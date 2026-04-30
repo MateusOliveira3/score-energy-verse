@@ -130,6 +130,65 @@ export interface Analysis {
   observations: string[];
   whatMattersNext: string;
   efficiencyLabel: string;
+  consultativeInsights?: string[];
+  consultiveInsight?: ConsultiveInsight;
+  evidenceItems?: InsightFactItem[];
+  educationItems?: InsightEducationItem[];
+}
+
+export type ConsultiveInsightDriver =
+  | 'pico'
+  | 'aumento_historico'
+  | 'custo_medio'
+  | 'bandeira'
+  | 'consumo_total'
+  | 'acompanhamento';
+
+export type InsightSeason = 'verao' | 'inverno' | 'meia_estacao';
+
+export interface ConsultiveInsightAction {
+  title: string;
+  reason: string;
+  evidence: string;
+  ctaLabel: string;
+}
+
+export interface ConsultiveInsightEnvironmentContext {
+  season: InsightSeason;
+}
+
+export interface ConsultiveInsightProfileContext {
+  profileType?: string;
+  locationLabel?: string;
+  householdSize?: number;
+  hasSolar: boolean;
+  contextSentence?: string;
+  warnings: string[];
+}
+
+export interface ConsultiveInsight {
+  mainDriver: ConsultiveInsightDriver;
+  headline: string;
+  evidence: string;
+  interpretation: string;
+  conclusion: string;
+  microEducation: string;
+  primaryAction: ConsultiveInsightAction;
+  secondaryAction?: ConsultiveInsightAction;
+  warnings: string[];
+  historyTrend?: string;
+  environmentContext?: ConsultiveInsightEnvironmentContext;
+  profileContext?: ConsultiveInsightProfileContext;
+}
+
+export interface InsightFactItem {
+  label: string;
+  value: string;
+}
+
+export interface InsightEducationItem {
+  explanation: string;
+  label: string;
 }
 
 export type NextActionPriority = 'high' | 'medium' | 'low';
