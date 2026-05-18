@@ -2,6 +2,12 @@
 
 This repo is a Vite + React + TypeScript app whose current MVP is centered on a single persisted journey state per user. The main product flow lives in `/perfil`, where the user completes a profile, uploads an energy bill file, receives a deterministic analysis summary, accumulates score events, and unlocks next actions plus ranking visibility.
 
+## Product Documentation
+
+- [Product Vision](docs/product/PRODUCT_VISION.md)
+- [Consultive Engine](docs/product/CONSULTIVE_ENGINE.md)
+- [Roadmap](docs/product/ROADMAP.md)
+
 ## Routes that exist today
 
 - `/`: static marketing landing page from `src/pages/LandingPage.tsx`
