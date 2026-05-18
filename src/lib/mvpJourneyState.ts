@@ -1,7 +1,11 @@
 import {
+  ActionInteractiveQuestion,
   AnalysisState,
   AnalysisStatus,
   ActionResultLink,
+  EnergyBehaviorLaundryFrequency,
+  EnergyBehaviorProfile,
+  EnergyBehaviorUsagePeriod,
   InvoiceComparisonBasis,
   InvoiceComparison,
   InvoiceActionSnapshot,
@@ -43,6 +47,10 @@ const isFiniteNumber = (value: unknown): value is number =>
 
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
+
+const isBoolean = (value: unknown): value is boolean => typeof value === 'boolean';
+
+const clampConfidence = (value: number) => Math.min(Math.max(value, 0), 1);
 
 const createEmptyParser = (): InvoiceData['parser'] => ({
   rawTextAvailable: false,
@@ -246,10 +254,304 @@ export const DEFAULT_USER_CONTEXT_STATE: UserContextState = {
   questions: {},
 };
 
+export const DEFAULT_ENERGY_BEHAVIOR_PROFILE: EnergyBehaviorProfile = {
+  appliances: {},
+  habits: {},
+  intentions: {},
+  qualification: {},
+  actionMemory: {},
+  confidence: {},
+};
+
+const mergeEnergyBehaviorProfile = (
+  energyBehaviorProfile?: Partial<EnergyBehaviorProfile>
+): Partial<EnergyBehaviorProfile> => ({
+  ...DEFAULT_ENERGY_BEHAVIOR_PROFILE,
+  ...energyBehaviorProfile,
+  appliances: {
+    ...DEFAULT_ENERGY_BEHAVIOR_PROFILE.appliances,
+    ...(energyBehaviorProfile?.appliances ?? {}),
+  },
+  habits: {
+    ...DEFAULT_ENERGY_BEHAVIOR_PROFILE.habits,
+    ...(energyBehaviorProfile?.habits ?? {}),
+  },
+  intentions: {
+    ...DEFAULT_ENERGY_BEHAVIOR_PROFILE.intentions,
+    ...(energyBehaviorProfile?.intentions ?? {}),
+  },
+  qualification: {
+    ...DEFAULT_ENERGY_BEHAVIOR_PROFILE.qualification,
+    ...(energyBehaviorProfile?.qualification ?? {}),
+  },
+  actionMemory: {
+    ...DEFAULT_ENERGY_BEHAVIOR_PROFILE.actionMemory,
+    ...(energyBehaviorProfile?.actionMemory ?? {}),
+  },
+  confidence: {
+    ...DEFAULT_ENERGY_BEHAVIOR_PROFILE.confidence,
+    ...(energyBehaviorProfile?.confidence ?? {}),
+  },
+});
+
+const VALID_USAGE_PERIODS: EnergyBehaviorUsagePeriod[] = [
+  'pico',
+  'fora_pico',
+  'misto',
+  'nao_informado',
+];
+
+const VALID_LAUNDRY_FREQUENCIES: EnergyBehaviorLaundryFrequency[] = [
+  'baixa',
+  'media',
+  'alta',
+  'nao_informado',
+];
+
+const VALID_HOUSEHOLD_ROUTINE_PERIODS = ['manha', 'tarde', 'noite', 'misto', 'nao_informado'];
+const VALID_PEAK_WINDOW_USAGES = ['sim', 'nao', 'as_vezes', 'nao_informado'];
+const VALID_HOUSEHOLD_PRESENCES = ['sim', 'nao', 'parcial', 'nao_informado'];
+const VALID_CLIMATE_USAGES = ['sim', 'nao', 'sazonal', 'nao_informado'];
+const VALID_THERMAL_SENSITIVITIES = ['sim', 'nao', 'nao_sei', 'nao_informado'];
+const VALID_INTEREST_LEVELS = ['sim', 'talvez', 'nao', 'nao_informado'];
+const VALID_PRIMARY_OBJECTIVES = ['economia', 'conforto', 'sustentabilidade', 'nao_informado'];
+
+const normalizeActionQuestionOptions = (
+  options: ActionInteractiveQuestion['options']
+) =>
+  options.filter(
+    (option) =>
+      Boolean(option) &&
+      typeof option.label === 'string' &&
+      option.label.trim() &&
+      typeof option.value === 'string' &&
+      option.value.trim()
+  );
+
+const normalizeInteractiveQuestions = (
+  questions?: NextAction['interactiveQuestions']
+): NextAction['interactiveQuestions'] => {
+  if (!Array.isArray(questions)) {
+    return undefined;
+  }
+
+  const normalizedQuestions = questions
+    .filter(
+      (question) =>
+        Boolean(question) &&
+        typeof question.id === 'string' &&
+        typeof question.prompt === 'string' &&
+        question.prompt.trim()
+    )
+    .map((question) => ({
+      id: question.id,
+      prompt: question.prompt,
+      helperText:
+        typeof question.helperText === 'string' && question.helperText.trim()
+          ? question.helperText
+          : undefined,
+      options: normalizeActionQuestionOptions(question.options),
+    }))
+    .filter((question) => question.options.length > 0);
+
+  return normalizedQuestions.length > 0 ? normalizedQuestions : undefined;
+};
+
+const normalizeConfidenceRatio = (answeredCount: number, totalCount: number) => {
+  if (answeredCount <= 0 || totalCount <= 0) {
+    return undefined;
+  }
+
+  return clampConfidence(Number((answeredCount / totalCount).toFixed(2)));
+};
+
+export const normalizeEnergyBehaviorProfile = (
+  energyBehaviorProfile?: Partial<EnergyBehaviorProfile>
+): EnergyBehaviorProfile => {
+  const mergedEnergyBehaviorProfile = mergeEnergyBehaviorProfile(energyBehaviorProfile);
+  const appliances = mergedEnergyBehaviorProfile.appliances ?? {};
+  const habits = mergedEnergyBehaviorProfile.habits ?? {};
+  const intentions = mergedEnergyBehaviorProfile.intentions ?? {};
+  const qualification = mergedEnergyBehaviorProfile.qualification ?? {};
+  const answeredActionPrompts = mergedEnergyBehaviorProfile.actionMemory?.answeredActionPrompts ?? {};
+  const startedActionTitles = mergedEnergyBehaviorProfile.actionMemory?.startedActionTitles ?? [];
+  const normalizedShowers =
+    isFiniteNumber(appliances.showers) && appliances.showers >= 0
+      ? Math.min(Math.round(appliances.showers), 99)
+      : undefined;
+  const normalizedDominantUsagePeriod =
+    typeof habits.dominantUsagePeriod === 'string' &&
+    VALID_USAGE_PERIODS.includes(habits.dominantUsagePeriod)
+      ? habits.dominantUsagePeriod
+      : undefined;
+  const normalizedLaundryFrequency =
+    typeof habits.laundryFrequency === 'string' &&
+    VALID_LAUNDRY_FREQUENCIES.includes(habits.laundryFrequency)
+      ? habits.laundryFrequency
+      : undefined;
+  const normalizedDominantUsageRoutine =
+    typeof habits.dominantUsageRoutine === 'string' &&
+    VALID_HOUSEHOLD_ROUTINE_PERIODS.includes(habits.dominantUsageRoutine)
+      ? habits.dominantUsageRoutine
+      : undefined;
+  const normalizedPeakWindowIntensity =
+    typeof habits.peakWindowIntensity === 'string' &&
+    VALID_PEAK_WINDOW_USAGES.includes(habits.peakWindowIntensity)
+      ? habits.peakWindowIntensity
+      : undefined;
+  const normalizedHouseholdPeakPresence =
+    typeof habits.householdPeakPresence === 'string' &&
+    VALID_HOUSEHOLD_PRESENCES.includes(habits.householdPeakPresence)
+      ? habits.householdPeakPresence
+      : undefined;
+  const normalizedClimateUsageIntensity =
+    typeof habits.climateUsageIntensity === 'string' &&
+    VALID_CLIMATE_USAGES.includes(habits.climateUsageIntensity)
+      ? habits.climateUsageIntensity
+      : undefined;
+  const normalizedThermalSensitivity =
+    typeof habits.thermalSensitivity === 'string' &&
+    VALID_THERMAL_SENSITIVITIES.includes(habits.thermalSensitivity)
+      ? habits.thermalSensitivity
+      : undefined;
+  const normalizedThermalComfortInterest =
+    typeof intentions.thermalComfortInterest === 'string' &&
+    VALID_INTEREST_LEVELS.includes(intentions.thermalComfortInterest)
+      ? intentions.thermalComfortInterest
+      : undefined;
+  const normalizedSolarAnalysisInterest =
+    typeof intentions.solarAnalysisInterest === 'string' &&
+    VALID_INTEREST_LEVELS.includes(intentions.solarAnalysisInterest)
+      ? intentions.solarAnalysisInterest
+      : undefined;
+  const normalizedConsultantInterest =
+    typeof intentions.consultantInterest === 'string' &&
+    VALID_INTEREST_LEVELS.includes(intentions.consultantInterest)
+      ? intentions.consultantInterest
+      : undefined;
+  const normalizedPrimaryObjective =
+    typeof intentions.primaryObjective === 'string' &&
+    VALID_PRIMARY_OBJECTIVES.includes(intentions.primaryObjective)
+      ? intentions.primaryObjective
+      : undefined;
+  const normalizedAnsweredActionPrompts = Object.fromEntries(
+    Object.entries(answeredActionPrompts).filter(
+      ([promptId, entry]) =>
+        typeof promptId === 'string' &&
+        promptId.trim() &&
+        typeof entry?.answer === 'string' &&
+        entry.answer.trim() &&
+        typeof entry.answeredAt === 'string' &&
+        !Number.isNaN(new Date(entry.answeredAt).getTime())
+    )
+  );
+  const normalizedStartedActionTitles = Array.from(
+    new Set(
+      startedActionTitles.filter(
+        (title): title is string => typeof title === 'string' && title.trim().length > 0
+      )
+    )
+  );
+  const applianceAnsweredCount = [
+    normalizedShowers !== undefined,
+    isBoolean(appliances.hasElectricShower),
+    isBoolean(appliances.hasAirConditioning),
+    isBoolean(appliances.hasExtraFridge),
+  ].filter(Boolean).length;
+  const habitAnsweredCount = [
+    normalizedDominantUsagePeriod !== undefined,
+    isBoolean(habits.usesHeavyLoadsAtNight),
+    normalizedLaundryFrequency !== undefined,
+    normalizedDominantUsageRoutine !== undefined,
+    normalizedPeakWindowIntensity !== undefined,
+    normalizedHouseholdPeakPresence !== undefined,
+    normalizedClimateUsageIntensity !== undefined,
+    normalizedThermalSensitivity !== undefined,
+  ].filter(Boolean).length;
+  const leadAnsweredCount = [
+    normalizedThermalComfortInterest !== undefined,
+    normalizedSolarAnalysisInterest !== undefined,
+    normalizedConsultantInterest !== undefined,
+    normalizedPrimaryObjective !== undefined,
+  ].filter(Boolean).length;
+  const answeredDiagnosisCount = Object.keys(normalizedAnsweredActionPrompts).length;
+  const diagnosisLevel =
+    answeredDiagnosisCount >= 15 ? 16 : answeredDiagnosisCount > 0 ? answeredDiagnosisCount + 1 : 1;
+  const qualifiedLead =
+    normalizedSolarAnalysisInterest === 'sim' ||
+    normalizedConsultantInterest === 'sim' ||
+    normalizedPrimaryObjective === 'sustentabilidade';
+
+  return {
+    appliances: {
+      showers: normalizedShowers,
+      hasElectricShower: isBoolean(appliances.hasElectricShower)
+        ? appliances.hasElectricShower
+        : undefined,
+      hasAirConditioning: isBoolean(appliances.hasAirConditioning)
+        ? appliances.hasAirConditioning
+        : undefined,
+      hasExtraFridge: isBoolean(appliances.hasExtraFridge)
+        ? appliances.hasExtraFridge
+        : undefined,
+    },
+    habits: {
+      dominantUsagePeriod: normalizedDominantUsagePeriod,
+      usesHeavyLoadsAtNight: isBoolean(habits.usesHeavyLoadsAtNight)
+        ? habits.usesHeavyLoadsAtNight
+        : undefined,
+      laundryFrequency: normalizedLaundryFrequency,
+      dominantUsageRoutine: normalizedDominantUsageRoutine,
+      peakWindowIntensity: normalizedPeakWindowIntensity,
+      householdPeakPresence: normalizedHouseholdPeakPresence,
+      climateUsageIntensity: normalizedClimateUsageIntensity,
+      thermalSensitivity: normalizedThermalSensitivity,
+    },
+    intentions: {
+      thermalComfortInterest: normalizedThermalComfortInterest,
+      solarAnalysisInterest: normalizedSolarAnalysisInterest,
+      consultantInterest: normalizedConsultantInterest,
+      primaryObjective: normalizedPrimaryObjective,
+    },
+    qualification: {
+      diagnosisLevel:
+        isFiniteNumber(qualification.diagnosisLevel) && qualification.diagnosisLevel >= 1
+          ? Math.min(Math.round(qualification.diagnosisLevel), 99)
+          : diagnosisLevel,
+      answeredDiagnosisCount:
+        isFiniteNumber(qualification.answeredDiagnosisCount) && qualification.answeredDiagnosisCount >= 0
+          ? Math.min(Math.round(qualification.answeredDiagnosisCount), 99)
+          : answeredDiagnosisCount,
+      qualifiedLead: isBoolean(qualification.qualifiedLead)
+        ? qualification.qualifiedLead
+        : qualifiedLead,
+    },
+    actionMemory: {
+      startedActionTitles:
+        normalizedStartedActionTitles.length > 0 ? normalizedStartedActionTitles : undefined,
+      answeredActionPrompts:
+        Object.keys(normalizedAnsweredActionPrompts).length > 0
+          ? normalizedAnsweredActionPrompts
+          : undefined,
+    },
+    confidence: {
+      applianceConfidence: normalizeConfidenceRatio(applianceAnsweredCount, 4),
+      habitConfidence: normalizeConfidenceRatio(habitAnsweredCount, 8),
+      leadConfidence: normalizeConfidenceRatio(leadAnsweredCount, 4),
+    },
+    updatedAt:
+      typeof mergedEnergyBehaviorProfile.updatedAt === 'string' &&
+      !Number.isNaN(new Date(mergedEnergyBehaviorProfile.updatedAt).getTime())
+        ? mergedEnergyBehaviorProfile.updatedAt
+        : undefined,
+  };
+};
+
 export const DEFAULT_MVP_STATE: MvpState = {
   profile: DEFAULT_PROFILE,
   mascot: DEFAULT_MASCOT,
   userContext: DEFAULT_USER_CONTEXT_STATE,
+  energyBehaviorProfile: DEFAULT_ENERGY_BEHAVIOR_PROFILE,
   analysis: DEFAULT_ANALYSIS_STATE,
   scoreEvents: [],
   actions: DEFAULT_ACTIONS_STATE,
@@ -348,8 +650,46 @@ const normalizeAction = (
     value: action.value,
     context: typeof action.context === 'string' ? action.context : undefined,
     suggestion: typeof action.suggestion === 'string' ? action.suggestion : undefined,
+    ctaLabel: typeof action.ctaLabel === 'string' ? action.ctaLabel : undefined,
+    evidence: typeof action.evidence === 'string' ? action.evidence : undefined,
+    reason: typeof action.reason === 'string' ? action.reason : undefined,
     impact: typeof action.impact === 'string' ? action.impact : undefined,
     validation: typeof action.validation === 'string' ? action.validation : undefined,
+    interactiveQuestions: normalizeInteractiveQuestions(action.interactiveQuestions),
+    usedDataPoints: isStringArray(action.usedDataPoints) ? action.usedDataPoints : undefined,
+    knownBehaviorSummary: isStringArray(action.knownBehaviorSummary)
+      ? action.knownBehaviorSummary
+      : undefined,
+    answeredQuestionSummaries: isStringArray(action.answeredQuestionSummaries)
+      ? action.answeredQuestionSummaries
+      : undefined,
+    diagnosticProgress:
+      action.diagnosticProgress &&
+      isFiniteNumber(action.diagnosticProgress.current) &&
+      isFiniteNumber(action.diagnosticProgress.total) &&
+      isFiniteNumber(action.diagnosticProgress.level)
+        ? {
+            current: Math.max(0, Math.round(action.diagnosticProgress.current)),
+            total: Math.max(1, Math.round(action.diagnosticProgress.total)),
+            level: Math.max(1, Math.round(action.diagnosticProgress.level)),
+            completed: action.diagnosticProgress.completed === true,
+          }
+        : undefined,
+    pendingAnswer:
+      action.pendingAnswer &&
+      typeof action.pendingAnswer.questionId === 'string' &&
+      typeof action.pendingAnswer.answer === 'string' &&
+      action.pendingAnswer.answer.trim()
+        ? {
+            questionId: action.pendingAnswer.questionId,
+            answer: action.pendingAnswer.answer,
+            answeredAt:
+              typeof action.pendingAnswer.answeredAt === 'string'
+                ? action.pendingAnswer.answeredAt
+                : undefined,
+            persistOnly: action.pendingAnswer.persistOnly === true,
+          }
+        : undefined,
     priority: action.priority,
     status,
     source: action.source ?? 'journey',
@@ -386,7 +726,8 @@ export const normalizeActionsState = (
 export const normalizeAnalysisState = (
   analysis?: Partial<AnalysisState>,
   legacyLatestInvoice?: AnalysisState['latestInvoice'],
-  legacySummary?: AnalysisState['summary']
+  legacySummary?: AnalysisState['summary'],
+  energyBehaviorProfile?: Partial<EnergyBehaviorProfile>
 ): AnalysisState => {
   const requestedStatus = analysis?.status;
   const latestInvoice = analysis?.latestInvoice ?? legacyLatestInvoice;
@@ -404,7 +745,12 @@ export const normalizeAnalysisState = (
     legacySummary ??
     (requestedStatus === 'processing' || !resolvedLatestInvoice
       ? undefined
-      : buildAnalysisSummary(resolvedLatestInvoice));
+      : buildAnalysisSummary(
+          resolvedLatestInvoice,
+          undefined,
+          invoiceHistory,
+          energyBehaviorProfile
+        ));
   const status =
     requestedStatus ??
     (resolvedLatestInvoice || summary ? 'ready' : DEFAULT_ANALYSIS_STATE.status);
@@ -451,14 +797,15 @@ export const resolveJourneyStage = (
 };
 
 const resolveActionsState = (
-  state: Pick<MvpState, 'profile' | 'analysis' | 'actions' | 'userContext'>
+  state: Pick<MvpState, 'profile' | 'analysis' | 'actions' | 'userContext' | 'energyBehaviorProfile'>
 ): NextActionsState => {
   const normalizedActions = normalizeActionsState(state.actions);
   const nextItems = buildNextActions(
     state.analysis.latestInvoice,
     state.analysis.summary,
     state.profile,
-    state.userContext
+    state.userContext,
+    state.energyBehaviorProfile
   );
   const nextItemIds = new Set(nextItems.map((action) => action.id));
   const persistedActionMap = new Map(
@@ -535,12 +882,19 @@ export const resolveFullJourneyState = (state: MvpState): MvpState => {
   const profile = normalizeProfile(state.profile);
   const mascot = normalizeMascot(state.mascot);
   const userContext = normalizeUserContext(state.userContext);
-  const analysis = normalizeAnalysisState(state.analysis);
+  const energyBehaviorProfile = normalizeEnergyBehaviorProfile(state.energyBehaviorProfile);
+  const analysis = normalizeAnalysisState(
+    state.analysis,
+    undefined,
+    undefined,
+    energyBehaviorProfile
+  );
   const actions = resolveActionsState({
     profile,
     analysis,
     actions: state.actions,
     userContext,
+    energyBehaviorProfile,
   });
   const scoreEvents = resolveScoreEventsState({
     profile,
@@ -556,6 +910,7 @@ export const resolveFullJourneyState = (state: MvpState): MvpState => {
     profile,
     mascot,
     userContext,
+    energyBehaviorProfile,
     analysis,
     scoreEvents,
     actions,
@@ -697,10 +1052,12 @@ export const normalizeState = (
   state?: Partial<MvpState>,
   legacyState?: LegacyStoredJourneyState
 ): MvpState => {
+  const energyBehaviorProfile = normalizeEnergyBehaviorProfile(state?.energyBehaviorProfile);
   const analysis = normalizeAnalysisState(
     state?.analysis,
     legacyState?.latestInvoice,
-    legacyState?.latestAnalysis
+    legacyState?.latestAnalysis,
+    energyBehaviorProfile
   );
   const actions = normalizeActionsState(
     state?.actions,
@@ -713,6 +1070,7 @@ export const normalizeState = (
     profile: normalizeProfile(state?.profile ?? legacyState?.profile),
     mascot: normalizeMascot(state?.mascot ?? legacyState?.mascotCustomization),
     userContext: normalizeUserContext(state?.userContext),
+    energyBehaviorProfile,
     analysis,
     scoreEvents: normalizeScoreEvents(
       Array.isArray(state?.scoreEvents)
@@ -783,7 +1141,7 @@ export const setAnalysis = (
     invoiceHistory: invoiceHistory ?? state.analysis.invoiceHistory,
     summary,
     lastCompletedAt: completedAt,
-  }),
+  }, undefined, undefined, state.energyBehaviorProfile),
 });
 
 export const buildInvoiceHistory = (
@@ -1319,6 +1677,328 @@ export const ignoreMascotContextQuestion = (
   };
 };
 
+const getBehaviorAnswerValue = (answer: string) => answer.trim().toLowerCase();
+
+const updateStartedActionMemory = (
+  energyBehaviorProfile: EnergyBehaviorProfile,
+  actionTitle: string,
+  updatedAt: string
+) =>
+  normalizeEnergyBehaviorProfile({
+    ...energyBehaviorProfile,
+    actionMemory: {
+      ...energyBehaviorProfile.actionMemory,
+      startedActionTitles: Array.from(
+        new Set([
+          ...(energyBehaviorProfile.actionMemory.startedActionTitles ?? []),
+          actionTitle,
+        ])
+      ),
+      answeredActionPrompts: energyBehaviorProfile.actionMemory.answeredActionPrompts,
+    },
+    updatedAt,
+  });
+
+const applyBehaviorAnswerToProfile = (
+  energyBehaviorProfile: EnergyBehaviorProfile,
+  questionId: NonNullable<NextAction['pendingAnswer']>['questionId'],
+  answer: string,
+  answeredAt: string
+) => {
+  const normalizedAnswer = getBehaviorAnswerValue(answer);
+  const nextProfile: Partial<EnergyBehaviorProfile> = {
+    ...energyBehaviorProfile,
+    appliances: { ...energyBehaviorProfile.appliances },
+    habits: { ...energyBehaviorProfile.habits },
+    intentions: { ...energyBehaviorProfile.intentions },
+    qualification: { ...energyBehaviorProfile.qualification },
+    actionMemory: {
+      ...energyBehaviorProfile.actionMemory,
+      answeredActionPrompts: {
+        ...(energyBehaviorProfile.actionMemory.answeredActionPrompts ?? {}),
+        [questionId]: {
+          answer,
+          answeredAt,
+        },
+      },
+      startedActionTitles: energyBehaviorProfile.actionMemory.startedActionTitles,
+    },
+    updatedAt: answeredAt,
+  };
+
+  if (questionId === 'showers_count') {
+    nextProfile.appliances = {
+      ...nextProfile.appliances,
+      showers:
+        normalizedAnswer === '0'
+          ? 0
+          : normalizedAnswer === '1'
+            ? 1
+            : normalizedAnswer === '2+'
+              ? 2
+              : nextProfile.appliances?.showers,
+    };
+  }
+
+  if (questionId === 'electric_shower_presence') {
+    nextProfile.appliances = {
+      ...nextProfile.appliances,
+      hasElectricShower:
+        normalizedAnswer === 'yes'
+          ? true
+          : normalizedAnswer === 'no'
+            ? false
+            : nextProfile.appliances?.hasElectricShower,
+    };
+  }
+
+  if (questionId === 'air_conditioning_presence') {
+    nextProfile.appliances = {
+      ...nextProfile.appliances,
+      hasAirConditioning:
+        normalizedAnswer === 'yes'
+          ? true
+          : normalizedAnswer === 'no'
+            ? false
+            : nextProfile.appliances?.hasAirConditioning,
+    };
+  }
+
+  if (questionId === 'extra_fridge_presence') {
+    nextProfile.appliances = {
+      ...nextProfile.appliances,
+      hasExtraFridge:
+        normalizedAnswer === 'yes'
+          ? true
+          : normalizedAnswer === 'no'
+            ? false
+            : nextProfile.appliances?.hasExtraFridge,
+    };
+  }
+
+  if (questionId === 'heavy_loads_at_night') {
+    nextProfile.habits = {
+      ...nextProfile.habits,
+      usesHeavyLoadsAtNight:
+        normalizedAnswer === 'yes'
+          ? true
+          : normalizedAnswer === 'no'
+            ? false
+            : nextProfile.habits?.usesHeavyLoadsAtNight,
+      dominantUsagePeriod:
+        normalizedAnswer === 'yes'
+          ? 'pico'
+          : nextProfile.habits?.dominantUsagePeriod,
+    };
+  }
+
+  if (questionId === 'laundry_frequency') {
+    nextProfile.habits = {
+      ...nextProfile.habits,
+      laundryFrequency:
+        normalizedAnswer === 'baixa' ||
+        normalizedAnswer === 'media' ||
+        normalizedAnswer === 'alta'
+          ? normalizedAnswer
+          : nextProfile.habits?.laundryFrequency,
+    };
+  }
+
+  if (questionId === 'dominant_usage_period') {
+    nextProfile.habits = {
+      ...nextProfile.habits,
+      dominantUsageRoutine:
+        normalizedAnswer === 'manha' ||
+        normalizedAnswer === 'tarde' ||
+        normalizedAnswer === 'noite' ||
+        normalizedAnswer === 'misto'
+          ? normalizedAnswer
+          : nextProfile.habits?.dominantUsageRoutine,
+    };
+  }
+
+  if (questionId === 'peak_window_intensity') {
+    nextProfile.habits = {
+      ...nextProfile.habits,
+      peakWindowIntensity:
+        normalizedAnswer === 'sim' ||
+        normalizedAnswer === 'nao' ||
+        normalizedAnswer === 'as_vezes'
+          ? normalizedAnswer
+          : nextProfile.habits?.peakWindowIntensity,
+    };
+  }
+
+  if (questionId === 'peak_household_presence') {
+    nextProfile.habits = {
+      ...nextProfile.habits,
+      householdPeakPresence:
+        normalizedAnswer === 'sim' ||
+        normalizedAnswer === 'nao' ||
+        normalizedAnswer === 'parcial'
+          ? normalizedAnswer
+          : nextProfile.habits?.householdPeakPresence,
+    };
+  }
+
+  if (questionId === 'climate_usage_intensity') {
+    nextProfile.habits = {
+      ...nextProfile.habits,
+      climateUsageIntensity:
+        normalizedAnswer === 'sim' ||
+        normalizedAnswer === 'nao' ||
+        normalizedAnswer === 'sazonal'
+          ? normalizedAnswer
+          : nextProfile.habits?.climateUsageIntensity,
+    };
+  }
+
+  if (questionId === 'thermal_instability') {
+    nextProfile.habits = {
+      ...nextProfile.habits,
+      thermalSensitivity:
+        normalizedAnswer === 'sim' ||
+        normalizedAnswer === 'nao' ||
+        normalizedAnswer === 'nao_sei'
+          ? normalizedAnswer
+          : nextProfile.habits?.thermalSensitivity,
+    };
+  }
+
+  if (questionId === 'thermal_comfort_interest') {
+    nextProfile.intentions = {
+      ...nextProfile.intentions,
+      thermalComfortInterest:
+        normalizedAnswer === 'sim' ||
+        normalizedAnswer === 'talvez' ||
+        normalizedAnswer === 'nao'
+          ? normalizedAnswer
+          : nextProfile.intentions?.thermalComfortInterest,
+    };
+  }
+
+  if (questionId === 'solar_analysis_interest') {
+    nextProfile.intentions = {
+      ...nextProfile.intentions,
+      solarAnalysisInterest:
+        normalizedAnswer === 'sim' ||
+        normalizedAnswer === 'talvez' ||
+        normalizedAnswer === 'nao'
+          ? normalizedAnswer
+          : nextProfile.intentions?.solarAnalysisInterest,
+    };
+  }
+
+  if (questionId === 'consultant_interest') {
+    nextProfile.intentions = {
+      ...nextProfile.intentions,
+      consultantInterest:
+        normalizedAnswer === 'sim' ||
+        normalizedAnswer === 'talvez' ||
+        normalizedAnswer === 'nao'
+          ? normalizedAnswer
+          : nextProfile.intentions?.consultantInterest,
+    };
+  }
+
+  if (questionId === 'primary_objective') {
+    nextProfile.intentions = {
+      ...nextProfile.intentions,
+      primaryObjective:
+        normalizedAnswer === 'economia' ||
+        normalizedAnswer === 'conforto' ||
+        normalizedAnswer === 'sustentabilidade'
+          ? normalizedAnswer
+          : nextProfile.intentions?.primaryObjective,
+    };
+  }
+
+  return normalizeEnergyBehaviorProfile(nextProfile);
+};
+
+const refreshAdaptiveJourneyState = (
+  state: MvpState,
+  nextEnergyBehaviorProfile: EnergyBehaviorProfile,
+  updatedAt: string,
+  recomputeAnalysis = false
+) => {
+  const latestInvoice = state.analysis.latestInvoice;
+  const invoiceHistory = state.analysis.invoiceHistory;
+  const summary =
+    latestInvoice &&
+    state.analysis.status !== 'processing' &&
+    (recomputeAnalysis || !state.analysis.summary)
+      ? buildAnalysisSummary(
+          latestInvoice,
+          state.profile,
+          invoiceHistory,
+          nextEnergyBehaviorProfile
+        )
+      : state.analysis.summary;
+  const nextAnalysis = normalizeAnalysisState(
+    {
+      ...state.analysis,
+      summary,
+      lastCompletedAt: state.analysis.lastCompletedAt,
+    },
+    undefined,
+    undefined,
+    nextEnergyBehaviorProfile
+  );
+  const nextActions = buildNextActions(
+    nextAnalysis.latestInvoice,
+    nextAnalysis.summary,
+    state.profile,
+    state.userContext,
+    nextEnergyBehaviorProfile
+  );
+  const persistedActionMap = new Map(
+    state.actions.items.map((currentAction) => [currentAction.id, currentAction] as const)
+  );
+  const hydratedNextActions = nextActions.map((nextAction) => ({
+    ...nextAction,
+    status: persistedActionMap.get(nextAction.id)?.status ?? nextAction.status,
+    source: nextAction.source ?? persistedActionMap.get(nextAction.id)?.source,
+  }));
+
+  return {
+    ...state,
+    energyBehaviorProfile: nextEnergyBehaviorProfile,
+    analysis: nextAnalysis,
+    actions: normalizeActionsState({
+      items: hydratedNextActions,
+      viewedActionIds: state.actions.viewedActionIds,
+      lastUpdatedAt: updatedAt,
+    }),
+  };
+};
+
+export const saveEnergyBehaviorAnswer = (
+  state: MvpState,
+  action: NextAction,
+  answeredAt = new Date().toISOString()
+): MvpState => {
+  const pendingAnswer = action.pendingAnswer;
+
+  if (!pendingAnswer?.questionId || !pendingAnswer.answer.trim()) {
+    return state;
+  }
+
+  const nextEnergyBehaviorProfile = applyBehaviorAnswerToProfile(
+    normalizeEnergyBehaviorProfile(state.energyBehaviorProfile),
+    pendingAnswer.questionId,
+    pendingAnswer.answer,
+    pendingAnswer.answeredAt ?? answeredAt
+  );
+
+  return refreshAdaptiveJourneyState(
+    state,
+    nextEnergyBehaviorProfile,
+    pendingAnswer.answeredAt ?? answeredAt,
+    true
+  );
+};
+
 export const updateActions = (
   state: MvpState,
   {
@@ -1374,22 +2054,58 @@ export const markActionViewed = (state: MvpState, actionId: string): MvpState =>
 
 export const updateActionStatus = (
   state: MvpState,
-  actionId: string,
+  actionOrId: NextAction | string,
   status: Extract<NextAction['status'], 'in_progress' | 'completed'>
 ): MvpState => {
+  const actionId = typeof actionOrId === 'string' ? actionOrId : actionOrId.id;
+  const actionTitle =
+    typeof actionOrId === 'string'
+      ? state.actions.items.find((action) => action.id === actionId)?.title ?? actionId
+      : actionOrId.title;
+
   if (!state.actions.items.some((action) => action.id === actionId)) {
     return state;
+  }
+
+  const answeredAt =
+    typeof actionOrId === 'string'
+      ? new Date().toISOString()
+      : actionOrId.pendingAnswer?.answeredAt ?? new Date().toISOString();
+  const shouldPersistAnswer =
+    typeof actionOrId === 'string' ? false : Boolean(actionOrId.pendingAnswer?.persistOnly);
+  const baseState = shouldPersistAnswer
+    ? saveEnergyBehaviorAnswer(state, actionOrId, answeredAt)
+    : state;
+
+  if (shouldPersistAnswer) {
+    return baseState;
   }
 
   const viewedActionIds = state.actions.viewedActionIds.includes(actionId)
     ? state.actions.viewedActionIds
     : [...state.actions.viewedActionIds, actionId];
-  const items = state.actions.items.map((action) =>
-    action.id === actionId ? { ...action, status } : action
+  const items = baseState.actions.items.map((currentAction) =>
+    currentAction.id === actionId ? { ...currentAction, status } : currentAction
+  );
+  const nextEnergyBehaviorProfile = updateStartedActionMemory(
+    normalizeEnergyBehaviorProfile(baseState.energyBehaviorProfile),
+    actionTitle,
+    answeredAt
   );
 
-  return updateActions(state, {
-    items,
-    viewedActionIds,
-  });
+  return refreshAdaptiveJourneyState(
+    updateActions(
+      {
+        ...baseState,
+        energyBehaviorProfile: nextEnergyBehaviorProfile,
+      },
+      {
+        items,
+        viewedActionIds,
+        updatedAt: answeredAt,
+      }
+    ),
+    nextEnergyBehaviorProfile,
+    answeredAt
+  );
 };

@@ -8,6 +8,7 @@ import {
   getScoreState,
   interpretInvoiceFile,
   isProfileComplete,
+  setActiveEnergyBehaviorProfile,
 } from '@/lib/mvpCoreFlow';
 import {
   addScoreEvent,
@@ -46,7 +47,12 @@ import {
 
 export const useMvpJourney = () => {
   const { journeyIdentity, loading: identityLoading } = useJourneyIdentity();
-  const [state, setState] = useState<MvpState>(() => resolveFullJourneyState(DEFAULT_MVP_STATE));
+  const resolveAndSyncJourneyState = (nextState: MvpState) => {
+    const resolvedState = resolveFullJourneyState(nextState);
+    setActiveEnergyBehaviorProfile(resolvedState.energyBehaviorProfile);
+    return resolvedState;
+  };
+  const [state, setState] = useState<MvpState>(() => resolveAndSyncJourneyState(DEFAULT_MVP_STATE));
   const [storageLoaded, setStorageLoaded] = useState(false);
   const journeyService = getMvpJourneyService();
 
@@ -72,7 +78,7 @@ export const useMvpJourney = () => {
           return;
         }
 
-        setState(resolveFullJourneyState(loadedState));
+        setState(resolveAndSyncJourneyState(loadedState));
       })
       .finally(() => {
         if (isActive) {
@@ -106,7 +112,7 @@ export const useMvpJourney = () => {
   }, [journeyIdentity, journeyService, state, storageLoaded]);
 
   const handleStateUpdate = (updater: (currentState: MvpState) => MvpState) => {
-    setState((currentState) => resolveFullJourneyState(updater(currentState)));
+    setState((currentState) => resolveAndSyncJourneyState(updater(currentState)));
   };
 
   const updateProfile = (profile: UserProfileData) => {
@@ -156,12 +162,18 @@ export const useMvpJourney = () => {
     });
 
     handleStateUpdate((latestState) => {
-      const analysis = buildAnalysisSummary(invoice, latestState.profile);
+      const analysis = buildAnalysisSummary(
+        invoice,
+        latestState.profile,
+        latestState.analysis.invoiceHistory,
+        latestState.energyBehaviorProfile
+      );
       const nextActions = buildNextActions(
         invoice,
         analysis,
         latestState.profile,
-        latestState.userContext
+        latestState.userContext,
+        latestState.energyBehaviorProfile
       );
       const nextInvoiceHistory = buildInvoiceHistory(latestState.analysis.invoiceHistory, invoice);
 
@@ -225,7 +237,13 @@ export const useMvpJourney = () => {
         });
 
         nextState = updateActions(nextState, {
-          items: buildNextActions(undefined, undefined, currentState.profile, currentState.userContext),
+          items: buildNextActions(
+            undefined,
+            undefined,
+            currentState.profile,
+            currentState.userContext,
+            currentState.energyBehaviorProfile
+          ),
           viewedActionIds: [],
         });
 
@@ -235,12 +253,18 @@ export const useMvpJourney = () => {
         };
       }
 
-      const fallbackAnalysis = buildAnalysisSummary(latestHistoryInvoice, currentState.profile);
+      const fallbackAnalysis = buildAnalysisSummary(
+        latestHistoryInvoice,
+        currentState.profile,
+        nextInvoiceHistory,
+        currentState.energyBehaviorProfile
+      );
       const fallbackActions = buildNextActions(
         latestHistoryInvoice,
         fallbackAnalysis,
         currentState.profile,
-        currentState.userContext
+        currentState.userContext,
+        currentState.energyBehaviorProfile
       );
       const viewedFallbackActionIds = currentState.actions.viewedActionIds.filter((viewedActionId) =>
         fallbackActions.some((action) => action.id === viewedActionId)
@@ -294,8 +318,12 @@ export const useMvpJourney = () => {
     status: Extract<NextActionStatus, 'in_progress' | 'completed'>
   ) => {
     handleStateUpdate((currentState) => {
+      if (action.pendingAnswer?.persistOnly) {
+        return applyActionStatus(currentState, action, status);
+      }
+
       const wasAlreadyViewed = currentState.actions.viewedActionIds.includes(action.id);
-      let nextState = applyActionStatus(currentState, action.id, status);
+      let nextState = applyActionStatus(currentState, action, status);
       const isNowViewed = nextState.actions.viewedActionIds.includes(action.id);
 
       if (!wasAlreadyViewed && isNowViewed) {

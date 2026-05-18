@@ -1,9 +1,12 @@
 import {
+  ActionInteractiveQuestion,
+  EnergyDiagnosisQuestionDefinition,
   AnalysisSummary,
   ConsultiveInsight,
   ConsultiveInsightAction,
   ConsultiveInsightDriver,
   ConsultiveInsightProfileContext,
+  EnergyBehaviorProfile,
   InvoiceData,
   InsightSeason,
   InsightEducationItem,
@@ -62,6 +65,17 @@ const DEFAULT_PROFILE: UserProfileData = {
   energyPreference: 'Convencional',
 };
 
+const DEFAULT_ENERGY_BEHAVIOR_PROFILE: EnergyBehaviorProfile = {
+  appliances: {},
+  habits: {},
+  intentions: {},
+  qualification: {},
+  actionMemory: {},
+  confidence: {},
+};
+
+let activeEnergyBehaviorProfile = DEFAULT_ENERGY_BEHAVIOR_PROFILE;
+
 const BASIC_SIGNAL_TOLERANCE = 0.05;
 
 const clamp = (value: number, min: number, max: number) =>
@@ -69,6 +83,164 @@ const clamp = (value: number, min: number, max: number) =>
 
 const hasNumericValue = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value);
+
+const hasBooleanValue = (value: unknown): value is boolean => typeof value === 'boolean';
+
+const normalizeForMatch = (value?: string) =>
+  (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+const VALID_HOUSEHOLD_ROUTINE_PERIODS = ['manha', 'tarde', 'noite', 'misto', 'nao_informado'];
+const VALID_PEAK_WINDOW_USAGES = ['sim', 'nao', 'as_vezes', 'nao_informado'];
+const VALID_HOUSEHOLD_PRESENCES = ['sim', 'nao', 'parcial', 'nao_informado'];
+const VALID_CLIMATE_USAGES = ['sim', 'nao', 'sazonal', 'nao_informado'];
+const VALID_THERMAL_SENSITIVITIES = ['sim', 'nao', 'nao_sei', 'nao_informado'];
+const VALID_INTEREST_LEVELS = ['sim', 'talvez', 'nao', 'nao_informado'];
+const VALID_PRIMARY_OBJECTIVES = ['economia', 'conforto', 'sustentabilidade', 'nao_informado'];
+
+export const normalizeEnergyBehaviorProfile = (
+  energyBehaviorProfile?: Partial<EnergyBehaviorProfile>
+): EnergyBehaviorProfile => ({
+  appliances: {
+    showers:
+      hasNumericValue(energyBehaviorProfile?.appliances?.showers) &&
+      energyBehaviorProfile.appliances.showers >= 0
+        ? Math.min(Math.round(energyBehaviorProfile.appliances.showers), 99)
+        : undefined,
+    hasElectricShower: hasBooleanValue(energyBehaviorProfile?.appliances?.hasElectricShower)
+      ? energyBehaviorProfile.appliances.hasElectricShower
+      : undefined,
+    hasAirConditioning: hasBooleanValue(energyBehaviorProfile?.appliances?.hasAirConditioning)
+      ? energyBehaviorProfile.appliances.hasAirConditioning
+      : undefined,
+    hasExtraFridge: hasBooleanValue(energyBehaviorProfile?.appliances?.hasExtraFridge)
+      ? energyBehaviorProfile.appliances.hasExtraFridge
+      : undefined,
+  },
+  habits: {
+    dominantUsagePeriod:
+      energyBehaviorProfile?.habits?.dominantUsagePeriod ?? undefined,
+    usesHeavyLoadsAtNight: hasBooleanValue(energyBehaviorProfile?.habits?.usesHeavyLoadsAtNight)
+      ? energyBehaviorProfile.habits.usesHeavyLoadsAtNight
+      : undefined,
+    laundryFrequency: energyBehaviorProfile?.habits?.laundryFrequency ?? undefined,
+    dominantUsageRoutine:
+      typeof energyBehaviorProfile?.habits?.dominantUsageRoutine === 'string' &&
+      VALID_HOUSEHOLD_ROUTINE_PERIODS.includes(energyBehaviorProfile.habits.dominantUsageRoutine)
+        ? energyBehaviorProfile.habits.dominantUsageRoutine
+        : undefined,
+    peakWindowIntensity:
+      typeof energyBehaviorProfile?.habits?.peakWindowIntensity === 'string' &&
+      VALID_PEAK_WINDOW_USAGES.includes(energyBehaviorProfile.habits.peakWindowIntensity)
+        ? energyBehaviorProfile.habits.peakWindowIntensity
+        : undefined,
+    householdPeakPresence:
+      typeof energyBehaviorProfile?.habits?.householdPeakPresence === 'string' &&
+      VALID_HOUSEHOLD_PRESENCES.includes(energyBehaviorProfile.habits.householdPeakPresence)
+        ? energyBehaviorProfile.habits.householdPeakPresence
+        : undefined,
+    climateUsageIntensity:
+      typeof energyBehaviorProfile?.habits?.climateUsageIntensity === 'string' &&
+      VALID_CLIMATE_USAGES.includes(energyBehaviorProfile.habits.climateUsageIntensity)
+        ? energyBehaviorProfile.habits.climateUsageIntensity
+        : undefined,
+    thermalSensitivity:
+      typeof energyBehaviorProfile?.habits?.thermalSensitivity === 'string' &&
+      VALID_THERMAL_SENSITIVITIES.includes(energyBehaviorProfile.habits.thermalSensitivity)
+        ? energyBehaviorProfile.habits.thermalSensitivity
+        : undefined,
+  },
+  intentions: {
+    thermalComfortInterest:
+      typeof energyBehaviorProfile?.intentions?.thermalComfortInterest === 'string' &&
+      VALID_INTEREST_LEVELS.includes(energyBehaviorProfile.intentions.thermalComfortInterest)
+        ? energyBehaviorProfile.intentions.thermalComfortInterest
+        : undefined,
+    solarAnalysisInterest:
+      typeof energyBehaviorProfile?.intentions?.solarAnalysisInterest === 'string' &&
+      VALID_INTEREST_LEVELS.includes(energyBehaviorProfile.intentions.solarAnalysisInterest)
+        ? energyBehaviorProfile.intentions.solarAnalysisInterest
+        : undefined,
+    consultantInterest:
+      typeof energyBehaviorProfile?.intentions?.consultantInterest === 'string' &&
+      VALID_INTEREST_LEVELS.includes(energyBehaviorProfile.intentions.consultantInterest)
+        ? energyBehaviorProfile.intentions.consultantInterest
+        : undefined,
+    primaryObjective:
+      typeof energyBehaviorProfile?.intentions?.primaryObjective === 'string' &&
+      VALID_PRIMARY_OBJECTIVES.includes(energyBehaviorProfile.intentions.primaryObjective)
+        ? energyBehaviorProfile.intentions.primaryObjective
+        : undefined,
+  },
+  qualification: {
+    diagnosisLevel:
+      hasNumericValue(energyBehaviorProfile?.qualification?.diagnosisLevel) &&
+      energyBehaviorProfile.qualification.diagnosisLevel >= 1
+        ? Math.min(Math.round(energyBehaviorProfile.qualification.diagnosisLevel), 99)
+        : undefined,
+    answeredDiagnosisCount:
+      hasNumericValue(energyBehaviorProfile?.qualification?.answeredDiagnosisCount) &&
+      energyBehaviorProfile.qualification.answeredDiagnosisCount >= 0
+        ? Math.min(Math.round(energyBehaviorProfile.qualification.answeredDiagnosisCount), 99)
+        : undefined,
+    qualifiedLead: hasBooleanValue(energyBehaviorProfile?.qualification?.qualifiedLead)
+      ? energyBehaviorProfile.qualification.qualifiedLead
+      : undefined,
+  },
+  actionMemory: {
+    startedActionTitles: Array.isArray(energyBehaviorProfile?.actionMemory?.startedActionTitles)
+      ? energyBehaviorProfile.actionMemory.startedActionTitles.filter(
+          (title): title is string => typeof title === 'string' && title.trim().length > 0
+        )
+      : undefined,
+    answeredActionPrompts:
+      energyBehaviorProfile?.actionMemory?.answeredActionPrompts &&
+      typeof energyBehaviorProfile.actionMemory.answeredActionPrompts === 'object'
+        ? Object.fromEntries(
+            Object.entries(energyBehaviorProfile.actionMemory.answeredActionPrompts).filter(
+              ([questionId, entry]) =>
+                typeof questionId === 'string' &&
+                questionId.trim().length > 0 &&
+                typeof entry?.answer === 'string' &&
+                entry.answer.trim().length > 0 &&
+                typeof entry.answeredAt === 'string' &&
+                !Number.isNaN(new Date(entry.answeredAt).getTime())
+            )
+          )
+        : undefined,
+  },
+  confidence: {
+    applianceConfidence: hasNumericValue(energyBehaviorProfile?.confidence?.applianceConfidence)
+      ? clamp(energyBehaviorProfile.confidence.applianceConfidence, 0, 1)
+      : undefined,
+    habitConfidence: hasNumericValue(energyBehaviorProfile?.confidence?.habitConfidence)
+      ? clamp(energyBehaviorProfile.confidence.habitConfidence, 0, 1)
+      : undefined,
+    leadConfidence: hasNumericValue(energyBehaviorProfile?.confidence?.leadConfidence)
+      ? clamp(energyBehaviorProfile.confidence.leadConfidence, 0, 1)
+      : undefined,
+  },
+  updatedAt:
+    typeof energyBehaviorProfile?.updatedAt === 'string' &&
+    !Number.isNaN(new Date(energyBehaviorProfile.updatedAt).getTime())
+      ? energyBehaviorProfile.updatedAt
+      : undefined,
+});
+
+export const setActiveEnergyBehaviorProfile = (
+  energyBehaviorProfile?: Partial<EnergyBehaviorProfile>
+) => {
+  activeEnergyBehaviorProfile = normalizeEnergyBehaviorProfile(energyBehaviorProfile);
+};
+
+const getResolvedEnergyBehaviorProfile = (
+  energyBehaviorProfile?: Partial<EnergyBehaviorProfile>
+) =>
+  normalizeEnergyBehaviorProfile(
+    energyBehaviorProfile ?? activeEnergyBehaviorProfile ?? DEFAULT_ENERGY_BEHAVIOR_PROFILE
+  );
 
 const PT_BR_MONTH_INDEX: Record<string, number> = {
   janeiro: 0,
@@ -528,13 +700,15 @@ const buildInsightAction = (
   title: ConsultiveInsightAction['title'],
   reason: string,
   evidence: string,
-  ctaLabel = 'Abrir acao principal'
+  ctaLabel = 'Comecar acao',
+  interactiveQuestions?: ActionInteractiveQuestion[],
+  usedDataPoints?: string[]
 ): ConsultiveInsightAction => ({
   ctaLabel,
   evidence,
-  reason: reason.trim().toLowerCase().startsWith('escolhida porque')
-    ? reason
-    : `Escolhida porque ${reason}`,
+  interactiveQuestions,
+  usedDataPoints,
+  reason: reason.trim(),
   title,
 });
 
@@ -613,6 +787,918 @@ const getPercentChange = (currentValue?: number, previousValue?: number) => {
   return ((currentValue - previousValue) / previousValue) * 100;
 };
 
+const BOOLEAN_INTERACTIVE_OPTIONS: ActionInteractiveQuestion['options'] = [
+  { value: 'yes', label: 'Sim' },
+  { value: 'no', label: 'Nao' },
+];
+
+const COUNT_INTERACTIVE_OPTIONS: ActionInteractiveQuestion['options'] = [
+  { value: '0', label: '0' },
+  { value: '1', label: '1' },
+  { value: '2+', label: '2+' },
+];
+
+const LAUNDRY_INTERACTIVE_OPTIONS: ActionInteractiveQuestion['options'] = [
+  { value: 'baixa', label: 'Pouca' },
+  { value: 'media', label: 'Media' },
+  { value: 'alta', label: 'Alta' },
+];
+
+const ROUTINE_PERIOD_OPTIONS: ActionInteractiveQuestion['options'] = [
+  { value: 'manha', label: 'Manha' },
+  { value: 'tarde', label: 'Tarde' },
+  { value: 'noite', label: 'Noite' },
+  { value: 'misto', label: 'Misto' },
+];
+
+const PEAK_INTENSITY_OPTIONS: ActionInteractiveQuestion['options'] = [
+  { value: 'sim', label: 'Sim' },
+  { value: 'nao', label: 'Nao' },
+  { value: 'as_vezes', label: 'As vezes' },
+];
+
+const HOUSEHOLD_PRESENCE_OPTIONS: ActionInteractiveQuestion['options'] = [
+  { value: 'sim', label: 'Sim' },
+  { value: 'nao', label: 'Nao' },
+  { value: 'parcial', label: 'Parcial' },
+];
+
+const CLIMATE_USAGE_OPTIONS: ActionInteractiveQuestion['options'] = [
+  { value: 'sim', label: 'Sim' },
+  { value: 'nao', label: 'Nao' },
+  { value: 'sazonal', label: 'Sazonal' },
+];
+
+const THERMAL_SENSITIVITY_OPTIONS: ActionInteractiveQuestion['options'] = [
+  { value: 'sim', label: 'Sim' },
+  { value: 'nao', label: 'Nao' },
+  { value: 'nao_sei', label: 'Nao sei' },
+];
+
+const INTEREST_OPTIONS: ActionInteractiveQuestion['options'] = [
+  { value: 'sim', label: 'Sim' },
+  { value: 'talvez', label: 'Talvez' },
+  { value: 'nao', label: 'Nao' },
+];
+
+const PRIMARY_OBJECTIVE_OPTIONS: ActionInteractiveQuestion['options'] = [
+  { value: 'economia', label: 'Economia' },
+  { value: 'conforto', label: 'Conforto' },
+  { value: 'sustentabilidade', label: 'Sustentabilidade' },
+];
+
+const ENERGY_DIAGNOSIS_QUESTIONS: EnergyDiagnosisQuestionDefinition[] = [
+  {
+    id: 'showers_count',
+    levelRange: { min: 1, max: 5 },
+    category: 'cargas',
+    question: 'Quantos chuveiros eletricos entram na rotina?',
+    options: COUNT_INTERACTIVE_OPTIONS,
+    mapsToField: 'appliances.showers',
+    whyItMatters: 'Banho eletrico costuma explicar uma parcela importante do consumo residencial.',
+    followUpPriority: 1,
+  },
+  {
+    id: 'air_conditioning_presence',
+    levelRange: { min: 1, max: 5 },
+    category: 'climatizacao',
+    question: 'Tem ar-condicionado?',
+    options: BOOLEAN_INTERACTIVE_OPTIONS,
+    mapsToField: 'appliances.hasAirConditioning',
+    whyItMatters: 'Climatizacao recorrente altera o custo medio e a leitura do consumo base.',
+    followUpPriority: 2,
+  },
+  {
+    id: 'extra_fridge_presence',
+    levelRange: { min: 1, max: 5 },
+    category: 'cargas',
+    question: 'Tem segunda geladeira, freezer ou equipamento ligado 24h?',
+    options: BOOLEAN_INTERACTIVE_OPTIONS,
+    mapsToField: 'appliances.hasExtraFridge',
+    whyItMatters: 'Carga continua ajuda a explicar consumo alto mesmo sem pico evidente.',
+    followUpPriority: 3,
+  },
+  {
+    id: 'laundry_frequency',
+    levelRange: { min: 1, max: 5 },
+    category: 'rotina',
+    question: 'Usa maquina de lavar ou secar com frequencia?',
+    options: LAUNDRY_INTERACTIVE_OPTIONS,
+    mapsToField: 'habits.laundryFrequency',
+    whyItMatters: 'Lavagem frequente pode deslocar consumo e ampliar custo por kWh.',
+    followUpPriority: 4,
+  },
+  {
+    id: 'electric_shower_presence',
+    levelRange: { min: 1, max: 5 },
+    category: 'cargas',
+    question: 'Tem chuveiro eletrico?',
+    options: BOOLEAN_INTERACTIVE_OPTIONS,
+    mapsToField: 'appliances.hasElectricShower',
+    whyItMatters: 'Confirma se a rotina de banho deve seguir como hipotese forte.',
+    followUpPriority: 5,
+  },
+  {
+    id: 'dominant_usage_period',
+    levelRange: { min: 6, max: 10 },
+    category: 'horarios',
+    question: 'Em qual periodo a casa mais usa energia?',
+    options: ROUTINE_PERIOD_OPTIONS,
+    mapsToField: 'habits.dominantUsageRoutine',
+    whyItMatters: 'Ajuda a localizar concentracao de uso sem inventar dado de fatura.',
+    followUpPriority: 1,
+  },
+  {
+    id: 'peak_window_intensity',
+    levelRange: { min: 6, max: 10 },
+    category: 'horarios',
+    question: 'Entre 18h e 22h ha uso intenso de chuveiro, cozinha ou lavanderia?',
+    options: PEAK_INTENSITY_OPTIONS,
+    mapsToField: 'habits.peakWindowIntensity',
+    whyItMatters: 'Sinaliza risco de concentracao no horario caro quando a fatura ainda nao prova isso.',
+    followUpPriority: 2,
+  },
+  {
+    id: 'peak_household_presence',
+    levelRange: { min: 6, max: 10 },
+    category: 'rotina',
+    question: 'A maioria dos moradores fica em casa no fim da tarde/noite?',
+    options: HOUSEHOLD_PRESENCE_OPTIONS,
+    mapsToField: 'habits.householdPeakPresence',
+    whyItMatters: 'Mostra se o padrao da casa favorece sobreposicao de cargas no mesmo horario.',
+    followUpPriority: 3,
+  },
+  {
+    id: 'heavy_loads_at_night',
+    levelRange: { min: 6, max: 10 },
+    category: 'perfil_de_consumo',
+    question: 'Voce usa cargas fortes mais a noite?',
+    options: BOOLEAN_INTERACTIVE_OPTIONS,
+    mapsToField: 'habits.usesHeavyLoadsAtNight',
+    whyItMatters: 'Complementa a leitura de pico com comportamento informado.',
+    followUpPriority: 4,
+  },
+  {
+    id: 'climate_usage_intensity',
+    levelRange: { min: 11, max: 15 },
+    category: 'climatizacao',
+    question: 'Usa aquecimento ou ar-condicionado por muitas horas?',
+    options: CLIMATE_USAGE_OPTIONS,
+    mapsToField: 'habits.climateUsageIntensity',
+    whyItMatters: 'Prepara recomendacoes de conforto e climatizacao com mais confianca.',
+    followUpPriority: 1,
+  },
+  {
+    id: 'thermal_instability',
+    levelRange: { min: 11, max: 15 },
+    category: 'climatizacao',
+    question: 'O imovel esquenta ou esfria muito facil?',
+    options: THERMAL_SENSITIVITY_OPTIONS,
+    mapsToField: 'habits.thermalSensitivity',
+    whyItMatters: 'Ajuda a separar consumo estrutural de simples uso de equipamento.',
+    followUpPriority: 2,
+  },
+  {
+    id: 'thermal_comfort_interest',
+    levelRange: { min: 11, max: 15 },
+    category: 'intencao',
+    question: 'Ha interesse em melhorar conforto termico?',
+    options: INTEREST_OPTIONS,
+    mapsToField: 'intentions.thermalComfortInterest',
+    whyItMatters: 'Qualifica recomendacoes de conforto sem parecer venda agressiva.',
+    followUpPriority: 3,
+  },
+  {
+    id: 'solar_analysis_interest',
+    levelRange: { min: 16 },
+    category: 'intencao',
+    question: 'Voce teria interesse em analise solar?',
+    options: INTEREST_OPTIONS,
+    mapsToField: 'intentions.solarAnalysisInterest',
+    whyItMatters: 'Qualifica interesse futuro em energia solar.',
+    followUpPriority: 1,
+  },
+  {
+    id: 'consultant_interest',
+    levelRange: { min: 16 },
+    category: 'intencao',
+    question: 'Voce gostaria de receber indicacao de consultor?',
+    options: INTEREST_OPTIONS,
+    mapsToField: 'intentions.consultantInterest',
+    whyItMatters: 'Mostra abertura para contato consultivo futuro.',
+    followUpPriority: 2,
+  },
+  {
+    id: 'primary_objective',
+    levelRange: { min: 16 },
+    category: 'intencao',
+    question: 'Seu objetivo principal e economizar, conforto ou sustentabilidade?',
+    options: PRIMARY_OBJECTIVE_OPTIONS,
+    mapsToField: 'intentions.primaryObjective',
+    whyItMatters: 'Direciona a linguagem e o proximo passo de valor.',
+    followUpPriority: 3,
+  },
+];
+
+const hasPromptBeenAnswered = (
+  energyBehaviorProfile: EnergyBehaviorProfile,
+  questionId: ActionInteractiveQuestion['id']
+) =>
+  Boolean(energyBehaviorProfile.actionMemory.answeredActionPrompts?.[questionId]);
+
+const getDiagnosisQuestionById = (questionId: ActionInteractiveQuestion['id']) =>
+  ENERGY_DIAGNOSIS_QUESTIONS.find((question) => question.id === questionId);
+
+const getDiagnosisAnswerValue = (
+  energyBehaviorProfile: EnergyBehaviorProfile,
+  questionId: ActionInteractiveQuestion['id']
+) => {
+  if (questionId === 'showers_count') {
+    if (!hasNumericValue(energyBehaviorProfile.appliances.showers)) {
+      return undefined;
+    }
+
+    return energyBehaviorProfile.appliances.showers >= 2
+      ? '2+'
+      : energyBehaviorProfile.appliances.showers === 1
+        ? '1'
+        : '0';
+  }
+
+  if (questionId === 'electric_shower_presence') {
+    return hasBooleanValue(energyBehaviorProfile.appliances.hasElectricShower)
+      ? energyBehaviorProfile.appliances.hasElectricShower
+        ? 'yes'
+        : 'no'
+      : undefined;
+  }
+
+  if (questionId === 'air_conditioning_presence') {
+    return hasBooleanValue(energyBehaviorProfile.appliances.hasAirConditioning)
+      ? energyBehaviorProfile.appliances.hasAirConditioning
+        ? 'yes'
+        : 'no'
+      : undefined;
+  }
+
+  if (questionId === 'extra_fridge_presence') {
+    return hasBooleanValue(energyBehaviorProfile.appliances.hasExtraFridge)
+      ? energyBehaviorProfile.appliances.hasExtraFridge
+        ? 'yes'
+        : 'no'
+      : undefined;
+  }
+
+  if (questionId === 'heavy_loads_at_night') {
+    return hasBooleanValue(energyBehaviorProfile.habits.usesHeavyLoadsAtNight)
+      ? energyBehaviorProfile.habits.usesHeavyLoadsAtNight
+        ? 'yes'
+        : 'no'
+      : undefined;
+  }
+
+  if (questionId === 'laundry_frequency') {
+    return energyBehaviorProfile.habits.laundryFrequency;
+  }
+
+  if (questionId === 'dominant_usage_period') {
+    return energyBehaviorProfile.habits.dominantUsageRoutine;
+  }
+
+  if (questionId === 'peak_window_intensity') {
+    return energyBehaviorProfile.habits.peakWindowIntensity;
+  }
+
+  if (questionId === 'peak_household_presence') {
+    return energyBehaviorProfile.habits.householdPeakPresence;
+  }
+
+  if (questionId === 'climate_usage_intensity') {
+    return energyBehaviorProfile.habits.climateUsageIntensity;
+  }
+
+  if (questionId === 'thermal_instability') {
+    return energyBehaviorProfile.habits.thermalSensitivity;
+  }
+
+  if (questionId === 'thermal_comfort_interest') {
+    return energyBehaviorProfile.intentions.thermalComfortInterest;
+  }
+
+  if (questionId === 'solar_analysis_interest') {
+    return energyBehaviorProfile.intentions.solarAnalysisInterest;
+  }
+
+  if (questionId === 'consultant_interest') {
+    return energyBehaviorProfile.intentions.consultantInterest;
+  }
+
+  if (questionId === 'primary_objective') {
+    return energyBehaviorProfile.intentions.primaryObjective;
+  }
+
+  return undefined;
+};
+
+const isBehaviorQuestionSatisfied = (
+  energyBehaviorProfile: EnergyBehaviorProfile,
+  questionId: ActionInteractiveQuestion['id']
+) =>
+  Boolean(
+    getDiagnosisAnswerValue(energyBehaviorProfile, questionId) ||
+      hasPromptBeenAnswered(energyBehaviorProfile, questionId)
+  );
+
+const formatDiagnosisSummaryFromValue = (
+  questionId: ActionInteractiveQuestion['id'],
+  answer?: string
+) => {
+  if (!answer) {
+    return undefined;
+  }
+
+  return formatAdaptiveAnswerValue(questionId, answer);
+};
+
+const buildBehaviorHighlights = (
+  energyBehaviorProfile: EnergyBehaviorProfile
+) => {
+  const highlights: string[] = [];
+
+  if (hasNumericValue(energyBehaviorProfile.appliances.showers)) {
+    highlights.push(
+      `${energyBehaviorProfile.appliances.showers} ${energyBehaviorProfile.appliances.showers === 1 ? 'chuveiro informado' : 'chuveiros informados'}`
+    );
+  }
+
+  if (energyBehaviorProfile.appliances.hasElectricShower === true) {
+    highlights.push('chuveiro eletrico informado');
+  }
+
+  if (energyBehaviorProfile.appliances.hasAirConditioning === true) {
+    highlights.push('ar-condicionado informado');
+  }
+
+  if (energyBehaviorProfile.appliances.hasExtraFridge === true) {
+    highlights.push('segunda geladeira ou freezer informado');
+  }
+
+  if (energyBehaviorProfile.habits.usesHeavyLoadsAtNight === true) {
+    highlights.push('cargas fortes a noite informadas');
+  }
+
+  if (energyBehaviorProfile.habits.laundryFrequency) {
+    const laundryLabel =
+      energyBehaviorProfile.habits.laundryFrequency === 'baixa'
+        ? 'lavagem com pouca frequencia'
+        : energyBehaviorProfile.habits.laundryFrequency === 'media'
+          ? 'lavagem com frequencia media'
+          : energyBehaviorProfile.habits.laundryFrequency === 'alta'
+            ? 'lavagem frequente'
+            : undefined;
+
+    if (laundryLabel) {
+      highlights.push(laundryLabel);
+    }
+  }
+
+  if (energyBehaviorProfile.habits.dominantUsageRoutine) {
+    const routineLabel =
+      energyBehaviorProfile.habits.dominantUsageRoutine === 'manha'
+        ? 'uso concentrado pela manha'
+        : energyBehaviorProfile.habits.dominantUsageRoutine === 'tarde'
+          ? 'uso concentrado pela tarde'
+          : energyBehaviorProfile.habits.dominantUsageRoutine === 'noite'
+            ? 'uso concentrado pela noite'
+            : energyBehaviorProfile.habits.dominantUsageRoutine === 'misto'
+              ? 'uso distribuido ao longo do dia'
+              : undefined;
+
+    if (routineLabel) {
+      highlights.push(routineLabel);
+    }
+  }
+
+  if (energyBehaviorProfile.habits.peakWindowIntensity === 'sim') {
+    highlights.push('uso intenso entre 18h e 22h informado');
+  } else if (energyBehaviorProfile.habits.peakWindowIntensity === 'as_vezes') {
+    highlights.push('uso parcial entre 18h e 22h informado');
+  }
+
+  if (energyBehaviorProfile.habits.climateUsageIntensity === 'sim') {
+    highlights.push('climatizacao por muitas horas informada');
+  } else if (energyBehaviorProfile.habits.climateUsageIntensity === 'sazonal') {
+    highlights.push('climatizacao sazonal informada');
+  }
+
+  if (energyBehaviorProfile.intentions.solarAnalysisInterest === 'sim') {
+    highlights.push('interesse em analise solar');
+  }
+
+  if (energyBehaviorProfile.intentions.primaryObjective) {
+    const objectiveLabel =
+      energyBehaviorProfile.intentions.primaryObjective === 'economia'
+        ? 'objetivo principal: economia'
+        : energyBehaviorProfile.intentions.primaryObjective === 'conforto'
+          ? 'objetivo principal: conforto'
+          : energyBehaviorProfile.intentions.primaryObjective === 'sustentabilidade'
+            ? 'objetivo principal: sustentabilidade'
+            : undefined;
+
+    if (objectiveLabel) {
+      highlights.push(objectiveLabel);
+    }
+  }
+
+  return highlights.slice(0, 6);
+};
+
+const buildKnownBehaviorSummary = (
+  energyBehaviorProfile: EnergyBehaviorProfile
+) =>
+  buildBehaviorHighlights(energyBehaviorProfile);
+
+const getAnsweredDiagnosisCount = (energyBehaviorProfile: EnergyBehaviorProfile) =>
+  ENERGY_DIAGNOSIS_QUESTIONS.filter((question) =>
+    isBehaviorQuestionSatisfied(energyBehaviorProfile, question.id)
+  ).length;
+
+const getDiagnosisLevel = (energyBehaviorProfile: EnergyBehaviorProfile) => {
+  const answeredCount = getAnsweredDiagnosisCount(energyBehaviorProfile);
+
+  if (answeredCount >= 15) {
+    return 16;
+  }
+
+  return answeredCount + 1;
+};
+
+const isQuestionInCurrentLevel = (
+  question: EnergyDiagnosisQuestionDefinition,
+  currentLevel: number
+) =>
+  currentLevel >= question.levelRange.min &&
+  (question.levelRange.max === undefined || currentLevel <= question.levelRange.max);
+
+const getActionDiagnosisCategories = (actionTitle: string) => {
+  const normalizedTitle = normalizeForMatch(actionTitle);
+
+  if (normalizedTitle.includes('deslocar uso fora do pico')) {
+    return ['horarios', 'rotina', 'perfil_de_consumo'] as const;
+  }
+
+  if (normalizedTitle.includes('mapear chuveiro e climatizacao')) {
+    return ['cargas', 'climatizacao'] as const;
+  }
+
+  if (normalizedTitle.includes('revisar cargas fixas')) {
+    return ['cargas', 'perfil_de_consumo'] as const;
+  }
+
+  if (normalizedTitle.includes('testar economia por 7 dias')) {
+    return ['cargas', 'horarios', 'rotina'] as const;
+  }
+
+  if (normalizedTitle.includes('completar diagnostico rapido')) {
+    return ['cargas', 'horarios', 'climatizacao', 'rotina', 'perfil_de_consumo', 'intencao'] as const;
+  }
+
+  if (normalizedTitle.includes('comparar proxima fatura')) {
+    return ['perfil_de_consumo', 'intencao'] as const;
+  }
+
+  return ['cargas', 'rotina'] as const;
+};
+
+const buildDiagnosisTrailForAction = (
+  actionTitle: string,
+  energyBehaviorProfile: EnergyBehaviorProfile
+) => {
+  const currentLevel = getDiagnosisLevel(energyBehaviorProfile);
+  const normalizedActionTitle = normalizeForMatch(actionTitle);
+  const preferredCategories = getActionDiagnosisCategories(actionTitle);
+  const unansweredCurrentLevelQuestions = ENERGY_DIAGNOSIS_QUESTIONS.filter(
+    (question) =>
+      preferredCategories.includes(question.category) &&
+      isQuestionInCurrentLevel(question, currentLevel) &&
+      !isBehaviorQuestionSatisfied(energyBehaviorProfile, question.id)
+  ).sort((left, right) => left.followUpPriority - right.followUpPriority);
+  const unansweredPreferredQuestions = ENERGY_DIAGNOSIS_QUESTIONS.filter(
+    (question) =>
+      preferredCategories.includes(question.category) &&
+      !isBehaviorQuestionSatisfied(energyBehaviorProfile, question.id)
+  ).sort((left, right) => {
+    const leftDistance = Math.abs(left.levelRange.min - currentLevel);
+    const rightDistance = Math.abs(right.levelRange.min - currentLevel);
+
+    if (leftDistance !== rightDistance) {
+      return leftDistance - rightDistance;
+    }
+
+    return left.followUpPriority - right.followUpPriority;
+  });
+  const fallbackCurrentLevelQuestions = normalizedActionTitle.includes('completar diagnostico rapido')
+    ? ENERGY_DIAGNOSIS_QUESTIONS.filter(
+        (question) =>
+          isQuestionInCurrentLevel(question, currentLevel) &&
+          !isBehaviorQuestionSatisfied(energyBehaviorProfile, question.id)
+      ).sort((left, right) => left.followUpPriority - right.followUpPriority)
+    : [];
+  const rankedTrail = [
+    ...unansweredCurrentLevelQuestions,
+    ...unansweredPreferredQuestions,
+    ...fallbackCurrentLevelQuestions,
+  ].filter(
+    (question, index, collection) =>
+      collection.findIndex((currentQuestion) => currentQuestion.id === question.id) === index
+  );
+  const interactiveQuestions = rankedTrail.map((question) =>
+    createInteractiveQuestion(question.id, question.question, question.options, question.whyItMatters)
+  );
+  const answeredQuestions = ENERGY_DIAGNOSIS_QUESTIONS.filter(
+    (question) =>
+      preferredCategories.includes(question.category) &&
+      isBehaviorQuestionSatisfied(energyBehaviorProfile, question.id)
+  )
+    .sort((left, right) => left.followUpPriority - right.followUpPriority);
+  const answeredQuestionSummaries = answeredQuestions
+    .slice(0, 2)
+    .map((question) =>
+      formatDiagnosisSummaryFromValue(
+        question.id,
+        getDiagnosisAnswerValue(energyBehaviorProfile, question.id)
+      )
+    )
+    .filter((summary): summary is string => Boolean(summary));
+  const totalQuestionsForAction = answeredQuestions.length + interactiveQuestions.length;
+  const diagnosticProgress =
+    totalQuestionsForAction > 0
+      ? {
+          current: answeredQuestions.length,
+          total: totalQuestionsForAction,
+          level: currentLevel,
+          completed: interactiveQuestions.length === 0,
+        }
+      : undefined;
+
+  return {
+    answeredQuestionSummaries,
+    diagnosticProgress,
+    interactiveQuestions,
+  };
+};
+
+const buildRecommendationDataPoints = ({
+  invoice,
+  invoiceEvidence,
+  resolvedProfile,
+  energyBehaviorProfile,
+}: {
+  invoice?: InvoiceData;
+  invoiceEvidence?: InvoiceDerivedEvidence;
+  resolvedProfile: UserProfileData;
+  energyBehaviorProfile: EnergyBehaviorProfile;
+}) => {
+  const points: string[] = [];
+
+  if (invoice && hasNumericValue(invoice.consumption)) {
+    points.push(
+      invoiceEvidence?.daysBilled
+        ? `${formatKwhValue(invoice.consumption)} em ${invoiceEvidence.daysBilled} dias`
+        : `${formatKwhValue(invoice.consumption)}`
+    );
+  }
+
+  if (hasNumericValue(invoiceEvidence?.averageCostPerKwh)) {
+    points.push(`custo medio ${formatCurrencyPerKwh(invoiceEvidence.averageCostPerKwh)}`);
+  }
+
+  if (invoiceEvidence?.peakWindowLabel && hasNumericValue(invoiceEvidence.peakConsumptionKwh)) {
+    points.push(
+      `${formatKwhValue(invoiceEvidence.peakConsumptionKwh)} no pico${hasNumericValue(invoiceEvidence.offPeakConsumptionKwh) ? ` e ${formatKwhValue(invoiceEvidence.offPeakConsumptionKwh)} fora do pico` : ''}`
+    );
+  }
+
+  points.push(
+    `perfil: ${resolvedProfile.consumerType.toLowerCase()}, ${resolvedProfile.peopleCount} ${resolvedProfile.peopleCount === 1 ? 'pessoa' : 'pessoas'}`
+  );
+
+  buildBehaviorHighlights(energyBehaviorProfile).forEach((highlight) => {
+    points.push(`informado: ${highlight}`);
+  });
+
+  return points.slice(0, 5);
+};
+
+const formatAdaptiveAnswerValue = (questionId: string, answer: string) => {
+  if (questionId === 'showers_count') {
+    return answer === '2+' ? '2+ chuveiros' : answer === '1' ? '1 chuveiro' : '0 chuveiros';
+  }
+
+  if (questionId === 'electric_shower_presence') {
+    return answer === 'yes' ? 'chuveiro eletrico: sim' : 'chuveiro eletrico: nao';
+  }
+
+  if (questionId === 'air_conditioning_presence') {
+    return answer === 'yes' ? 'ar-condicionado: sim' : 'ar-condicionado: nao';
+  }
+
+  if (questionId === 'extra_fridge_presence') {
+    return answer === 'yes' ? 'segunda geladeira/freezer: sim' : 'segunda geladeira/freezer: nao';
+  }
+
+  if (questionId === 'heavy_loads_at_night') {
+    return answer === 'yes' ? 'uso forte a noite: sim' : 'uso forte a noite: nao';
+  }
+
+  if (questionId === 'laundry_frequency') {
+    return answer === 'alta'
+      ? 'lavagem frequente: alta'
+      : answer === 'media'
+        ? 'lavagem frequente: media'
+        : 'lavagem frequente: baixa';
+  }
+
+  if (questionId === 'dominant_usage_period') {
+    return answer === 'manha'
+      ? 'uso concentrado pela manha'
+      : answer === 'tarde'
+        ? 'uso concentrado pela tarde'
+        : answer === 'noite'
+          ? 'uso concentrado pela noite'
+          : 'uso misto ao longo do dia';
+  }
+
+  if (questionId === 'peak_window_intensity') {
+    return answer === 'sim'
+      ? 'uso intenso entre 18h e 22h'
+      : answer === 'as_vezes'
+        ? 'uso parcial entre 18h e 22h'
+        : 'sem uso intenso entre 18h e 22h';
+  }
+
+  if (questionId === 'peak_household_presence') {
+    return answer === 'sim'
+      ? 'moradores em casa no fim da tarde/noite: sim'
+      : answer === 'parcial'
+        ? 'moradores em casa no fim da tarde/noite: parcial'
+        : 'moradores em casa no fim da tarde/noite: nao';
+  }
+
+  if (questionId === 'climate_usage_intensity') {
+    return answer === 'sim'
+      ? 'climatizacao por muitas horas'
+      : answer === 'sazonal'
+        ? 'climatizacao sazonal'
+        : 'sem uso intenso de climatizacao';
+  }
+
+  if (questionId === 'thermal_instability') {
+    return answer === 'sim'
+      ? 'imovel com alta sensibilidade termica'
+      : answer === 'nao_sei'
+        ? 'sensibilidade termica: nao sei'
+        : 'imovel sem alta sensibilidade termica';
+  }
+
+  if (questionId === 'thermal_comfort_interest') {
+    return answer === 'sim'
+      ? 'interesse em conforto termico: sim'
+      : answer === 'talvez'
+        ? 'interesse em conforto termico: talvez'
+        : 'interesse em conforto termico: nao';
+  }
+
+  if (questionId === 'solar_analysis_interest') {
+    return answer === 'sim'
+      ? 'interesse em analise solar: sim'
+      : answer === 'talvez'
+        ? 'interesse em analise solar: talvez'
+        : 'interesse em analise solar: nao';
+  }
+
+  if (questionId === 'consultant_interest') {
+    return answer === 'sim'
+      ? 'interesse em consultor: sim'
+      : answer === 'talvez'
+        ? 'interesse em consultor: talvez'
+        : 'interesse em consultor: nao';
+  }
+
+  if (questionId === 'primary_objective') {
+    return `objetivo principal: ${answer}`;
+  }
+
+  return answer;
+};
+
+const buildAdaptiveAnswerInsight = (questionId: string, answer: string) => {
+  if (questionId === 'showers_count') {
+    if (answer === '2+') {
+      return 'Com 2+ chuveiros, banho vira hipotese principal.';
+    }
+
+    if (answer === '1') {
+      return 'Com 1 chuveiro, banho segue no radar, mas nao explica sozinho todo o consumo.';
+    }
+
+    return 'Sem chuveiro nessa rotina, o foco volta para outras cargas da casa.';
+  }
+
+  if (questionId === 'electric_shower_presence') {
+    return answer === 'yes'
+      ? 'Com chuveiro eletrico informado, banho entra como hipotese relevante nas proximas acoes.'
+      : 'Sem chuveiro eletrico informado, a leitura fica menos dependente da rotina de banho.';
+  }
+
+  if (questionId === 'air_conditioning_presence') {
+    return answer === 'yes'
+      ? 'Com ar-condicionado informado, climatizacao entra no radar.'
+      : 'Sem ar-condicionado informado, o foco volta para padrao historico e custo por kWh.';
+  }
+
+  if (questionId === 'extra_fridge_presence') {
+    return answer === 'yes'
+      ? 'Com carga extra informada, revisaremos consumo base e uso continuo nas proximas acoes.'
+      : 'Sem carga extra informada, o foco volta para padrao historico e custo por kWh.';
+  }
+
+  if (questionId === 'heavy_loads_at_night') {
+    return answer === 'yes'
+      ? 'Com uso forte a noite, horarios entram no foco da proxima recomendacao.'
+      : 'Sem uso forte a noite informado, o foco sai do habito noturno e volta para outras rotinas.';
+  }
+
+  if (questionId === 'laundry_frequency') {
+    if (answer === 'alta') {
+      return 'Com lavagem frequente, a rotina da maquina entra como hipotese relevante.';
+    }
+
+    if (answer === 'media') {
+      return 'Com lavagem em frequencia media, a maquina segue no radar sem virar causa principal sozinha.';
+    }
+
+    return 'Com lavagem baixa, o foco fica mais livre para outras cargas e horarios.';
+  }
+
+  if (questionId === 'dominant_usage_period') {
+    return answer === 'noite'
+      ? 'Com uso concentrado a noite, vamos tratar a faixa mais cara como ponto de atencao potencial.'
+      : answer === 'misto'
+        ? 'Com uso distribuido ao longo do dia, o diagnostico precisa olhar combinacao de cargas e custo medio.'
+        : 'Com esse horario informado, vamos cruzar rotina com consumo antes de apontar uma causa.';
+  }
+
+  if (questionId === 'peak_window_intensity') {
+    return answer === 'sim'
+      ? 'Com uso intenso entre 18h e 22h, a rotina desse horario entra como hipotese relevante.'
+      : answer === 'as_vezes'
+        ? 'Com uso parcial entre 18h e 22h, o risco de concentracao existe, mas ainda precisa de contexto adicional.'
+        : 'Sem uso intenso entre 18h e 22h, o foco volta para consumo base e custo medio.';
+  }
+
+  if (questionId === 'peak_household_presence') {
+    return answer === 'sim'
+      ? 'Com mais moradores em casa nesse horario, a sobreposicao de cargas ganha peso no diagnostico.'
+      : answer === 'parcial'
+        ? 'Com presenca parcial no fim da tarde/noite, a carga pode estar dividida entre rotina e equipamentos fixos.'
+        : 'Sem concentracao de moradores nesse horario, o foco volta para cargas continuas e padrao historico.';
+  }
+
+  if (questionId === 'climate_usage_intensity') {
+    return answer === 'sim'
+      ? 'Com climatizacao por muitas horas, conforto termico passa a influenciar mais as proximas acoes.'
+      : answer === 'sazonal'
+        ? 'Com climatizacao sazonal, esse fator entra como contexto, mas nao como causa principal em todos os ciclos.'
+        : 'Sem uso intenso de climatizacao, o foco volta para cargas principais e rotina.';
+  }
+
+  if (questionId === 'thermal_instability') {
+    return answer === 'sim'
+      ? 'Com sensibilidade termica informada, recomendacoes de conforto ganham prioridade consultiva.'
+      : answer === 'nao_sei'
+        ? 'Com esse ponto ainda indefinido, o sistema segue priorizando sinais de uso e custo.'
+        : 'Sem sensibilidade termica marcante, a leitura fica mais centrada na rotina e nas cargas.';
+  }
+
+  if (questionId === 'thermal_comfort_interest') {
+    return answer === 'sim'
+      ? 'Com interesse em conforto termico, o diagnostico passa a abrir espaco para recomendacoes de conforto.'
+      : answer === 'talvez'
+        ? 'Com interesse parcial em conforto, podemos equilibrar economia e bem-estar nas proximas sugestoes.'
+        : 'Sem foco em conforto termico agora, a prioridade segue em consumo e custo.';
+  }
+
+  if (questionId === 'solar_analysis_interest') {
+    return answer === 'sim'
+      ? 'Com interesse solar informado, energia solar entra no radar das proximas recomendacoes.'
+      : answer === 'talvez'
+        ? 'Com interesse solar em aberto, vale amadurecer o diagnostico antes de qualquer passo consultivo.'
+        : 'Sem interesse solar por enquanto, o foco segue em ganho direto de rotina e custo.';
+  }
+
+  if (questionId === 'consultant_interest') {
+    return answer === 'sim'
+      ? 'Com abertura para consultor, o perfil ganha sinal claro de qualificacao futura.'
+      : answer === 'talvez'
+        ? 'Com abertura parcial para consultor, o sistema pode amadurecer mais contexto antes de sugerir contato.'
+        : 'Sem interesse em consultor agora, o foco segue em autonomia e proximas acoes do app.';
+  }
+
+  if (questionId === 'primary_objective') {
+    return answer === 'economia'
+      ? 'Com foco em economia, as proximas recomendacoes vao priorizar reducao de custo.'
+      : answer === 'conforto'
+        ? 'Com foco em conforto, as proximas recomendacoes vao equilibrar bem-estar e eficiencia.'
+        : 'Com foco em sustentabilidade, as proximas recomendacoes vao reforcar escolhas de menor impacto.';
+  }
+
+  return 'Usarei isso nas proximas recomendacoes.';
+};
+
+export const describeAdaptiveAnswer = (questionId: string, answer: string) => ({
+  insight: buildAdaptiveAnswerInsight(questionId, answer),
+  microFeedback: 'Salvo',
+  summary: formatAdaptiveAnswerValue(questionId, answer),
+});
+
+const createInteractiveQuestion = (
+  id: ActionInteractiveQuestion['id'],
+  prompt: string,
+  options: ActionInteractiveQuestion['options'],
+  helperText?: string
+): ActionInteractiveQuestion => ({
+  id,
+  prompt,
+  options,
+  helperText,
+});
+
+const buildInteractiveQuestionsForAction = ({
+  actionTitle,
+  energyBehaviorProfile,
+}: {
+  actionTitle: string;
+  invoiceEvidence?: InvoiceDerivedEvidence;
+  energyBehaviorProfile: EnergyBehaviorProfile;
+}) => buildDiagnosisTrailForAction(actionTitle, energyBehaviorProfile).interactiveQuestions;
+
+const shouldIncludeSecondaryAction = (
+  primaryAction: ConsultiveInsightAction,
+  secondaryAction?: ConsultiveInsightAction
+) => {
+  if (!secondaryAction) {
+    return false;
+  }
+
+  const normalizedPrimaryTitle = normalizeForMatch(primaryAction.title);
+  const normalizedSecondaryTitle = normalizeForMatch(secondaryAction.title);
+
+  if (!normalizedSecondaryTitle || normalizedSecondaryTitle === normalizedPrimaryTitle) {
+    return false;
+  }
+
+  const normalizedPrimaryReason = normalizeForMatch(primaryAction.reason);
+  const normalizedSecondaryReason = normalizeForMatch(secondaryAction.reason);
+  const normalizedPrimaryEvidence = normalizeForMatch(primaryAction.evidence);
+  const normalizedSecondaryEvidence = normalizeForMatch(secondaryAction.evidence);
+  const hasDistinctReason =
+    normalizedSecondaryReason.length > 0 && normalizedSecondaryReason !== normalizedPrimaryReason;
+  const hasDistinctEvidence =
+    normalizedSecondaryEvidence.length > 0 &&
+    normalizedSecondaryEvidence !== normalizedPrimaryEvidence;
+  const isGenericComparisonFollowUp =
+    normalizedSecondaryTitle === normalizeForMatch('Comparar proxima fatura');
+
+  if (isGenericComparisonFollowUp && !hasDistinctReason && !hasDistinctEvidence) {
+    return false;
+  }
+
+  return hasDistinctReason || hasDistinctEvidence;
+};
+
+const isFollowUpActionTitle = (title: string) =>
+  [
+    'comparar proxima fatura',
+    'adicionar a proxima fatura',
+  ].includes(normalizeForMatch(title));
+
+const resolveActionCtaLabel = ({
+  title,
+  isPrimary,
+  diagnosticProgress,
+}: {
+  title: string;
+  isPrimary: boolean;
+  diagnosticProgress?: ActionDiagnosticProgress;
+}) => {
+  if (isPrimary && diagnosticProgress) {
+    return diagnosticProgress.completed ? 'Diagnostico atualizado' : 'Responder diagnostico';
+  }
+
+  return isFollowUpActionTitle(title) ? 'Preparar acompanhamento' : 'Comecar acao';
+};
+
 const buildConsumptionTotalConclusion = (
   currentConsumption: number,
   historyAverageConsumption: number
@@ -650,8 +1736,10 @@ const buildConsumptionTotalInterpretation = (
 export const buildConsultiveInsight = (
   invoice: InvoiceData,
   invoiceHistory: InvoiceData[] = [],
-  profile?: Partial<UserProfileData>
+  profile?: Partial<UserProfileData>,
+  energyBehaviorProfile?: Partial<EnergyBehaviorProfile>
 ): ConsultiveInsight => {
+  const resolvedEnergyBehaviorProfile = getResolvedEnergyBehaviorProfile(energyBehaviorProfile);
   const averageCostPerKwh = getInvoiceCostPerKwh(invoice);
   const invoiceEvidence = getInvoiceEvidence(invoice, averageCostPerKwh);
   const previousInvoice = getPreviousInvoice(invoice, invoiceHistory);
@@ -665,6 +1753,22 @@ export const buildConsultiveInsight = (
   const monthLabel = getInvoiceMonthLabel(invoice);
   const season = getSeasonFromMonth(monthLabel);
   const profileContext = buildProfileContext(profile);
+  const behaviorHighlights = buildBehaviorHighlights(resolvedEnergyBehaviorProfile);
+  const behaviorContextSentence =
+    behaviorHighlights.length > 0
+      ? `Contexto informado pelo usuario: ${behaviorHighlights.join('; ')}.`
+      : undefined;
+  const usedDataPoints = buildRecommendationDataPoints({
+    invoice,
+    invoiceEvidence,
+    resolvedProfile: getResolvedProfile(profile),
+    energyBehaviorProfile: resolvedEnergyBehaviorProfile,
+  });
+  const diagnosticQuestions = buildInteractiveQuestionsForAction({
+    actionTitle: 'Completar diagnostico rapido',
+    invoiceEvidence,
+    energyBehaviorProfile: resolvedEnergyBehaviorProfile,
+  });
   const warnings: string[] = [];
 
   if (!hasNumericValue(invoice.consumption)) {
@@ -693,14 +1797,28 @@ export const buildConsultiveInsight = (
     hasNumericValue(invoiceEvidence.peakConsumptionKwh) &&
     invoiceEvidence.peakConsumptionKwh > 0
   ) {
-    const peakEvidence = `A fatura registrou ${formatKwhValue(invoiceEvidence.peakConsumptionKwh)} no pico.`;
+    const peakEvidence = `Encontramos ${formatKwhValue(invoiceEvidence.peakConsumptionKwh)} no horario de pico${hasNumericValue(invoiceEvidence.offPeakConsumptionKwh) ? ` e ${formatKwhValue(invoiceEvidence.offPeakConsumptionKwh)} fora do pico` : ''}.${invoiceEvidence.peakWindowLabel ? ` Horario de pico identificado: ${invoiceEvidence.peakWindowLabel}.` : ''}`;
+    const hasPeakBehaviorContext =
+      resolvedEnergyBehaviorProfile.appliances.hasElectricShower === true ||
+      (resolvedEnergyBehaviorProfile.appliances.showers ?? 0) >= 1 ||
+      resolvedEnergyBehaviorProfile.habits.usesHeavyLoadsAtNight === true ||
+      resolvedEnergyBehaviorProfile.habits.dominantUsagePeriod === 'pico';
     const interpretation = invoiceEvidence.peakWindowLabel
       ? `Isso indica concentracao real de uso no pico, com janela ${invoiceEvidence.peakWindowLabel} confirmada pela propria fatura.`
       : 'Isso indica concentracao real de uso no pico confirmada pela propria fatura.';
-    const conclusion = 'O principal fator neste ciclo foi o consumo no horario de pico.';
-    const reason = invoiceEvidence.peakWindowLabel
-      ? `${formatKwhValue(invoiceEvidence.peakConsumptionKwh)} no pico tornam o deslocamento de uso a acao mais direta deste ciclo.`
-      : `${formatKwhValue(invoiceEvidence.peakConsumptionKwh)} no pico tornam o deslocamento de uso a acao mais direta deste ciclo.`;
+    const conclusion = hasPeakBehaviorContext
+      ? `A fatura registrou ${formatKwhValue(invoiceEvidence.peakConsumptionKwh)} no pico. Como habito informado, isso entra como hipotese para a proxima recomendacao.`
+      : 'A melhor acao agora e refinar o diagnostico antes de apontar a principal causa.';
+    const primaryTitle =
+      diagnosticQuestions.length > 0 && !hasPeakBehaviorContext
+        ? 'Completar diagnostico rapido'
+        : 'Deslocar uso fora do pico';
+    const reason =
+      primaryTitle === 'Completar diagnostico rapido'
+        ? 'Faltam alguns dados de rotina para explicar esse aumento no horario de pico.'
+        : hasPeakBehaviorContext
+          ? `A fatura registrou ${formatKwhValue(invoiceEvidence.peakConsumptionKwh)} no pico. Como habito informado, isso entra como hipotese para deslocar uso.`
+          : `A fatura registrou ${formatKwhValue(invoiceEvidence.peakConsumptionKwh)} no pico, e a melhor acao agora e testar deslocamento de uso.`;
 
     return {
       environmentContext: { season },
@@ -708,7 +1826,10 @@ export const buildConsultiveInsight = (
       mainDriver: 'pico',
       headline: conclusion,
       evidence: peakEvidence,
-      interpretation: appendContextClause(interpretation, profileContext.contextSentence),
+      interpretation: appendContextClause(
+        appendContextClause(interpretation, behaviorContextSentence),
+        profileContext.contextSentence
+      ),
       conclusion,
       microEducation: invoiceEvidence.peakWindowLabel
         ? joinMicroEducation(
@@ -720,9 +1841,18 @@ export const buildConsultiveInsight = (
             getProfileMicroEducationClause(profileContext)
           ),
       primaryAction: buildInsightAction(
-        'Deslocar uso fora do pico',
+        primaryTitle,
         appendContextClause(reason, getProfileActionReasonClause(profileContext)),
-        peakEvidence
+        peakEvidence,
+        primaryTitle === 'Completar diagnostico rapido'
+          ? 'Responder diagnostico'
+          : 'Comecar acao',
+        buildInteractiveQuestionsForAction({
+          actionTitle: primaryTitle,
+          invoiceEvidence,
+          energyBehaviorProfile: resolvedEnergyBehaviorProfile,
+        }),
+        usedDataPoints
       ),
       secondaryAction: buildInsightAction(
         'Comparar proxima fatura',
@@ -731,7 +1861,13 @@ export const buildConsultiveInsight = (
           profileContext.warnings[0]
         ),
         peakEvidence,
-        'Comparar no proximo ciclo'
+        'Preparar acompanhamento',
+        buildInteractiveQuestionsForAction({
+          actionTitle: 'Comparar proxima fatura',
+          invoiceEvidence,
+          energyBehaviorProfile: resolvedEnergyBehaviorProfile,
+        }),
+        usedDataPoints
       ),
       warnings,
       historyTrend,
@@ -745,6 +1881,17 @@ export const buildConsultiveInsight = (
     invoice.consumption > previousInvoice.consumption * 1.1
   ) {
     const evidence = `O consumo subiu de ${formatKwhValue(previousInvoice.consumption)} para ${formatKwhValue(invoice.consumption)}.`;
+    const showersAreRelevant = (resolvedEnergyBehaviorProfile.appliances.showers ?? 0) >= 2;
+    const hasApplianceContext =
+      showersAreRelevant ||
+      resolvedEnergyBehaviorProfile.appliances.hasAirConditioning === true ||
+      resolvedEnergyBehaviorProfile.appliances.hasElectricShower === true;
+    const primaryTitle =
+      diagnosticQuestions.length > 0 && !hasApplianceContext
+        ? 'Completar diagnostico rapido'
+        : showersAreRelevant || resolvedEnergyBehaviorProfile.appliances.hasAirConditioning === true
+          ? 'Mapear chuveiro e climatizacao'
+          : 'Revisar cargas fixas';
 
     return {
       environmentContext: { season },
@@ -753,21 +1900,41 @@ export const buildConsultiveInsight = (
       headline: 'O principal fator neste ciclo foi o aumento de consumo.',
       evidence,
       interpretation: appendContextClause(
-        `Isso indica uma mudanca concreta de rotina entre os dois ciclos. ${getSeasonalConsumptionContext(season)}`,
+        appendContextClause(
+          `Isso indica uma mudanca concreta de rotina entre os dois ciclos. ${getSeasonalConsumptionContext(season)}`,
+          showersAreRelevant
+            ? 'Com 2 ou mais chuveiros informados, comparar a rotina de banho deve revelar parte da causa.'
+            : behaviorContextSentence
+        ),
         profileContext.contextSentence
       ),
-      conclusion: 'O principal fator neste ciclo foi o aumento de consumo.',
+      conclusion: showersAreRelevant
+        ? 'O consumo ficou acima da media do historico. Com 2 ou mais chuveiros informados, comparar rotina de banho deve revelar parte da causa.'
+        : 'O principal fator neste ciclo foi o aumento de consumo.',
       microEducation: joinMicroEducation(
         getSeasonalMicroEducation(season),
         getProfileMicroEducationClause(profileContext)
       ),
       primaryAction: buildInsightAction(
-        'Revisar rotina de consumo',
+        primaryTitle,
         appendContextClause(
-          `Comparar este ciclo com o anterior deve revelar a causa mais provavel do aumento em ${monthLabel}.`,
+          primaryTitle === 'Completar diagnostico rapido'
+            ? `O consumo subiu em ${monthLabel}. Faltam alguns dados de rotina para explicar esse aumento.`
+            : primaryTitle === 'Mapear chuveiro e climatizacao'
+              ? 'A melhor acao agora e mapear banho e climatizacao.'
+              : 'A melhor acao agora e revisar as cargas fixas.',
           getProfileActionReasonClause(profileContext)
         ),
-        evidence
+        evidence,
+        primaryTitle === 'Completar diagnostico rapido'
+          ? 'Responder diagnostico'
+          : 'Comecar acao',
+        buildInteractiveQuestionsForAction({
+          actionTitle: primaryTitle,
+          invoiceEvidence,
+          energyBehaviorProfile: resolvedEnergyBehaviorProfile,
+        }),
+        usedDataPoints
       ),
       secondaryAction: buildInsightAction(
         'Comparar proxima fatura',
@@ -776,7 +1943,13 @@ export const buildConsultiveInsight = (
           profileContext.warnings[0]
         ),
         evidence,
-        'Comparar no proximo ciclo'
+        'Preparar acompanhamento',
+        buildInteractiveQuestionsForAction({
+          actionTitle: 'Comparar proxima fatura',
+          invoiceEvidence,
+          energyBehaviorProfile: resolvedEnergyBehaviorProfile,
+        }),
+        usedDataPoints
       ),
       warnings,
       historyTrend,
@@ -800,6 +1973,13 @@ export const buildConsultiveInsight = (
       : hasNumericValue(previousAverageCostPerKwh)
         ? ` Ele ficou acima da fatura anterior, que estava em ${formatCurrencyPerKwh(previousAverageCostPerKwh)}.`
         : '';
+    const hasCostContext =
+      resolvedEnergyBehaviorProfile.appliances.hasAirConditioning === true ||
+      resolvedEnergyBehaviorProfile.appliances.hasExtraFridge === true;
+    const primaryTitle =
+      diagnosticQuestions.length > 0 && !hasCostContext
+        ? 'Completar diagnostico rapido'
+        : 'Testar economia por 7 dias';
 
     return {
       environmentContext: { season },
@@ -808,7 +1988,12 @@ export const buildConsultiveInsight = (
       headline: 'O principal fator neste ciclo foi o custo por kWh.',
       evidence: `${evidence}${comparisonLine}`.trim(),
       interpretation: appendContextClause(
-        'Isso indica que o custo por unidade consumida explica melhor a pressao desta conta.',
+        appendContextClause(
+          'Isso indica que o custo por unidade consumida explica melhor a pressao desta conta.',
+          hasCostContext
+            ? 'Como voce informou ar-condicionado ou geladeira extra, vale testar reducao controlada desses usos por 7 dias.'
+            : behaviorContextSentence
+        ),
         profileContext.contextSentence
       ),
       conclusion: 'A prioridade agora e testar economia por 7 dias.',
@@ -817,12 +2002,25 @@ export const buildConsultiveInsight = (
         getProfileMicroEducationClause(profileContext)
       ),
       primaryAction: buildInsightAction(
-        'Testar economia por 7 dias',
+        primaryTitle,
         appendContextClause(
-          `O custo por kWh em ${formatCurrencyPerKwh(invoiceEvidence.averageCostPerKwh)} torna um teste curto de economia a resposta mais util deste ciclo.`,
+          primaryTitle === 'Completar diagnostico rapido'
+            ? `O custo por kWh ficou em ${formatCurrencyPerKwh(invoiceEvidence.averageCostPerKwh)}. Faltam alguns dados de rotina para explicar melhor essa pressao.`
+            : hasCostContext
+              ? 'Com esse custo por kWh e o equipamento informado, a melhor acao agora e testar economia por 7 dias.'
+              : 'Com esse custo por kWh, a melhor acao agora e testar uma reducao simples por 7 dias.',
           getProfileActionReasonClause(profileContext)
         ),
-        evidence
+        evidence,
+        primaryTitle === 'Completar diagnostico rapido'
+          ? 'Responder diagnostico'
+          : 'Comecar acao',
+        buildInteractiveQuestionsForAction({
+          actionTitle: primaryTitle,
+          invoiceEvidence,
+          energyBehaviorProfile: resolvedEnergyBehaviorProfile,
+        }),
+        usedDataPoints
       ),
       secondaryAction: buildInsightAction(
         'Comparar proxima fatura',
@@ -831,7 +2029,13 @@ export const buildConsultiveInsight = (
           profileContext.warnings[0]
         ),
         evidence,
-        'Comparar no proximo ciclo'
+        'Preparar acompanhamento',
+        buildInteractiveQuestionsForAction({
+          actionTitle: 'Comparar proxima fatura',
+          invoiceEvidence,
+          energyBehaviorProfile: resolvedEnergyBehaviorProfile,
+        }),
+        usedDataPoints
       ),
       warnings,
       historyTrend,
@@ -848,7 +2052,10 @@ export const buildConsultiveInsight = (
       headline: 'O principal fator neste ciclo foi o contexto tarifario.',
       evidence,
       interpretation: appendContextClause(
-        'Isso indica pressao tarifaria adicional neste ciclo, sem substituir a evidencia principal da fatura.',
+        appendContextClause(
+          'Isso indica pressao tarifaria adicional neste ciclo, sem substituir a evidencia principal da fatura.',
+          behaviorContextSentence
+        ),
         profileContext.contextSentence
       ),
       conclusion: 'O principal fator neste ciclo foi o contexto tarifario.',
@@ -862,7 +2069,14 @@ export const buildConsultiveInsight = (
           `A bandeira ${invoiceEvidence.tariffFlag.toLowerCase()} torna um teste curto de economia a melhor resposta deste ciclo.`,
           getProfileActionReasonClause(profileContext)
         ),
-        evidence
+        evidence,
+        'Comecar acao',
+        buildInteractiveQuestionsForAction({
+          actionTitle: 'Testar economia por 7 dias',
+          invoiceEvidence,
+          energyBehaviorProfile: resolvedEnergyBehaviorProfile,
+        }),
+        usedDataPoints
       ),
       secondaryAction: buildInsightAction(
         'Comparar proxima fatura',
@@ -871,7 +2085,13 @@ export const buildConsultiveInsight = (
           profileContext.warnings[0]
         ),
         evidence,
-        'Comparar no proximo ciclo'
+        'Preparar acompanhamento',
+        buildInteractiveQuestionsForAction({
+          actionTitle: 'Comparar proxima fatura',
+          invoiceEvidence,
+          energyBehaviorProfile: resolvedEnergyBehaviorProfile,
+        }),
+        usedDataPoints
       ),
       warnings,
       historyTrend,
@@ -892,13 +2112,22 @@ export const buildConsultiveInsight = (
       historyAverageConsumption
     );
     const primaryActionTitle =
-      invoice.consumption > historyAverageConsumption * 1.05
-        ? 'Mapear cargas fixas'
-        : 'Comparar proxima fatura';
+      diagnosticQuestions.length > 0 &&
+      !resolvedEnergyBehaviorProfile.appliances.hasExtraFridge &&
+      !resolvedEnergyBehaviorProfile.appliances.hasAirConditioning &&
+      (resolvedEnergyBehaviorProfile.appliances.showers ?? 0) === 0
+        ? 'Completar diagnostico rapido'
+        : invoice.consumption > historyAverageConsumption * 1.05 &&
+            ((resolvedEnergyBehaviorProfile.appliances.showers ?? 0) >= 1 ||
+              resolvedEnergyBehaviorProfile.appliances.hasAirConditioning === true)
+          ? 'Mapear chuveiro e climatizacao'
+          : invoice.consumption > historyAverageConsumption * 1.05
+            ? 'Revisar cargas fixas'
+            : 'Comparar proxima fatura';
     const secondaryActionTitle =
-      primaryActionTitle === 'Mapear cargas fixas'
-        ? 'Revisar rotina de consumo'
-        : 'Revisar rotina de consumo';
+      primaryActionTitle === 'Comparar proxima fatura'
+        ? 'Revisar cargas fixas'
+        : 'Comparar proxima fatura';
 
     return {
       environmentContext: { season },
@@ -906,7 +2135,10 @@ export const buildConsultiveInsight = (
       mainDriver: 'consumo_total',
       headline: conclusion,
       evidence,
-      interpretation: appendContextClause(interpretation, profileContext.contextSentence),
+      interpretation: appendContextClause(
+        appendContextClause(interpretation, behaviorContextSentence),
+        profileContext.contextSentence
+      ),
       conclusion,
       microEducation: joinMicroEducation(
         'Media historica ajuda a comparar este ciclo com o seu padrao recente.',
@@ -916,20 +2148,43 @@ export const buildConsultiveInsight = (
         primaryActionTitle,
         appendContextClause(
           primaryActionTitle === 'Mapear cargas fixas'
-            ? 'O consumo atual ficou acima da media recente e mapear cargas fixas deve revelar a principal fonte dessa diferenca.'
-            : 'Comparar a proxima fatura deve confirmar se este ciclo representa mudanca real de padrao.',
+            ? 'A melhor acao agora e revisar as cargas fixas para entender essa diferenca.'
+            : primaryActionTitle === 'Mapear chuveiro e climatizacao'
+              ? 'A melhor acao agora e mapear banho e climatizacao para entender essa diferenca.'
+              : primaryActionTitle === 'Completar diagnostico rapido'
+                ? 'A fatura mostra um desvio em relacao ao historico. Faltam alguns dados de rotina para explicar esse aumento.'
+            : 'A melhor acao agora e acompanhar o proximo ciclo para confirmar se houve mudanca real.',
           getProfileActionReasonClause(profileContext)
         ),
-        evidence
+        evidence,
+        primaryActionTitle === 'Completar diagnostico rapido'
+          ? 'Responder diagnostico'
+          : 'Comecar acao',
+        buildInteractiveQuestionsForAction({
+          actionTitle: primaryActionTitle,
+          invoiceEvidence,
+          energyBehaviorProfile: resolvedEnergyBehaviorProfile,
+        }),
+        usedDataPoints
       ),
       secondaryAction: buildInsightAction(
         secondaryActionTitle,
         appendContextClause(
-          'Revisar a rotina deve isolar a causa antes de ampliar qualquer mudanca.',
+          secondaryActionTitle === 'Comparar proxima fatura'
+            ? 'Comparar a proxima fatura deve confirmar se o ajuste fez diferenca.'
+            : 'Revisar a rotina deve isolar a causa antes de ampliar qualquer mudanca.',
           profileContext.warnings[0]
         ),
         evidence,
-        'Abrir acao secundaria'
+        secondaryActionTitle === 'Comparar proxima fatura'
+          ? 'Preparar acompanhamento'
+          : 'Comecar acao',
+        buildInteractiveQuestionsForAction({
+          actionTitle: secondaryActionTitle,
+          invoiceEvidence,
+          energyBehaviorProfile: resolvedEnergyBehaviorProfile,
+        }),
+        usedDataPoints
       ),
       warnings,
       historyTrend,
@@ -947,21 +2202,38 @@ export const buildConsultiveInsight = (
     headline: 'Ainda faltam ciclos suficientes para uma conclusao forte.',
     evidence,
     interpretation: appendContextClause(
-      'Sem historico comparavel ou sem campos essenciais, qualquer diagnostico mais forte agora seria inventado.',
+      appendContextClause(
+        'Sem historico comparavel ou sem campos essenciais, qualquer diagnostico mais forte agora seria inventado.',
+        behaviorHighlights.length > 0
+          ? 'Ja tenho algumas respostas suas, mas ainda preciso de mais ciclos de fatura para uma conclusao forte.'
+          : undefined
+      ),
       profileContext.contextSentence
     ),
-    conclusion: 'Ainda faltam ciclos suficientes para uma conclusao forte.',
+    conclusion:
+      behaviorHighlights.length > 0
+        ? 'Ja tenho algumas respostas suas, mas ainda preciso de mais ciclos de fatura para uma conclusao forte.'
+        : 'Ainda faltam ciclos suficientes para uma conclusao forte.',
     microEducation: joinMicroEducation(
       'Media historica so fica confiavel quando existe mais de um ciclo comparavel.',
       getProfileMicroEducationClause(profileContext)
     ),
     primaryAction: buildInsightAction(
-      'Adicionar proxima fatura',
+      diagnosticQuestions.length > 0 ? 'Completar diagnostico rapido' : 'Comparar proxima fatura',
       appendContextClause(
-        'Adicionar a proxima fatura deve liberar a comparacao que falta para decidir o proximo passo.',
+        diagnosticQuestions.length > 0
+          ? 'Faltam alguns dados de rotina para refinar o diagnostico antes do proximo ciclo.'
+          : 'A melhor acao agora e preparar o proximo acompanhamento para destravar a comparacao.',
         profileContext.warnings[0]
       ),
-      evidence
+      evidence,
+      diagnosticQuestions.length > 0 ? 'Responder diagnostico' : 'Preparar acompanhamento',
+      buildInteractiveQuestionsForAction({
+        actionTitle: diagnosticQuestions.length > 0 ? 'Completar diagnostico rapido' : 'Comparar proxima fatura',
+        invoiceEvidence,
+        energyBehaviorProfile: resolvedEnergyBehaviorProfile,
+      }),
+      usedDataPoints
     ),
     warnings,
     historyTrend,
@@ -1049,8 +2321,10 @@ const getCostSignal = (totalValue: number): AnalysisSummary['costSignal'] => {
 export const buildAnalysisSummary = (
   invoice: InvoiceData,
   profile?: Partial<UserProfileData>,
-  invoiceHistory: InvoiceData[] = []
+  invoiceHistory: InvoiceData[] = [],
+  energyBehaviorProfile?: Partial<EnergyBehaviorProfile>
 ): AnalysisSummary => {
+  const resolvedEnergyBehaviorProfile = getResolvedEnergyBehaviorProfile(energyBehaviorProfile);
   const previousInvoiceForInsights = getPreviousInvoice(invoice, invoiceHistory);
   const comparisonSignals = previousInvoiceForInsights
     ? buildBasicInvoiceSignals(invoice, previousInvoiceForInsights)
@@ -1074,7 +2348,13 @@ export const buildAnalysisSummary = (
   const dueDate = invoice.parser.fields.dueDate.value;
   const evidenceItems: InsightFactItem[] = [];
   const educationItems: InsightEducationItem[] = [];
-  const consultiveInsight = buildConsultiveInsight(invoice, invoiceHistory, profile);
+  const behaviorHighlights = buildBehaviorHighlights(resolvedEnergyBehaviorProfile);
+  const consultiveInsight = buildConsultiveInsight(
+    invoice,
+    invoiceHistory,
+    profile,
+    resolvedEnergyBehaviorProfile
+  );
 
   if (hasNumericValue(invoice.consumption)) {
     evidenceItems.push({
@@ -1106,6 +2386,13 @@ export const buildAnalysisSummary = (
     });
   }
 
+  if (hasNumericValue(invoiceEvidence.offPeakConsumptionKwh)) {
+    evidenceItems.push({
+      label: 'Consumo fora do pico',
+      value: formatKwhValue(invoiceEvidence.offPeakConsumptionKwh) || 'Indisponivel',
+    });
+  }
+
   if (invoiceEvidence.tariffFlag) {
     evidenceItems.push({
       label: 'Bandeira',
@@ -1134,6 +2421,13 @@ export const buildAnalysisSummary = (
       explanation: consultiveInsight.microEducation,
     });
   }
+
+  behaviorHighlights.forEach((highlight) => {
+    evidenceItems.push({
+      label: 'Contexto informado',
+      value: highlight,
+    });
+  });
 
   observations.push(consultiveInsight.conclusion);
   observations.push(consultiveInsight.evidence);
@@ -1171,7 +2465,8 @@ export const buildAnalysisSummary = (
               ? `Resumo parcial ${providerName}`
               : 'Resumo parcial',
     educationItems: educationItems.slice(0, 3),
-    evidenceItems: evidenceItems.slice(0, 4),
+    evidenceItems: evidenceItems.slice(0, 6),
+    behaviorHighlights,
     consultiveInsight,
   };
 };
@@ -1180,9 +2475,11 @@ export const buildNextActions = (
   invoice: InvoiceData | undefined,
   analysis: AnalysisSummary | undefined,
   profile?: Partial<UserProfileData>,
-  userContext?: Partial<UserContextState>
+  userContext?: Partial<UserContextState>,
+  energyBehaviorProfile?: Partial<EnergyBehaviorProfile>
 ): NextAction[] => {
   const resolvedProfile = getResolvedProfile(profile);
+  const resolvedEnergyBehaviorProfile = getResolvedEnergyBehaviorProfile(energyBehaviorProfile);
   const profileLabel = resolvedProfile.location
     ? `${resolvedProfile.consumerType.toLowerCase()} em ${resolvedProfile.location}`
     : resolvedProfile.consumerType.toLowerCase();
@@ -1202,6 +2499,15 @@ export const buildNextActions = (
   const daysBilledLabel = invoiceEvidence?.daysBilled ? `${invoiceEvidence.daysBilled} dias` : undefined;
   const tariffLabel = invoiceEvidence?.tariffFlag;
   const consultiveInsight = analysis?.consultiveInsight;
+  const knownBehaviorSummary = buildKnownBehaviorSummary(resolvedEnergyBehaviorProfile);
+  const usedDataPoints = buildRecommendationDataPoints({
+    invoice,
+    invoiceEvidence,
+    resolvedProfile,
+    energyBehaviorProfile: resolvedEnergyBehaviorProfile,
+  });
+  const getActionDiagnosisState = (actionTitle: string) =>
+    buildDiagnosisTrailForAction(actionTitle, resolvedEnergyBehaviorProfile);
   const pushUniqueAction = (nextAction: NextAction) => {
     const normalizedTitle = nextAction.title.trim().toLowerCase();
 
@@ -1261,30 +2567,60 @@ export const buildNextActions = (
   }
 
   if (consultiveInsight) {
+    const startedActionTitles = resolvedEnergyBehaviorProfile.actionMemory.startedActionTitles ?? [];
+    const shouldPrioritizeComparison = startedActionTitles.includes(
+      consultiveInsight.primaryAction.title
+    );
+    const primaryAdaptiveAction = shouldPrioritizeComparison && consultiveInsight.secondaryAction
+      ? consultiveInsight.secondaryAction
+      : consultiveInsight.primaryAction;
+    const followUpAdaptiveAction =
+      shouldPrioritizeComparison
+        ? undefined
+        : consultiveInsight.secondaryAction;
+    const primaryDiagnosisState = getActionDiagnosisState(primaryAdaptiveAction.title);
+
     pushUniqueAction({
       id: `driver-${consultiveInsight.mainDriver}`,
-      title: consultiveInsight.primaryAction.title,
+      title: primaryAdaptiveAction.title,
       description: consultiveInsight.conclusion,
-      value: consultiveInsight.primaryAction.evidence,
-      context: consultiveInsight.primaryAction.reason,
-      suggestion: consultiveInsight.primaryAction.ctaLabel,
+      value: primaryAdaptiveAction.evidence,
+      context: primaryAdaptiveAction.reason,
+      suggestion: primaryAdaptiveAction.ctaLabel,
+      ctaLabel: primaryAdaptiveAction.ctaLabel,
+      evidence: primaryAdaptiveAction.evidence,
+      reason: primaryAdaptiveAction.reason,
       impact: consultiveInsight.historyTrend || consultiveInsight.microEducation,
       validation: 'Compare o resultado na proxima fatura.',
+      interactiveQuestions: primaryDiagnosisState.interactiveQuestions,
+      usedDataPoints: primaryAdaptiveAction.usedDataPoints ?? usedDataPoints,
+      knownBehaviorSummary,
+      answeredQuestionSummaries: primaryDiagnosisState.answeredQuestionSummaries,
+      diagnosticProgress: primaryDiagnosisState.diagnosticProgress,
       priority: 'high',
       status: 'new',
       source: 'analysis',
     });
 
-    if (consultiveInsight.secondaryAction) {
+    if (followUpAdaptiveAction && shouldIncludeSecondaryAction(primaryAdaptiveAction, followUpAdaptiveAction)) {
+      const followUpDiagnosisState = getActionDiagnosisState(followUpAdaptiveAction.title);
       pushUniqueAction({
         id: `driver-${consultiveInsight.mainDriver}-follow-up`,
-        title: consultiveInsight.secondaryAction.title,
-        description: consultiveInsight.secondaryAction.reason,
+        title: followUpAdaptiveAction.title,
+        description: followUpAdaptiveAction.reason,
         value: 'Confirmar se o ajuste aparece no proximo ciclo.',
-        context: consultiveInsight.secondaryAction.reason,
-        suggestion: consultiveInsight.secondaryAction.ctaLabel,
+        context: followUpAdaptiveAction.reason,
+        suggestion: followUpAdaptiveAction.ctaLabel,
+        ctaLabel: followUpAdaptiveAction.ctaLabel,
+        evidence: followUpAdaptiveAction.evidence,
+        reason: followUpAdaptiveAction.reason,
         impact: consultiveInsight.historyTrend || `Use a fatura de ${monthLabel} como base da comparacao.`,
         validation: 'A nova conta precisa entrar no historico para a comparacao.',
+        interactiveQuestions: followUpDiagnosisState.interactiveQuestions,
+        usedDataPoints: followUpAdaptiveAction.usedDataPoints ?? usedDataPoints,
+        knownBehaviorSummary,
+        answeredQuestionSummaries: followUpDiagnosisState.answeredQuestionSummaries,
+        diagnosticProgress: followUpDiagnosisState.diagnosticProgress,
         priority: 'medium',
         status: 'new',
         source: 'journey',
@@ -1306,8 +2642,11 @@ export const buildNextActions = (
       suggestion: invoice.parser.rawTextAvailable
         ? 'Compare os campos essenciais com a propria conta e envie o proximo ciclo em PDF textual quando possivel.'
         : 'Se houver PDF exportado pela distribuidora, use esse arquivo no proximo envio em vez de imagem.',
+      ctaLabel: invoice.parser.rawTextAvailable ? 'Revisar campos' : 'Enviar PDF textual',
       impact: `Mantem a jornada baseada em dados reais (+${actionReviewPoints} pontos ao revisar).`,
       validation: 'Campos essenciais confirmados ou nova fatura textual enviada.',
+      usedDataPoints,
+      knownBehaviorSummary,
       priority: 'high',
       status: 'new',
       source: 'analysis',
@@ -1315,9 +2654,17 @@ export const buildNextActions = (
   }
 
   if (actions.length === 0 && analysis.consumptionLevel === 'alto') {
+    const highConsumptionActionTitle =
+      (resolvedEnergyBehaviorProfile.appliances.showers ?? 0) > 0 ||
+      resolvedEnergyBehaviorProfile.appliances.hasAirConditioning === true
+        ? 'Mapear chuveiro e climatizacao'
+        : peakConsumptionLabel
+          ? 'Deslocar uso fora do pico'
+          : 'Revisar cargas fixas';
+    const highConsumptionDiagnosisState = getActionDiagnosisState(highConsumptionActionTitle);
     pushUniqueAction({
       id: 'map-peak-usage',
-      title: peakConsumptionLabel ? 'Reduzir uso no horario de pico' : 'Mapear cargas fixas',
+      title: highConsumptionActionTitle,
       description: peakConsumptionLabel
         ? `A fatura registrou ${peakConsumptionLabel} no pico${offPeakConsumptionLabel ? ` e ${offPeakConsumptionLabel} fora do pico` : ''}.`
         : daysBilledLabel
@@ -1335,8 +2682,14 @@ export const buildNextActions = (
             : primaryGoal === 'understand_consumption'
               ? 'Anote os usos para observar melhor o padrao de consumo.'
               : 'Anote chuveiro, ar-condicionado, forno, maquinas e usos simultaneos.',
+      ctaLabel: highConsumptionDiagnosisState.diagnosticProgress ? 'Responder diagnostico' : 'Comecar acao',
       impact: `Ajuda a escolher um ajuste mais provavel (+${actionReviewPoints} pontos ao revisar).`,
       validation: 'Liste os 2 ou 3 usos mais frequentes no pico.',
+      interactiveQuestions: highConsumptionDiagnosisState.interactiveQuestions,
+      usedDataPoints,
+      knownBehaviorSummary,
+      answeredQuestionSummaries: highConsumptionDiagnosisState.answeredQuestionSummaries,
+      diagnosticProgress: highConsumptionDiagnosisState.diagnosticProgress,
       priority: 'high',
       status: 'new',
       source: 'analysis',
@@ -1344,9 +2697,10 @@ export const buildNextActions = (
   }
 
   if (actions.length < 2 && analysis.costSignal && analysis.costSignal !== 'controlado') {
+    const costCutDiagnosisState = getActionDiagnosisState('Testar economia por 7 dias');
     pushUniqueAction({
       id: 'choose-one-cost-cut',
-      title: 'Testar um corte de custo por 7 dias',
+      title: 'Testar economia por 7 dias',
       description: costPerKwhLabel
         ? `Seu custo medio ficou em ${costPerKwhLabel}${tariffLabel ? ` sob bandeira ${tariffLabel}` : ''}${invoice.peakHours ? `, com atencao em ${invoice.peakHours}` : ''}.`
         : `O custo total da fatura de ${monthLabel} ficou em ${formatCurrency(invoice.totalValue)}${invoice.peakHours ? `, com atencao em ${invoice.peakHours}` : ''}.`,
@@ -1362,8 +2716,14 @@ export const buildNextActions = (
         ? `Evidencia: ${costPerKwhLabel} por kWh${tariffLabel ? ` e bandeira ${tariffLabel}` : ''} neste ciclo.`
         : `Evidencia: o sinal de custo esta ${analysis.costSignal} nesta fatura.`,
       suggestion: 'Reduza uso simultaneo, encurte um uso intenso ou revise luzes recorrentes.',
+      ctaLabel: costCutDiagnosisState.diagnosticProgress ? 'Responder diagnostico' : 'Comecar acao',
       impact: `Transforma recomendacao em comportamento acompanhado (+${actionReviewPoints} pontos ao revisar).`,
       validation: 'Aplicar em pelo menos 5 dos 7 dias.',
+      interactiveQuestions: costCutDiagnosisState.interactiveQuestions,
+      usedDataPoints,
+      knownBehaviorSummary,
+      answeredQuestionSummaries: costCutDiagnosisState.answeredQuestionSummaries,
+      diagnosticProgress: costCutDiagnosisState.diagnosticProgress,
       priority: 'high',
       status: 'new',
       source: 'analysis',
@@ -1371,6 +2731,7 @@ export const buildNextActions = (
   }
 
   if (actions.length < 2) {
+    const comparisonDiagnosisState = getActionDiagnosisState('Comparar proxima fatura');
     pushUniqueAction({
       id: 'return-next-bill',
       title: 'Adicionar a proxima fatura',
@@ -1384,17 +2745,58 @@ export const buildNextActions = (
         primaryGoal === 'reduce_cost'
           ? 'Adicione a proxima fatura para ver se o custo responde ao ajuste.'
           : primaryGoal === 'understand_consumption'
-            ? 'Adicione a proxima fatura para observar se o padrao se repete.'
-            : 'Adicione a proxima fatura quando ela estiver disponivel.',
+          ? 'Adicione a proxima fatura para observar se o padrao se repete.'
+          : 'Adicione a proxima fatura quando ela estiver disponivel.',
+      ctaLabel: comparisonDiagnosisState.diagnosticProgress ? 'Responder diagnostico' : 'Preparar acompanhamento',
       impact: `Pode somar ate ${invoiceCyclePoints} pontos em novo ciclo de fatura e analise.`,
       validation: 'Proxima fatura aparece no historico.',
+      interactiveQuestions: comparisonDiagnosisState.interactiveQuestions,
+      usedDataPoints,
+      knownBehaviorSummary,
+      answeredQuestionSummaries: comparisonDiagnosisState.answeredQuestionSummaries,
+      diagnosticProgress: comparisonDiagnosisState.diagnosticProgress,
       priority: 'medium',
       status: 'new',
       source: 'journey',
     });
   }
 
-  return actions.slice(0, 2);
+  const filteredActions = actions.filter((action, index) => {
+    if (index === 0) {
+      return true;
+    }
+
+    const primaryAction = actions[0];
+    const normalizedTitle = normalizeForMatch(action.title);
+    const isGenericComparisonAction =
+      normalizedTitle === normalizeForMatch('Comparar proxima fatura') ||
+      normalizedTitle === normalizeForMatch('Adicionar a proxima fatura');
+    const hasDistinctContext =
+      normalizeForMatch(action.context) !== normalizeForMatch(primaryAction?.context) ||
+      normalizeForMatch(action.evidence) !== normalizeForMatch(primaryAction?.evidence);
+
+    if (isGenericComparisonAction && !hasDistinctContext) {
+      return false;
+    }
+
+    return true;
+  });
+
+  return filteredActions.slice(0, 2).map((action, index) => {
+    const isPrimary = index === 0;
+
+    return {
+      ...action,
+      ctaLabel: resolveActionCtaLabel({
+        title: action.title,
+        isPrimary,
+        diagnosticProgress: isPrimary ? action.diagnosticProgress : undefined,
+      }),
+      interactiveQuestions: isPrimary ? action.interactiveQuestions : undefined,
+      answeredQuestionSummaries: isPrimary ? action.answeredQuestionSummaries : undefined,
+      diagnosticProgress: isPrimary ? action.diagnosticProgress : undefined,
+    };
+  });
 };
 
 export const buildMascotGuidance = ({

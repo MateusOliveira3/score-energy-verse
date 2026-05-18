@@ -109,6 +109,106 @@ export interface InvoiceComparison {
   totalValue?: InvoiceMetricComparison;
 }
 
+export type EnergyBehaviorUsagePeriod =
+  | 'pico'
+  | 'fora_pico'
+  | 'misto'
+  | 'nao_informado';
+
+export type EnergyBehaviorLaundryFrequency =
+  | 'baixa'
+  | 'media'
+  | 'alta'
+  | 'nao_informado';
+
+export type EnergyBehaviorHouseholdRoutinePeriod =
+  | 'manha'
+  | 'tarde'
+  | 'noite'
+  | 'misto'
+  | 'nao_informado';
+
+export type EnergyBehaviorPeakWindowUsage =
+  | 'sim'
+  | 'nao'
+  | 'as_vezes'
+  | 'nao_informado';
+
+export type EnergyBehaviorHouseholdPresence =
+  | 'sim'
+  | 'nao'
+  | 'parcial'
+  | 'nao_informado';
+
+export type EnergyBehaviorClimateUsage =
+  | 'sim'
+  | 'nao'
+  | 'sazonal'
+  | 'nao_informado';
+
+export type EnergyBehaviorThermalSensitivity =
+  | 'sim'
+  | 'nao'
+  | 'nao_sei'
+  | 'nao_informado';
+
+export type EnergyBehaviorInterest =
+  | 'sim'
+  | 'talvez'
+  | 'nao'
+  | 'nao_informado';
+
+export type EnergyBehaviorPrimaryObjective =
+  | 'economia'
+  | 'conforto'
+  | 'sustentabilidade'
+  | 'nao_informado';
+
+export interface EnergyBehaviorPromptMemoryEntry {
+  answer: string;
+  answeredAt: string;
+}
+
+export interface EnergyBehaviorProfile {
+  appliances: {
+    showers?: number;
+    hasElectricShower?: boolean;
+    hasAirConditioning?: boolean;
+    hasExtraFridge?: boolean;
+  };
+  habits: {
+    dominantUsagePeriod?: EnergyBehaviorUsagePeriod;
+    usesHeavyLoadsAtNight?: boolean;
+    laundryFrequency?: EnergyBehaviorLaundryFrequency;
+    dominantUsageRoutine?: EnergyBehaviorHouseholdRoutinePeriod;
+    peakWindowIntensity?: EnergyBehaviorPeakWindowUsage;
+    householdPeakPresence?: EnergyBehaviorHouseholdPresence;
+    climateUsageIntensity?: EnergyBehaviorClimateUsage;
+    thermalSensitivity?: EnergyBehaviorThermalSensitivity;
+  };
+  intentions: {
+    thermalComfortInterest?: EnergyBehaviorInterest;
+    solarAnalysisInterest?: EnergyBehaviorInterest;
+    consultantInterest?: EnergyBehaviorInterest;
+    primaryObjective?: EnergyBehaviorPrimaryObjective;
+  };
+  qualification: {
+    diagnosisLevel?: number;
+    answeredDiagnosisCount?: number;
+    qualifiedLead?: boolean;
+  };
+  actionMemory: {
+    startedActionTitles?: string[];
+    answeredActionPrompts?: Record<string, EnergyBehaviorPromptMemoryEntry>;
+  };
+  confidence: {
+    applianceConfidence?: number;
+    habitConfidence?: number;
+    leadConfidence?: number;
+  };
+  updatedAt?: string;
+}
+
 export interface NextCycleGuidance {
   title: string;
   message: string;
@@ -134,6 +234,7 @@ export interface Analysis {
   consultiveInsight?: ConsultiveInsight;
   evidenceItems?: InsightFactItem[];
   educationItems?: InsightEducationItem[];
+  behaviorHighlights?: string[];
 }
 
 export type ConsultiveInsightDriver =
@@ -146,11 +247,78 @@ export type ConsultiveInsightDriver =
 
 export type InsightSeason = 'verao' | 'inverno' | 'meia_estacao';
 
+export type ActionInteractiveQuestionId =
+  | 'showers_count'
+  | 'electric_shower_presence'
+  | 'air_conditioning_presence'
+  | 'extra_fridge_presence'
+  | 'heavy_loads_at_night'
+  | 'laundry_frequency'
+  | 'dominant_usage_period'
+  | 'peak_window_intensity'
+  | 'peak_household_presence'
+  | 'climate_usage_intensity'
+  | 'thermal_instability'
+  | 'thermal_comfort_interest'
+  | 'solar_analysis_interest'
+  | 'consultant_interest'
+  | 'primary_objective';
+
+export type EnergyDiagnosisQuestionCategory =
+  | 'cargas'
+  | 'horarios'
+  | 'climatizacao'
+  | 'rotina'
+  | 'perfil_de_consumo'
+  | 'intencao';
+
+export interface ActionInteractiveQuestionOption {
+  value: string;
+  label: string;
+}
+
+export interface EnergyDiagnosisQuestionDefinition {
+  id: ActionInteractiveQuestionId;
+  levelRange: {
+    min: number;
+    max?: number;
+  };
+  category: EnergyDiagnosisQuestionCategory;
+  question: string;
+  options: ActionInteractiveQuestionOption[];
+  mapsToField: string;
+  whyItMatters: string;
+  followUpPriority: number;
+}
+
+export interface ActionInteractiveQuestion {
+  id: ActionInteractiveQuestionId;
+  prompt: string;
+  options: ActionInteractiveQuestionOption[];
+  helperText?: string;
+}
+
+export interface NextActionPendingAnswer {
+  questionId: ActionInteractiveQuestionId;
+  answer: string;
+  answeredAt?: string;
+  persistOnly?: boolean;
+}
+
+export interface ActionDiagnosticProgress {
+  current: number;
+  total: number;
+  level: number;
+  completed: boolean;
+}
+
 export interface ConsultiveInsightAction {
   title: string;
   reason: string;
   evidence: string;
   ctaLabel: string;
+  interactiveQuestions?: ActionInteractiveQuestion[];
+  usedDataPoints?: string[];
 }
 
 export interface ConsultiveInsightEnvironmentContext {
@@ -202,8 +370,17 @@ export interface NextAction {
   value: string;
   context?: string;
   suggestion?: string;
+  ctaLabel?: string;
+  evidence?: string;
+  reason?: string;
   impact?: string;
   validation?: string;
+  interactiveQuestions?: ActionInteractiveQuestion[];
+  usedDataPoints?: string[];
+  knownBehaviorSummary?: string[];
+  answeredQuestionSummaries?: string[];
+  diagnosticProgress?: ActionDiagnosticProgress;
+  pendingAnswer?: NextActionPendingAnswer;
   priority: NextActionPriority;
   status?: NextActionStatus;
   source?: NextActionSource;
@@ -342,6 +519,7 @@ export interface MvpState {
   profile: Profile;
   mascot: Mascot;
   userContext: UserContextState;
+  energyBehaviorProfile: EnergyBehaviorProfile;
   analysis: AnalysisState;
   scoreEvents: ScoreEvent[];
   actions: NextActionsState;

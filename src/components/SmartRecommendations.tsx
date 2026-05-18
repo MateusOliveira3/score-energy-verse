@@ -8,7 +8,7 @@ import {
   Target,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { buildAnalysisSummary, buildNextActions } from '@/lib/mvpCoreFlow';
+import { buildAnalysisSummary, buildNextActions, describeAdaptiveAnswer } from '@/lib/mvpCoreFlow';
 import {
   AnalysisSummary,
   InvoiceData,
@@ -38,6 +38,7 @@ interface SmartRecommendationsProps {
 
 type ActionEngagementChoice = 'start' | 'done' | 'try';
 type ActionCategory = 'habito' | 'equipamento' | 'tarifa' | 'solar' | 'monitoramento';
+type ActionInteractionOptionValue = '0' | '1' | '2+' | 'yes' | 'no';
 
 interface ContextHints {
   averageCostPerKwh?: number;
@@ -52,6 +53,37 @@ interface FeedbackContext {
   primaryGoal?: ReturnType<typeof getAnsweredContextValue>;
   usagePeriod?: ReturnType<typeof getAnsweredContextValue>;
   electricShowerUsage?: ReturnType<typeof getAnsweredContextValue>;
+}
+
+interface ActionInteractionQuestion {
+  id: string;
+  prompt: string;
+  options: Array<{
+    label: string;
+    value: ActionInteractionOptionValue;
+  }>;
+}
+
+interface ActionInteractionConfig {
+  title: string;
+  prompt: string;
+  questions: ActionInteractionQuestion[];
+  buildFeedback: (answers: Record<string, ActionInteractionOptionValue>) => string;
+  buildNextStep: (answers: Record<string, ActionInteractionOptionValue>) => string;
+}
+
+interface AdaptiveActionFeedbackState {
+  answer: string;
+  choice?: ActionEngagementChoice;
+  insight: string;
+  message: string;
+  questionId?: string;
+  summary?: string;
+  answeredQuestions?: Array<{
+    answer: string;
+    questionId: string;
+    summary: string;
+  }>;
 }
 
 const priorityClasses = {
@@ -85,9 +117,20 @@ const actionEngagementOptions: Array<{
   value: ActionEngagementChoice;
   label: string;
 }> = [
-  { value: 'start', label: 'Comecar' },
-  { value: 'done', label: 'Ja fiz' },
-  { value: 'try', label: 'Vou testar' },
+  { value: 'start', label: 'Comecar acao' },
+  { value: 'done', label: 'Concluir acao' },
+  { value: 'try', label: 'Preparar acompanhamento' },
+];
+
+const countOptions: ActionInteractionQuestion['options'] = [
+  { label: '0', value: '0' },
+  { label: '1', value: '1' },
+  { label: '2+', value: '2+' },
+];
+
+const booleanOptions: ActionInteractionQuestion['options'] = [
+  { label: 'Sim', value: 'yes' },
+  { label: 'Nao', value: 'no' },
 ];
 
 const formatCurrency = (value?: number) =>
@@ -134,6 +177,12 @@ const getCompactText = (value: string, maxLength = 120) => {
 
   return `${value.slice(0, maxLength).trimEnd()}...`;
 };
+
+const mergeUniqueStrings = (...groups: string[][]) =>
+  Array.from(new Set(groups.flat().filter((value) => value.trim().length > 0)));
+
+const buildAnsweredSummaryLine = (summaries: string[]) =>
+  summaries.length > 0 ? `Voce ja informou: ${summaries.slice(0, 2).join(', ')}.` : undefined;
 
 const getInvoiceReferenceLabel = (invoice: InvoiceData) => {
   const month = invoice.month?.trim();
@@ -352,6 +401,163 @@ const deriveActionCategory = (action: NextAction): ActionCategory => {
   return 'monitoramento';
 };
 
+const getActionInteractionConfig = (action: NextAction): ActionInteractionConfig | null => {
+  const searchableText = normalizeForMatch(
+    [action.title, action.description, action.value, action.context, action.suggestion]
+      .filter(Boolean)
+      .join(' ')
+  );
+
+  if (/(horario de pico|pico|revisar rotina|rotina de consumo|uso noturno|periodo)/.test(searchableText)) {
+    return {
+      title: 'Interacao rapida',
+      prompt: 'Responda em 2 toques para descobrir onde observar primeiro.',
+      questions: [
+        {
+          id: 'night_peak',
+          prompt: 'Seu uso mais pesado costuma acontecer a noite?',
+          options: booleanOptions,
+        },
+        {
+          id: 'heat_routine',
+          prompt: 'Chuveiro, forno ou ar entram quase todo dia nesse horario?',
+          options: booleanOptions,
+        },
+      ],
+      buildFeedback: (answers) => {
+        if (answers.night_peak === 'yes' && answers.heat_routine === 'yes') {
+          return 'Isso indica que seu consumo pode estar concentrado no pico da noite, com banho, cozinha ou climatizacao puxando junto.';
+        }
+
+        if (answers.night_peak === 'yes') {
+          return 'Isso indica um pico noturno mais distribuido; vale observar maquinas, iluminacao e climatizacao.';
+        }
+
+        if (answers.heat_routine === 'yes') {
+          return 'Isso indica um habito recorrente fora da noite que ainda pode concentrar boa parte do consumo.';
+        }
+
+        return 'Isso sugere uma rotina mais espalhada; comece observando o horario com mais aparelhos ligados ao mesmo tempo.';
+      },
+      buildNextStep: (answers) =>
+        answers.night_peak === 'yes'
+          ? 'Hoje, tente evitar ligar dois usos intensos no mesmo periodo da noite.'
+          : 'Hoje, identifique um unico horario critico para testar uma mudanca simples.',
+    };
+  }
+
+  if (/(mapear cargas fixas|cargas fixas|consumo total|consumo alto|usos simultaneos)/.test(searchableText)) {
+    return {
+      title: 'Mapa rapido',
+      prompt: 'Responda em 2 toques para apontar a carga que merece atencao primeiro.',
+      questions: [
+        {
+          id: 'shower_count',
+          prompt: 'Quantos chuveiros eletricos entram na rotina?',
+          options: countOptions,
+        },
+        {
+          id: 'cooling_load',
+          prompt: 'Tem ar-condicionado ou segunda geladeira ligada quase todo dia?',
+          options: booleanOptions,
+        },
+      ],
+      buildFeedback: (answers) => {
+        if (answers.shower_count === '2+' && answers.cooling_load === 'yes') {
+          return 'Isso indica que seu consumo pode estar concentrado em banho eletrico somado a climatizacao ou refrigeracao continua.';
+        }
+
+        if (answers.shower_count === '2+') {
+          return 'Isso indica que seu consumo pode estar concentrado em banho eletrico repetido ao longo do dia.';
+        }
+
+        if (answers.shower_count === '1' && answers.cooling_load === 'yes') {
+          return 'Isso indica que seu consumo pode estar dividido entre banho eletrico e uma carga continua, como ar ou geladeira extra.';
+        }
+
+        if (answers.cooling_load === 'yes') {
+          return 'Isso indica que uma carga continua pode estar puxando o consumo base da casa.';
+        }
+
+        return 'Isso sugere olhar primeiro os equipamentos que ficam ligados o tempo todo, como geladeira principal e standby.';
+      },
+      buildNextStep: () => 'Hoje, observe quais cargas ficam ligadas ao mesmo tempo por mais horas.',
+    };
+  }
+
+  if (/(equipamento mais usado|geladeira|freezer|ar condicionado|ar-condicionado|equipamento|aparelho)/.test(searchableText)) {
+    return {
+      title: 'Checklist rapido',
+      prompt: 'Responda em 2 toques para descobrir qual equipamento merece ajuste primeiro.',
+      questions: [
+        {
+          id: 'cold_equipment_count',
+          prompt: 'Quantas geladeiras ou freezers ficam ligados o tempo todo?',
+          options: countOptions,
+        },
+        {
+          id: 'daily_ac',
+          prompt: 'Tem ar-condicionado ligado quase todo dia?',
+          options: booleanOptions,
+        },
+      ],
+      buildFeedback: (answers) => {
+        if (answers.cold_equipment_count === '2+' && answers.daily_ac === 'yes') {
+          return 'Isso indica que seu consumo pode estar concentrado em refrigeracao continua e climatizacao.';
+        }
+
+        if (answers.cold_equipment_count === '2+') {
+          return 'Isso indica que a refrigeracao continua pode estar concentrando boa parte do consumo.';
+        }
+
+        if (answers.daily_ac === 'yes') {
+          return 'Isso indica que a climatizacao diaria merece observacao antes de qualquer troca.';
+        }
+
+        return 'Isso sugere olhar primeiro o equipamento que passa mais horas ligado, nao apenas o mais potente.';
+      },
+      buildNextStep: () => 'Comece pelo aparelho com mais horas de uso antes de pensar em substituicao.',
+    };
+  }
+
+  if (/(proxima fatura|proximo ciclo|comparar|7 dias|testar economia)/.test(searchableText)) {
+    return {
+      title: 'Teste rapido',
+      prompt: 'Responda em 2 toques para deixar a comparacao da proxima conta mais clara.',
+      questions: [
+        {
+          id: 'recent_change',
+          prompt: 'Voce ja mudou algum habito nesta semana?',
+          options: booleanOptions,
+        },
+        {
+          id: 'many_changes',
+          prompt: 'Tem mais de uma mudanca acontecendo ao mesmo tempo?',
+          options: booleanOptions,
+        },
+      ],
+      buildFeedback: (answers) => {
+        if (answers.recent_change === 'yes' && answers.many_changes === 'yes') {
+          return 'Isso indica que a proxima conta pode misturar sinais; compare uma mudanca por vez.';
+        }
+
+        if (answers.recent_change === 'yes') {
+          return 'Isso indica que a proxima conta ja pode mostrar um sinal mais limpo dessa mudanca.';
+        }
+
+        if (answers.many_changes === 'yes') {
+          return 'Isso indica que ainda nao ha uma base clara; escolha uma unica mudanca antes de comparar.';
+        }
+
+        return 'Isso indica que falta uma mudanca observavel; escolha um ajuste simples para medir no proximo ciclo.';
+      },
+      buildNextStep: () => 'Use a proxima conta para comparar custo e consumo sem adicionar novas variaveis.',
+    };
+  }
+
+  return null;
+};
+
 const getContextHints = (
   selectedInvoice: InvoiceData | undefined,
   selectedAnalysis: AnalysisSummary | undefined,
@@ -470,6 +676,11 @@ const buildActionPreview = (action: NextAction, actionContextLine: string) => {
   return getCompactText(action.description || action.context || actionContextLine, 88);
 };
 
+const supportsAdaptiveDiagnosis = (title: string) =>
+  /^(deslocar uso fora do pico|testar economia por 7 dias|mapear chuveiro e climatizacao|revisar cargas fixas|comparar proxima fatura|completar diagnostico rapido)$/i.test(
+    title.trim()
+  );
+
 const SmartRecommendations = ({
   actions,
   viewedActionIds,
@@ -486,23 +697,32 @@ const SmartRecommendations = ({
 }: SmartRecommendationsProps) => {
   const [expandedDetailIds, setExpandedDetailIds] = React.useState<string[]>([]);
   const [actionFeedbackById, setActionFeedbackById] = React.useState<
-    Record<string, { choice: ActionEngagementChoice; message: string }>
+    Record<string, AdaptiveActionFeedbackState>
   >({});
+  const previousExpandedRef = React.useRef(isExpanded);
   const contextInvoice = selectedInvoice;
   const contextInvoiceLabel = contextInvoice ? getInvoiceReferenceLabel(contextInvoice) : undefined;
+  const latestJourneyInvoice = invoiceHistory?.[invoiceHistory.length - 1];
+  const isJourneyFocus =
+    !selectedInvoice || selectedInvoice.fingerprint === latestJourneyInvoice?.fingerprint;
   const contextAnalysis = React.useMemo(
     () =>
-      contextInvoice
+      contextInvoice && !isJourneyFocus
         ? buildAnalysisSummary(contextInvoice, profile, invoiceHistory ?? [])
         : analysis,
-    [analysis, contextInvoice, invoiceHistory, profile]
+    [analysis, contextInvoice, invoiceHistory, isJourneyFocus, profile]
   );
   const recommendedActions = React.useMemo(
-    () =>
-      contextInvoice && contextAnalysis
+    () => {
+      if (isJourneyFocus) {
+        return actions.slice(0, 2);
+      }
+
+      return contextInvoice && contextAnalysis
         ? buildNextActions(contextInvoice, contextAnalysis, profile, userContext).slice(0, 2)
-        : actions,
-    [actions, contextAnalysis, contextInvoice, profile, userContext]
+        : actions;
+    },
+    [actions, contextAnalysis, contextInvoice, isJourneyFocus, profile, userContext]
   );
   const educationItems = contextAnalysis?.educationItems ?? [];
   const evidenceItems = contextAnalysis?.evidenceItems ?? [];
@@ -534,6 +754,14 @@ const SmartRecommendations = ({
     setActionFeedbackById({});
   }, [contextInvoice?.fingerprint]);
 
+  React.useEffect(() => {
+    if (isExpanded && !previousExpandedRef.current) {
+      setActionFeedbackById({});
+    }
+
+    previousExpandedRef.current = isExpanded;
+  }, [isExpanded]);
+
   const toggleActionDetails = (actionId: string) => {
     setExpandedDetailIds((currentIds) =>
       currentIds.includes(actionId)
@@ -551,8 +779,10 @@ const SmartRecommendations = ({
     setActionFeedbackById((currentFeedback) => ({
       ...currentFeedback,
       [action.id]: {
+        answer: '',
         choice,
-        message: buildFeedbackMessage(action, choice, feedbackContext),
+        insight: buildFeedbackMessage(action, choice, feedbackContext),
+        message: choice === 'done' ? 'Salvo' : 'Usarei isso nas proximas recomendacoes',
       },
     }));
 
@@ -695,6 +925,7 @@ const SmartRecommendations = ({
               const isCompleted = status === 'completed';
               const isInProgress = status === 'in_progress';
               const isDetailsExpanded = expandedDetailIds.includes(action.id);
+              const isDominantAction = index === 0;
               const actionContextLine = buildActionContextLine({
                 action,
                 analysis: contextAnalysis,
@@ -715,6 +946,50 @@ const SmartRecommendations = ({
               const summaryLine = buildActionPreview(action, actionContextLine);
               const compactGoal = getCompactText(action.value, 52);
               const compactImpact = action.impact ? getCompactText(action.impact, 64) : undefined;
+              const interactionQuestions = action.interactiveQuestions ?? [];
+              const optimisticAnsweredQuestions = actionFeedback?.answeredQuestions ?? [];
+              const hasAnsweredThisSession = optimisticAnsweredQuestions.length > 0;
+              const nextInteractionQuestion =
+                hasAnsweredThisSession || interactionQuestions.length === 0
+                  ? undefined
+                  : interactionQuestions[0];
+              const knownBehaviorSummary = action.knownBehaviorSummary ?? [];
+              const answeredQuestionSummaries = action.answeredQuestionSummaries ?? [];
+              const usedDataPoints = action.usedDataPoints ?? [];
+              const hasAdaptiveDiagnosis =
+                isDominantAction &&
+                supportsAdaptiveDiagnosis(action.title) &&
+                (interactionQuestions.length > 0 ||
+                  answeredQuestionSummaries.length > 0 ||
+                  knownBehaviorSummary.length > 0 ||
+                  Boolean(actionFeedback?.questionId) ||
+                  Boolean(action.diagnosticProgress));
+              const mergedAnsweredSummaries = mergeUniqueStrings(
+                answeredQuestionSummaries,
+                optimisticAnsweredQuestions.map((question) => question.summary)
+              );
+              const answeredSummaryLine = buildAnsweredSummaryLine(
+                mergedAnsweredSummaries.length > 0 ? mergedAnsweredSummaries : knownBehaviorSummary
+              );
+              const isDiagnosisUpdated =
+                hasAdaptiveDiagnosis &&
+                interactionQuestions.length === 0 &&
+                !hasAnsweredThisSession;
+              const answeredFeedbackMessage = hasAnsweredThisSession
+                ? interactionQuestions.length === 0
+                  ? 'Ja entendi melhor sua casa.'
+                  : 'Resposta salva. Vou usar isso nas proximas recomendacoes.'
+                : undefined;
+              const interactionConfig = hasAdaptiveDiagnosis
+                ? {
+                    title: isDiagnosisUpdated ? 'Diagnostico atualizado' : 'Pergunta rapida',
+                    prompt: isDiagnosisUpdated
+                      ? 'Ja entendi melhor sua casa.'
+                      : nextInteractionQuestion
+                        ? 'Ajude a refinar sua proxima recomendacao.'
+                        : answeredFeedbackMessage ?? 'Ja entendi melhor sua casa.',
+                  }
+                : null;
               const hasExpandableDetails = Boolean(
                 action.description ||
                 actionContextLine ||
@@ -729,12 +1004,12 @@ const SmartRecommendations = ({
                   key={action.id}
                   className={`rounded-[26px] border-2 p-4 transition-all duration-300 ${
                     priorityClasses[action.priority]
-                  } ${index === 0 ? 'ring-2 ring-emerald-200' : ''} sm:p-5`}
+                  } ${isDominantAction ? 'ring-2 ring-emerald-200' : ''} sm:p-5`}
                 >
                   <div className="space-y-4">
                     <div className="space-y-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        {index === 0 && (
+                        {isDominantAction && (
                           <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white">
                             Mais promissora
                           </span>
@@ -766,15 +1041,159 @@ const SmartRecommendations = ({
                             Impacto: {compactImpact}
                           </span>
                         )}
-                        {action.suggestion && (
+                        {action.ctaLabel && (
                           <span className="rounded-full border border-white/90 bg-white/80 px-3 py-1 text-xs font-medium text-blue-700">
-                            CTA: {getCompactText(action.suggestion, 52)}
+                            CTA: {action.ctaLabel}
                           </span>
                         )}
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+                    {interactionConfig && (
+                      <div className="rounded-[22px] border border-white/80 bg-white/75 p-4 shadow-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
+                            {interactionConfig.title}
+                          </p>
+                          <span className="text-xs font-medium text-slate-500">
+                            {isDiagnosisUpdated
+                              ? 'Diagnostico atualizado'
+                              : hasAnsweredThisSession
+                                ? 'Ja entendi melhor sua casa'
+                                : '1 pergunta por vez'}
+                          </span>
+                        </div>
+
+                        <p className="mt-2 text-sm leading-6 text-slate-700">{interactionConfig.prompt}</p>
+
+                        {(actionFeedback?.insight || answeredSummaryLine || isDiagnosisUpdated || answeredFeedbackMessage) && (
+                          <div className="mt-3 min-h-[42px] space-y-1">
+                            {answeredFeedbackMessage && (
+                              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                                <span className="rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-700">
+                                  Salvo
+                                </span>
+                                <span>{answeredFeedbackMessage}</span>
+                              </div>
+                            )}
+
+                            {!answeredFeedbackMessage && actionFeedback?.insight && (
+                              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                                <span className="rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-700">
+                                  {actionFeedback.message}
+                                </span>
+                                <span>{actionFeedback.insight}</span>
+                              </div>
+                            )}
+
+                            {answeredSummaryLine && (
+                              <p className="text-xs leading-5 text-slate-600">{answeredSummaryLine}</p>
+                            )}
+
+                            {isDiagnosisUpdated && (
+                              <p className="text-xs font-medium text-emerald-700">
+                                Diagnostico atualizado
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {nextInteractionQuestion && (
+                          <>
+                            <p className="mt-3 text-sm leading-6 text-slate-700">
+                              {nextInteractionQuestion.prompt}
+                            </p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {nextInteractionQuestion.options.map((option) => {
+                                const isSelected =
+                                  actionFeedback?.questionId === nextInteractionQuestion.id &&
+                                  actionFeedback.answer === option.value;
+
+                                return (
+                                  <button
+                                    key={`${action.id}-${nextInteractionQuestion.id}-${option.value}`}
+                                    type="button"
+                                    disabled={isSelected}
+                                    className={`inline-flex items-center justify-center rounded-full border px-4 py-2 text-sm font-medium transition ${
+                                      isSelected
+                                        ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                                        : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:text-blue-700'
+                                    }`}
+                                    onClick={() => {
+                                      const answeredAt = new Date().toISOString();
+                                      const adaptiveAnswer = describeAdaptiveAnswer(
+                                        nextInteractionQuestion.id,
+                                        option.value
+                                      );
+
+                                      setActionFeedbackById((currentFeedback) => ({
+                                        ...currentFeedback,
+                                        [action.id]: {
+                                          ...currentFeedback[action.id],
+                                          answer: option.value,
+                                          choice: currentFeedback[action.id]?.choice,
+                                          insight: adaptiveAnswer.insight,
+                                          message: adaptiveAnswer.microFeedback,
+                                          questionId: nextInteractionQuestion.id,
+                                          summary: adaptiveAnswer.summary,
+                                          answeredQuestions: [
+                                            ...(currentFeedback[action.id]?.answeredQuestions ?? []).filter(
+                                              (question) => question.questionId !== nextInteractionQuestion.id
+                                            ),
+                                            {
+                                              answer: option.value,
+                                              questionId: nextInteractionQuestion.id,
+                                              summary: adaptiveAnswer.summary,
+                                            },
+                                          ],
+                                        },
+                                      }));
+                                      onActionStatusChange(
+                                        {
+                                          ...action,
+                                          pendingAnswer: {
+                                            questionId: nextInteractionQuestion.id,
+                                            answer: option.value,
+                                            answeredAt,
+                                            persistOnly: true,
+                                          },
+                                        },
+                                        'in_progress'
+                                      );
+                                    }}
+                                  >
+                                    {isSelected ? `${option.label} - respondido` : option.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            {nextInteractionQuestion.helperText && (
+                              <p className="mt-3 text-xs leading-5 text-slate-500">
+                                {nextInteractionQuestion.helperText}
+                              </p>
+                            )}
+                          </>
+                        )}
+
+                        {usedDataPoints.length > 0 && (
+                          <div className="mt-3 rounded-2xl border border-slate-200 bg-white/90 px-3 py-3 text-sm leading-relaxed text-slate-700">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                              Dados usados
+                            </p>
+                            <div className="mt-2 space-y-1">
+                              {usedDataPoints.slice(0, 4).map((point) => (
+                                <p key={`${action.id}-${point}`}>• {point}</p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                      </div>
+                    )}
+
+                    {(!interactionConfig || isDiagnosisUpdated) && (
+                      <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
                       {actionEngagementOptions.map((option) => {
                         const isSelected = actionFeedback?.choice === option.value;
 
@@ -793,11 +1212,6 @@ const SmartRecommendations = ({
                           </button>
                         );
                       })}
-                    </div>
-
-                    {actionFeedback && (
-                      <div className="w-full break-words rounded-2xl border border-emerald-100 bg-emerald-50/95 px-3 py-2 text-sm leading-relaxed text-emerald-800">
-                        {actionFeedback.message}
                       </div>
                     )}
 

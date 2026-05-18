@@ -406,6 +406,7 @@ const AnalysisSummary = ({
   const consultativeInsights = contextAnalysis.consultativeInsights ?? [];
   const educationItems = contextAnalysis.educationItems ?? [];
   const evidenceItems = contextAnalysis.evidenceItems ?? [];
+  const behaviorHighlights = contextAnalysis.behaviorHighlights ?? [];
   const consultiveInsight = contextAnalysis.consultiveInsight;
   const contextLines = getInsightContextLines(consultiveInsight);
   const consumptionTrendMessage = buildConsumptionTrendMessage(history, contextInvoice);
@@ -548,6 +549,17 @@ const AnalysisSummary = ({
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {consultiveInsight && (
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-4 text-sm leading-6 text-emerald-900">
+              {consultiveInsight.evidence}
+              {behaviorHighlights.length > 0 && (
+                <p className="mt-2">
+                  Contexto aprendido: {behaviorHighlights.slice(0, 3).join(', ')}.
+                </p>
+              )}
             </div>
           )}
 

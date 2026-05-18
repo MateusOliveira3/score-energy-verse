@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { buildAnalysisSummary, buildNextActions } from '@/lib/mvpCoreFlow';
+import { buildAnalysisSummary, buildNextActions, describeAdaptiveAnswer } from '@/lib/mvpCoreFlow';
 import {
   AnalysisSummary,
   InvoiceData,
@@ -118,6 +118,218 @@ const panelMeta = {
 const compactText = (value: string, maxLength = 110) =>
   value.length <= maxLength ? value : `${value.slice(0, maxLength).trimEnd()}...`;
 
+const mergeUniqueStrings = (...groups: string[][]) =>
+  Array.from(new Set(groups.flat().filter((value) => value.trim().length > 0)));
+
+const buildAnsweredSummaryLine = (summaries: string[]) =>
+  summaries.length > 0 ? `Voce ja informou: ${summaries.slice(0, 2).join(', ')}.` : undefined;
+
+const normalizeForMatch = (value?: string) =>
+  (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+type ActionInteractionOptionValue = '0' | '1' | '2+' | 'yes' | 'no';
+
+interface ActionInteractionQuestion {
+  id: string;
+  prompt: string;
+  options: Array<{
+    label: string;
+    value: ActionInteractionOptionValue;
+  }>;
+}
+
+interface ActionInteractionConfig {
+  title: string;
+  prompt: string;
+  questions: ActionInteractionQuestion[];
+  buildFeedback: (answers: Record<string, ActionInteractionOptionValue>) => string;
+  buildNextStep: (answers: Record<string, ActionInteractionOptionValue>) => string;
+}
+
+interface AdaptiveActionFeedbackState {
+  answer: string;
+  insight: string;
+  microFeedback: string;
+  questionId: string;
+  summary: string;
+  answeredQuestions?: Array<{
+    answer: string;
+    questionId: string;
+    summary: string;
+  }>;
+}
+
+const countOptions: ActionInteractionQuestion['options'] = [
+  { label: '0', value: '0' },
+  { label: '1', value: '1' },
+  { label: '2+', value: '2+' },
+];
+
+const booleanOptions: ActionInteractionQuestion['options'] = [
+  { label: 'Sim', value: 'yes' },
+  { label: 'Nao', value: 'no' },
+];
+
+const getActionInteractionConfig = (action: NextAction): ActionInteractionConfig | null => {
+  const searchableText = normalizeForMatch(
+    [action.title, action.description, action.value, action.context, action.suggestion]
+      .filter(Boolean)
+      .join(' ')
+  );
+
+  if (/(horario de pico|pico|revisar rotina|rotina de consumo|uso noturno|periodo)/.test(searchableText)) {
+    return {
+      title: 'Interacao rapida',
+      prompt: 'Responda em 2 toques para descobrir onde observar primeiro.',
+      questions: [
+        {
+          id: 'night_peak',
+          prompt: 'Seu uso mais pesado costuma acontecer a noite?',
+          options: booleanOptions,
+        },
+        {
+          id: 'heat_routine',
+          prompt: 'Chuveiro, forno ou ar entram quase todo dia nesse horario?',
+          options: booleanOptions,
+        },
+      ],
+      buildFeedback: (answers) => {
+        if (answers.night_peak === 'yes' && answers.heat_routine === 'yes') {
+          return 'Isso indica que seu consumo pode estar concentrado no pico da noite, com banho, cozinha ou climatizacao puxando junto.';
+        }
+
+        if (answers.night_peak === 'yes') {
+          return 'Isso indica um pico noturno mais distribuido; vale observar maquinas, iluminacao e climatizacao.';
+        }
+
+        if (answers.heat_routine === 'yes') {
+          return 'Isso indica um habito recorrente fora da noite que ainda pode concentrar boa parte do consumo.';
+        }
+
+        return 'Isso sugere uma rotina mais espalhada; comece observando o horario com mais aparelhos ligados ao mesmo tempo.';
+      },
+      buildNextStep: (answers) =>
+        answers.night_peak === 'yes'
+          ? 'Hoje, tente evitar ligar dois usos intensos no mesmo periodo da noite.'
+          : 'Hoje, identifique um unico horario critico para testar uma mudanca simples.',
+    };
+  }
+
+  if (/(mapear cargas fixas|cargas fixas|consumo total|consumo alto|usos simultaneos)/.test(searchableText)) {
+    return {
+      title: 'Mapa rapido',
+      prompt: 'Responda em 2 toques para apontar a carga que merece atencao primeiro.',
+      questions: [
+        {
+          id: 'shower_count',
+          prompt: 'Quantos chuveiros eletricos entram na rotina?',
+          options: countOptions,
+        },
+        {
+          id: 'cooling_load',
+          prompt: 'Tem ar-condicionado ou segunda geladeira ligada quase todo dia?',
+          options: booleanOptions,
+        },
+      ],
+      buildFeedback: (answers) => {
+        if (answers.shower_count === '2+' && answers.cooling_load === 'yes') {
+          return 'Isso indica que seu consumo pode estar concentrado em banho eletrico somado a climatizacao ou refrigeracao continua.';
+        }
+
+        if (answers.shower_count === '2+') {
+          return 'Isso indica que seu consumo pode estar concentrado em banho eletrico repetido ao longo do dia.';
+        }
+
+        if (answers.shower_count === '1' && answers.cooling_load === 'yes') {
+          return 'Isso indica que seu consumo pode estar dividido entre banho eletrico e uma carga continua, como ar ou geladeira extra.';
+        }
+
+        if (answers.cooling_load === 'yes') {
+          return 'Isso indica que uma carga continua pode estar puxando o consumo base da casa.';
+        }
+
+        return 'Isso sugere olhar primeiro os equipamentos que ficam ligados o tempo todo, como geladeira principal e standby.';
+      },
+      buildNextStep: () => 'Hoje, observe quais cargas ficam ligadas ao mesmo tempo por mais horas.',
+    };
+  }
+
+  if (/(equipamento mais usado|geladeira|freezer|ar condicionado|ar-condicionado|equipamento|aparelho)/.test(searchableText)) {
+    return {
+      title: 'Checklist rapido',
+      prompt: 'Responda em 2 toques para descobrir qual equipamento merece ajuste primeiro.',
+      questions: [
+        {
+          id: 'cold_equipment_count',
+          prompt: 'Quantas geladeiras ou freezers ficam ligados o tempo todo?',
+          options: countOptions,
+        },
+        {
+          id: 'daily_ac',
+          prompt: 'Tem ar-condicionado ligado quase todo dia?',
+          options: booleanOptions,
+        },
+      ],
+      buildFeedback: (answers) => {
+        if (answers.cold_equipment_count === '2+' && answers.daily_ac === 'yes') {
+          return 'Isso indica que seu consumo pode estar concentrado em refrigeracao continua e climatizacao.';
+        }
+
+        if (answers.cold_equipment_count === '2+') {
+          return 'Isso indica que a refrigeracao continua pode estar concentrando boa parte do consumo.';
+        }
+
+        if (answers.daily_ac === 'yes') {
+          return 'Isso indica que a climatizacao diaria merece observacao antes de qualquer troca.';
+        }
+
+        return 'Isso sugere olhar primeiro o equipamento que passa mais horas ligado, nao apenas o mais potente.';
+      },
+      buildNextStep: () => 'Comece pelo aparelho com mais horas de uso antes de pensar em substituicao.',
+    };
+  }
+
+  if (/(proxima fatura|proximo ciclo|comparar|7 dias|testar economia)/.test(searchableText)) {
+    return {
+      title: 'Teste rapido',
+      prompt: 'Responda em 2 toques para deixar a comparacao da proxima conta mais clara.',
+      questions: [
+        {
+          id: 'recent_change',
+          prompt: 'Voce ja mudou algum habito nesta semana?',
+          options: booleanOptions,
+        },
+        {
+          id: 'many_changes',
+          prompt: 'Tem mais de uma mudanca acontecendo ao mesmo tempo?',
+          options: booleanOptions,
+        },
+      ],
+      buildFeedback: (answers) => {
+        if (answers.recent_change === 'yes' && answers.many_changes === 'yes') {
+          return 'Isso indica que a proxima conta pode misturar sinais; compare uma mudanca por vez.';
+        }
+
+        if (answers.recent_change === 'yes') {
+          return 'Isso indica que a proxima conta ja pode mostrar um sinal mais limpo dessa mudanca.';
+        }
+
+        if (answers.many_changes === 'yes') {
+          return 'Isso indica que ainda nao ha uma base clara; escolha uma unica mudanca antes de comparar.';
+        }
+
+        return 'Isso indica que falta uma mudanca observavel; escolha um ajuste simples para medir no proximo ciclo.';
+      },
+      buildNextStep: () => 'Use a proxima conta para comparar custo e consumo sem adicionar novas variaveis.',
+    };
+  }
+
+  return null;
+};
+
 const getInvoiceReferenceLabel = (invoice: InvoiceData) => {
   const month = invoice.month?.trim();
 
@@ -194,8 +406,16 @@ const normalizeActionTitle = (action: NextAction, index: number) => {
     .join(' ')
     .toLowerCase();
 
+  if (
+    /^(deslocar uso fora do pico|testar economia por 7 dias|mapear chuveiro e climatizacao|revisar cargas fixas|comparar proxima fatura|completar diagnostico rapido)$/i.test(
+      rawTitle
+    )
+  ) {
+    return rawTitle;
+  }
+
   if (/(pico|horario|noite|tarde)/.test(searchableText)) {
-    return 'Reduzir uso no horario de pico';
+    return 'Deslocar uso fora do pico';
   }
 
   if (/(compar|acompanh|proxima fatura|proximo ciclo)/.test(searchableText)) {
@@ -207,7 +427,7 @@ const normalizeActionTitle = (action: NextAction, index: number) => {
   }
 
   if (/(chuveiro|equipamento|geladeira|ar condicionado|lampada|motor|aparelho)/.test(searchableText)) {
-    return 'Ajustar o equipamento mais usado';
+    return 'Mapear chuveiro e climatizacao';
   }
 
   if (rawTitle.length <= 40) {
@@ -289,6 +509,11 @@ const buildHistoryTrendLine = (
     : 'Este ciclo ficou abaixo da media do historico.';
 };
 
+const supportsAdaptiveDiagnosis = (title: string) =>
+  /^(deslocar uso fora do pico|testar economia por 7 dias|mapear chuveiro e climatizacao|revisar cargas fixas|comparar proxima fatura|completar diagnostico rapido)$/i.test(
+    title.trim()
+  );
+
 const DynamicContextPanel = ({
   activeView,
   activeTip,
@@ -317,9 +542,12 @@ const DynamicContextPanel = ({
   historyUploadContent,
 }: DynamicContextPanelProps) => {
   const [isVisible, setIsVisible] = React.useState(true);
-  const [localActionFeedback, setLocalActionFeedback] = React.useState<Record<string, string>>({});
+  const [localActionFeedback, setLocalActionFeedback] = React.useState<
+    Record<string, AdaptiveActionFeedbackState>
+  >({});
   const [historyFeedback, setHistoryFeedback] = React.useState<string | null>(null);
   const previousInvoiceCountRef = React.useRef(invoiceHistory.length);
+  const previousActiveViewRef = React.useRef(activeView);
   const panelSignature = [
     activeView,
     activeTip,
@@ -359,20 +587,27 @@ const DynamicContextPanel = ({
         )
       : undefined;
   const historyTrendLine = buildHistoryTrendLine(invoiceHistory, focusedInvoice);
+  const latestJourneyInvoice = invoiceHistory[invoiceHistory.length - 1];
+  const isJourneyFocus =
+    !selectedInvoice || selectedInvoice.fingerprint === latestJourneyInvoice?.fingerprint;
   const contextAnalysis = React.useMemo(() => {
-    if (!focusedInvoice) {
+    if (!focusedInvoice || isJourneyFocus) {
       return latestAnalysis;
     }
 
     return buildAnalysisSummary(focusedInvoice, profile, invoiceHistory);
-  }, [focusedInvoice, invoiceHistory, latestAnalysis, profile]);
+  }, [focusedInvoice, invoiceHistory, isJourneyFocus, latestAnalysis, profile]);
   const prioritizedActions = React.useMemo(() => {
+    if (isJourneyFocus) {
+      return actions.slice(0, 2);
+    }
+
     if (!focusedInvoice || !contextAnalysis) {
       return actions.slice(0, 2);
     }
 
     return buildNextActions(focusedInvoice, contextAnalysis, profile).slice(0, 2);
-  }, [actions, contextAnalysis, focusedInvoice, profile]);
+  }, [actions, contextAnalysis, focusedInvoice, isJourneyFocus, profile]);
   const educationItems = contextAnalysis?.educationItems ?? [];
   const consultiveInsight = contextAnalysis?.consultiveInsight;
   const contextLines = getInsightContextLines(consultiveInsight);
@@ -410,6 +645,18 @@ const DynamicContextPanel = ({
       window.clearTimeout(timeoutId);
     };
   }, [historyFeedback]);
+
+  React.useEffect(() => {
+    setLocalActionFeedback({});
+  }, [focusedInvoice?.fingerprint]);
+
+  React.useEffect(() => {
+    if (activeView === 'actions' && previousActiveViewRef.current !== 'actions') {
+      setLocalActionFeedback({});
+    }
+
+    previousActiveViewRef.current = activeView;
+  }, [activeView]);
 
   const renderHistoryBars = () => {
     if (sortedInvoices.length === 0) {
@@ -707,7 +954,52 @@ const DynamicContextPanel = ({
               const supportingContext = action.context && action.context !== action.description
                 ? compactText(action.context, 112)
                 : null;
-              const clearCta = action.suggestion ? compactText(action.suggestion, 84) : null;
+              const clearCta = action.ctaLabel ? compactText(action.ctaLabel, 84) : null;
+              const interactionQuestions = action.interactiveQuestions ?? [];
+              const statusFeedback = localActionFeedback[action.id];
+              const optimisticAnsweredQuestions = statusFeedback?.answeredQuestions ?? [];
+              const hasAnsweredThisSession = optimisticAnsweredQuestions.length > 0;
+              const nextInteractionQuestion =
+                hasAnsweredThisSession || interactionQuestions.length === 0
+                  ? undefined
+                  : interactionQuestions[0];
+              const knownBehaviorSummary = action.knownBehaviorSummary ?? [];
+              const answeredQuestionSummaries = action.answeredQuestionSummaries ?? [];
+              const usedDataPoints = action.usedDataPoints ?? [];
+              const hasAdaptiveDiagnosis =
+                index === 0 &&
+                supportsAdaptiveDiagnosis(displayTitle) &&
+                (interactionQuestions.length > 0 ||
+                  answeredQuestionSummaries.length > 0 ||
+                  knownBehaviorSummary.length > 0 ||
+                  Boolean(statusFeedback) ||
+                  Boolean(action.diagnosticProgress));
+              const mergedAnsweredSummaries = mergeUniqueStrings(
+                answeredQuestionSummaries,
+                optimisticAnsweredQuestions.map((question) => question.summary)
+              );
+              const answeredSummaryLine = buildAnsweredSummaryLine(
+                mergedAnsweredSummaries.length > 0 ? mergedAnsweredSummaries : knownBehaviorSummary
+              );
+              const isDiagnosisUpdated =
+                hasAdaptiveDiagnosis &&
+                interactionQuestions.length === 0 &&
+                !hasAnsweredThisSession;
+              const answeredFeedbackMessage = hasAnsweredThisSession
+                ? interactionQuestions.length === 0
+                  ? 'Ja entendi melhor sua casa.'
+                  : 'Resposta salva. Vou usar isso nas proximas recomendacoes.'
+                : undefined;
+              const interactionConfig = hasAdaptiveDiagnosis
+                ? {
+                    title: isDiagnosisUpdated ? 'Diagnostico atualizado' : 'Pergunta rapida',
+                    prompt: isDiagnosisUpdated
+                      ? 'Ja entendi melhor sua casa.'
+                      : nextInteractionQuestion
+                        ? 'Ajude a refinar sua proxima recomendacao.'
+                        : answeredFeedbackMessage ?? 'Ja entendi melhor sua casa.',
+                  }
+                : null;
 
               return (
                 <div
@@ -746,47 +1038,178 @@ const DynamicContextPanel = ({
                     </Badge>
                   </div>
 
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {status === 'completed' ? (
-                      <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
-                        <CheckCircle2 className="h-4 w-4" />
-                        Acao ja testada na jornada
+                  {interactionConfig && (
+                    <div className="mt-4 rounded-[16px] border border-[#365f58] bg-[#0f342f] p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9dbfa6]">
+                          {interactionConfig.title}
+                        </p>
+                        <span className="text-xs font-medium text-[#bfe7bc]">
+                          {isDiagnosisUpdated
+                            ? 'Diagnostico atualizado'
+                            : hasAnsweredThisSession
+                              ? 'Ja entendi melhor sua casa'
+                              : '1 pergunta por vez'}
+                        </span>
                       </div>
-                    ) : index === 0 ? (
-                      <Button
-                        onClick={() => {
-                          setLocalActionFeedback((currentFeedback) => ({
-                            ...currentFeedback,
-                            [action.id]: 'Acao iniciada',
-                          }));
-                          onActionStatusChange(action, 'in_progress');
-                        }}
-                        className="rounded-[14px] bg-[#5f925c] text-white hover:bg-[#517d4f]"
-                      >
-                        Comecar acao
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setLocalActionFeedback((currentFeedback) => ({
-                            ...currentFeedback,
-                            [action.id]: 'Acompanharemos no proximo ciclo',
-                          }));
-                          onActionStatusChange(action, 'in_progress');
-                        }}
-                        className="rounded-[14px] border-[#365f58] bg-[#163f39] text-[#f5f8f3] hover:bg-[#1b4a43]"
-                      >
-                        Preparar teste
-                      </Button>
-                    )}
-                  </div>
 
-                  {localActionFeedback[action.id] && (
-                    <div className="mt-3 rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm font-medium leading-6 text-emerald-900">
-                      {localActionFeedback[action.id]}
+                      <p className="mt-2 text-sm leading-6 text-[#d9ead8]">{interactionConfig.prompt}</p>
+
+                      {(statusFeedback?.insight || answeredSummaryLine || isDiagnosisUpdated || answeredFeedbackMessage) && (
+                        <div className="mt-3 min-h-[42px] space-y-1">
+                          {answeredFeedbackMessage && (
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-[#c5d8c8]">
+                              <span className="rounded-full bg-[#215147] px-2 py-1 font-semibold text-[#8fd08e]">
+                                Salvo
+                              </span>
+                              <span>{answeredFeedbackMessage}</span>
+                            </div>
+                          )}
+
+                          {!answeredFeedbackMessage && statusFeedback?.insight && (
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-[#c5d8c8]">
+                              <span className="rounded-full bg-[#215147] px-2 py-1 font-semibold text-[#8fd08e]">
+                                {statusFeedback.microFeedback}
+                              </span>
+                              <span>{statusFeedback.insight}</span>
+                            </div>
+                          )}
+
+                          {answeredSummaryLine && (
+                            <p className="text-xs leading-5 text-[#9dbfa6]">{answeredSummaryLine}</p>
+                          )}
+
+                          {isDiagnosisUpdated && (
+                            <p className="text-xs font-medium text-[#8fd08e]">Diagnostico atualizado</p>
+                          )}
+                        </div>
+                      )}
+
+                      {nextInteractionQuestion && (
+                        <>
+                          <p className="mt-3 text-sm leading-6 text-[#d9ead8]">
+                            {nextInteractionQuestion.prompt}
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {nextInteractionQuestion.options.map((option) => {
+                              const isSelected =
+                                statusFeedback?.questionId === nextInteractionQuestion.id &&
+                                statusFeedback.answer === option.value;
+
+                              return (
+                                <Button
+                                  key={`${action.id}-${nextInteractionQuestion.id}-${option.value}`}
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={isSelected}
+                                  className={cn(
+                                    'rounded-[12px] border-[#365f58] bg-[#163f39] text-[#f5f8f3] hover:bg-[#1b4a43]',
+                                    isSelected && 'border-[#8fd08e] bg-[#215147] text-[#dff4dd]'
+                                  )}
+                                  onClick={() => {
+                                    const answeredAt = new Date().toISOString();
+                                    const adaptiveAnswer = describeAdaptiveAnswer(
+                                      nextInteractionQuestion.id,
+                                      option.value
+                                    );
+
+                                    setLocalActionFeedback((currentFeedback) => ({
+                                      ...currentFeedback,
+                                      [action.id]: {
+                                        ...currentFeedback[action.id],
+                                        answer: option.value,
+                                        insight: adaptiveAnswer.insight,
+                                        microFeedback: adaptiveAnswer.microFeedback,
+                                        questionId: nextInteractionQuestion.id,
+                                        summary: adaptiveAnswer.summary,
+                                        answeredQuestions: [
+                                          ...(currentFeedback[action.id]?.answeredQuestions ?? []).filter(
+                                            (question) => question.questionId !== nextInteractionQuestion.id
+                                          ),
+                                          {
+                                            answer: option.value,
+                                            questionId: nextInteractionQuestion.id,
+                                            summary: adaptiveAnswer.summary,
+                                          },
+                                        ],
+                                      },
+                                    }));
+                                    onActionStatusChange(
+                                      {
+                                        ...action,
+                                        pendingAnswer: {
+                                          questionId: nextInteractionQuestion.id,
+                                          answer: option.value,
+                                          answeredAt,
+                                          persistOnly: true,
+                                        },
+                                      },
+                                      'in_progress'
+                                    );
+                                  }}
+                                >
+                                  {isSelected ? `${option.label} - respondido` : option.label}
+                                </Button>
+                              );
+                            })}
+                          </div>
+
+                          {nextInteractionQuestion.helperText && (
+                            <p className="mt-3 text-xs leading-5 text-[#9dbfa6]">
+                              {nextInteractionQuestion.helperText}
+                            </p>
+                          )}
+                        </>
+                      )}
+
+                      {usedDataPoints.length > 0 && (
+                        <div className="mt-3 rounded-[14px] border border-[#365f58] bg-[#163f39] px-3 py-3 text-sm leading-6 text-[#d9ead8]">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9dbfa6]">
+                            Dados usados
+                          </p>
+                          <div className="mt-2 space-y-1">
+                            {usedDataPoints.slice(0, 4).map((point) => (
+                              <p key={`${action.id}-${point}`}>• {point}</p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {(!interactionConfig || isDiagnosisUpdated)
+                      ? status === 'completed'
+                        ? (
+                            <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+                              <CheckCircle2 className="h-4 w-4" />
+                              Acao ja testada na jornada
+                            </div>
+                          )
+                        : index === 0
+                          ? (
+                              <Button
+                                onClick={() => {
+                                  onActionStatusChange(action, 'in_progress');
+                                }}
+                                className="rounded-[14px] bg-[#5f925c] text-white hover:bg-[#517d4f]"
+                              >
+                                Comecar acao
+                              </Button>
+                            )
+                          : (
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  onActionStatusChange(action, 'in_progress');
+                                }}
+                                className="rounded-[14px] border-[#365f58] bg-[#163f39] text-[#f5f8f3] hover:bg-[#1b4a43]"
+                              >
+                                Preparar acompanhamento
+                              </Button>
+                            )
+                      : null}
+                  </div>
                 </div>
               );
             })
