@@ -21,7 +21,9 @@ import {
   buildNextCycleGuidance,
   captureActionSnapshotsForInvoice,
   DEFAULT_MVP_STATE,
+  getCurrentJourneyInvoice,
   getScoreExplanation,
+  isCurrentJourneyInvoice,
   normalizeState,
   answerMascotContextQuestion,
   ignoreMascotContextQuestion,
@@ -34,6 +36,7 @@ import {
 } from '@/services/ranking/helpers';
 import {
   AnalysisSummary,
+  EnergyBehaviorProfile,
   InvoiceData,
   InvoiceParserResult,
   MvpState,
@@ -536,6 +539,25 @@ test('getPreviousInvoice encontra a fatura imediatamente anterior por competenci
   ]);
 
   assert.equal(previousInvoice?.fingerprint, novemberInvoice.fingerprint);
+});
+
+test('fatura atual da jornada usa invoiceHistory[0] como convencao canonica', () => {
+  const currentInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-03-current',
+    month: '03/2026',
+    uploadedAt: '2026-03-22T12:00:00.000Z',
+  });
+  const previousInvoice = makeInvoice({
+    fingerprint: 'invoice-2026-02-previous',
+    month: '02/2026',
+    uploadedAt: '2026-02-22T12:00:00.000Z',
+  });
+  const invoiceHistory = [currentInvoice, previousInvoice];
+
+  assert.equal(getCurrentJourneyInvoice(invoiceHistory)?.fingerprint, currentInvoice.fingerprint);
+  assert.equal(isCurrentJourneyInvoice(invoiceHistory, currentInvoice), true);
+  assert.equal(isCurrentJourneyInvoice(invoiceHistory, previousInvoice), false);
+  assert.equal(isCurrentJourneyInvoice(invoiceHistory, undefined), true);
 });
 
 test('buildAnalysisSummary compara sinais com a competencia anterior em historico fora de ordem', () => {
@@ -1699,6 +1721,135 @@ test('roundtrip de persistencia preserva os campos canonicos que a UI consome', 
   assert.equal(resolved.analysis.invoiceHistory[0]?.month, '02/2026');
   assert.equal(resolved.analysis.invoiceHistory[0]?.consumption, 528);
   assert.equal(resolved.analysis.invoiceHistory[0]?.totalValue, 472.3);
+});
+
+test('normalizeState preserva memoria energetica e evita reabrir perguntas ja respondidas apos reidratacao', () => {
+  const persistedEnergyBehaviorProfile: EnergyBehaviorProfile = {
+    appliances: {
+      showers: 2,
+      hasElectricShower: true,
+      hasAirConditioning: true,
+    },
+    habits: {
+      usesHeavyLoadsAtNight: true,
+      laundryFrequency: 'media',
+      dominantUsageRoutine: 'noite',
+      peakWindowIntensity: 'sim',
+    },
+    intentions: {
+      solarAnalysisInterest: 'sim',
+      consultantInterest: 'talvez',
+      primaryObjective: 'economia',
+    },
+    qualification: {
+      diagnosisLevel: 7,
+      answeredDiagnosisCount: 6,
+      qualifiedLead: true,
+    },
+    actionMemory: {
+      startedActionTitles: ['Testar economia por 7 dias'],
+      answeredActionPrompts: {
+        heavy_loads_at_night: {
+          answer: 'yes',
+          answeredAt: '2026-04-23T14:10:00.000Z',
+        },
+        laundry_frequency: {
+          answer: 'media',
+          answeredAt: '2026-04-23T14:12:00.000Z',
+        },
+        solar_analysis_interest: {
+          answer: 'sim',
+          answeredAt: '2026-04-23T14:15:00.000Z',
+        },
+        primary_objective: {
+          answer: 'economia',
+          answeredAt: '2026-04-23T14:17:00.000Z',
+        },
+      },
+    },
+    confidence: {
+      applianceConfidence: 0.75,
+      habitConfidence: 0.8,
+      leadConfidence: 0.5,
+    },
+    updatedAt: '2026-04-23T14:20:00.000Z',
+  };
+  const persistedAnalysis = buildAnalysisSummary(
+    invoice,
+    completeProfile,
+    [invoice],
+    persistedEnergyBehaviorProfile
+  );
+  const expectedActions = buildNextActions(
+    invoice,
+    persistedAnalysis,
+    completeProfile,
+    undefined,
+    persistedEnergyBehaviorProfile
+  );
+  const persistedState = JSON.parse(
+    JSON.stringify(
+      makeState({
+        profile: completeProfile,
+        energyBehaviorProfile: persistedEnergyBehaviorProfile,
+        analysis: {
+          status: 'ready',
+          latestInvoice: invoice,
+          invoiceHistory: [invoice],
+          summary: persistedAnalysis,
+        },
+      })
+    )
+  );
+  const resolved = normalizeState(persistedState);
+
+  assert.equal(resolved.energyBehaviorProfile.appliances.showers, 2);
+  assert.equal(resolved.energyBehaviorProfile.appliances.hasElectricShower, true);
+  assert.equal(resolved.energyBehaviorProfile.appliances.hasAirConditioning, true);
+  assert.equal(resolved.energyBehaviorProfile.habits.usesHeavyLoadsAtNight, true);
+  assert.equal(resolved.energyBehaviorProfile.habits.laundryFrequency, 'media');
+  assert.equal(resolved.energyBehaviorProfile.habits.dominantUsageRoutine, 'noite');
+  assert.equal(resolved.energyBehaviorProfile.habits.peakWindowIntensity, 'sim');
+  assert.equal(resolved.energyBehaviorProfile.intentions.solarAnalysisInterest, 'sim');
+  assert.equal(resolved.energyBehaviorProfile.intentions.consultantInterest, 'talvez');
+  assert.equal(resolved.energyBehaviorProfile.intentions.primaryObjective, 'economia');
+  assert.equal(resolved.energyBehaviorProfile.qualification.diagnosisLevel, 7);
+  assert.equal(resolved.energyBehaviorProfile.qualification.answeredDiagnosisCount, 6);
+  assert.equal(resolved.energyBehaviorProfile.qualification.qualifiedLead, true);
+  assert.deepEqual(resolved.energyBehaviorProfile.actionMemory, persistedEnergyBehaviorProfile.actionMemory);
+  assert.equal(resolved.energyBehaviorProfile.confidence.applianceConfidence, 0.75);
+  assert.equal(resolved.energyBehaviorProfile.confidence.habitConfidence, 0.8);
+  assert.equal(resolved.energyBehaviorProfile.confidence.leadConfidence, 0.5);
+  assert.equal(resolved.energyBehaviorProfile.updatedAt, '2026-04-23T14:20:00.000Z');
+  assert.deepEqual(
+    resolved.actions.items.map((action) => ({
+      id: action.id,
+      interactiveQuestionIds: (action.interactiveQuestions ?? []).map((question) => question.id),
+      answeredQuestionSummaries: action.answeredQuestionSummaries ?? [],
+      diagnosticProgress: action.diagnosticProgress,
+    })),
+    expectedActions.map((action) => ({
+      id: action.id,
+      interactiveQuestionIds: (action.interactiveQuestions ?? []).map((question) => question.id),
+      answeredQuestionSummaries: action.answeredQuestionSummaries ?? [],
+      diagnosticProgress: action.diagnosticProgress,
+    }))
+  );
+  assert.ok(
+    resolved.actions.items.some(
+      (action) => (action.answeredQuestionSummaries ?? []).length > 0
+    )
+  );
+  assert.ok(
+    resolved.actions.items.every(
+      (action) =>
+        !(action.interactiveQuestions ?? []).some((question) =>
+          ['heavy_loads_at_night', 'laundry_frequency', 'solar_analysis_interest', 'primary_objective'].includes(
+            question.id
+          )
+        )
+    )
+  );
 });
 
 test('parser preserva ausencia segura quando campo nao existe', () => {

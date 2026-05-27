@@ -16,12 +16,14 @@ import { cn } from '@/lib/utils';
 import { buildAnalysisSummary, buildNextActions, describeAdaptiveAnswer } from '@/lib/mvpCoreFlow';
 import {
   AnalysisSummary,
+  EnergyBehaviorProfile,
   InvoiceData,
   MascotContextQuestion,
   MascotContextQuestionValue,
   MascotGuidance,
   NextAction,
   NextActionStatus,
+  UserContextState,
   UserProfileData,
 } from '@/types/mvp';
 import UserProfile from './UserProfile';
@@ -44,9 +46,12 @@ interface DynamicContextPanelProps {
   latestAnalysis?: AnalysisSummary;
   invoiceHistory: InvoiceData[];
   selectedInvoice?: InvoiceData;
+  isCurrentJourneyFocus?: boolean;
   profileCompletion: number;
   profile: UserProfileData;
   isProfileComplete: boolean;
+  userContext?: Partial<UserContextState>;
+  energyBehaviorProfile: EnergyBehaviorProfile;
   contextQuestion?: MascotContextQuestion;
   onContextQuestionAnswer?: (
     questionId: MascotContextQuestion['id'],
@@ -524,9 +529,12 @@ const DynamicContextPanel = ({
   latestAnalysis,
   invoiceHistory,
   selectedInvoice,
+  isCurrentJourneyFocus = true,
   profileCompletion,
   profile,
   isProfileComplete,
+  userContext,
+  energyBehaviorProfile,
   contextQuestion,
   onContextQuestionAnswer,
   onContextQuestionIgnore,
@@ -565,10 +573,7 @@ const DynamicContextPanel = ({
         .slice(-5),
     [invoiceHistory]
   );
-  const focusedInvoice =
-    selectedInvoice ||
-    sortedInvoices[sortedInvoices.length - 1] ||
-    invoiceHistory[invoiceHistory.length - 1];
+  const focusedInvoice = selectedInvoice;
   const maxConsumption = Math.max(
     ...sortedInvoices.map((invoice) =>
       typeof invoice.consumption === 'number' && Number.isFinite(invoice.consumption)
@@ -587,18 +592,26 @@ const DynamicContextPanel = ({
         )
       : undefined;
   const historyTrendLine = buildHistoryTrendLine(invoiceHistory, focusedInvoice);
-  const latestJourneyInvoice = invoiceHistory[invoiceHistory.length - 1];
-  const isJourneyFocus =
-    !selectedInvoice || selectedInvoice.fingerprint === latestJourneyInvoice?.fingerprint;
   const contextAnalysis = React.useMemo(() => {
-    if (!focusedInvoice || isJourneyFocus) {
+    if (!focusedInvoice) {
       return latestAnalysis;
     }
 
-    return buildAnalysisSummary(focusedInvoice, profile, invoiceHistory);
-  }, [focusedInvoice, invoiceHistory, isJourneyFocus, latestAnalysis, profile]);
+    if (isCurrentJourneyFocus) {
+      return latestAnalysis;
+    }
+
+    return buildAnalysisSummary(focusedInvoice, profile, invoiceHistory, energyBehaviorProfile);
+  }, [
+    energyBehaviorProfile,
+    focusedInvoice,
+    invoiceHistory,
+    isCurrentJourneyFocus,
+    latestAnalysis,
+    profile,
+  ]);
   const prioritizedActions = React.useMemo(() => {
-    if (isJourneyFocus) {
+    if (isCurrentJourneyFocus) {
       return actions.slice(0, 2);
     }
 
@@ -606,8 +619,22 @@ const DynamicContextPanel = ({
       return actions.slice(0, 2);
     }
 
-    return buildNextActions(focusedInvoice, contextAnalysis, profile).slice(0, 2);
-  }, [actions, contextAnalysis, focusedInvoice, isJourneyFocus, profile]);
+    return buildNextActions(
+      focusedInvoice,
+      contextAnalysis,
+      profile,
+      userContext,
+      energyBehaviorProfile
+    ).slice(0, 2);
+  }, [
+    actions,
+    contextAnalysis,
+    energyBehaviorProfile,
+    focusedInvoice,
+    isCurrentJourneyFocus,
+    profile,
+    userContext,
+  ]);
   const educationItems = contextAnalysis?.educationItems ?? [];
   const consultiveInsight = contextAnalysis?.consultiveInsight;
   const contextLines = getInsightContextLines(consultiveInsight);

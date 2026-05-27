@@ -21,7 +21,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMvpJourney } from '@/hooks/useMvpJourney';
 import { getInvoiceFlowSnapshot, logInvoiceFlow } from '@/lib/invoiceFlowDebug';
-import { buildAnalysisSummary } from '@/lib/mvpCoreFlow';
+import { buildAnalysisSummary, buildNextActions } from '@/lib/mvpCoreFlow';
+import { getCurrentJourneyInvoice, isCurrentJourneyInvoice } from '@/lib/mvpJourneyState';
 import { InvoiceData, NextAction, NextActionStatus } from '@/types/mvp';
 
 type DashboardSectionKey = 'profile' | 'score' | 'summary' | 'actions' | 'history';
@@ -89,12 +90,38 @@ const detailButtons: Array<{ id: DashboardSectionKey; label: string }> = [
   { id: 'history', label: 'Historico' },
 ];
 
+const resolveInitialPanelView = ({
+  isProfileComplete,
+  latestAnalysis,
+  nextActions,
+}: {
+  isProfileComplete: boolean;
+  latestAnalysis?: ReturnType<typeof buildAnalysisSummary>;
+  nextActions: NextAction[];
+}): DynamicContextPanelView => {
+  if (!isProfileComplete) {
+    return 'profile';
+  }
+
+  if (nextActions.length > 0) {
+    return 'actions';
+  }
+
+  if (latestAnalysis) {
+    return 'summary';
+  }
+
+  return 'history';
+};
+
 const Index = () => {
   const {
     profile,
     mascotCustomization,
     profileCompletion,
     isProfileComplete,
+    isJourneyHydrated,
+    energyBehaviorProfile,
     latestInvoice,
     invoiceHistory,
     latestAnalysis,
@@ -114,22 +141,22 @@ const Index = () => {
     answerMascotContextQuestion,
     ignoreMascotContextQuestion,
   } = useMvpJourney();
-  const initialPanelView: DynamicContextPanelView = !isProfileComplete
-    ? 'profile'
-    : nextActions.length > 0
-      ? 'actions'
-      : latestAnalysis
-        ? 'summary'
-        : 'history';
-  const [selectedInvoice, setSelectedInvoice] = React.useState<InvoiceData | undefined>(latestInvoice);
+  const [selectedInvoice, setSelectedInvoice] = React.useState<InvoiceData | undefined>(undefined);
   const [activeSection, setActiveSection] = React.useState<DashboardSectionKey>('summary');
   const [showLegacyDetails, setShowLegacyDetails] = React.useState(false);
-  const [isHistoryUploadVisible, setIsHistoryUploadVisible] = React.useState(invoiceHistory.length === 0);
+  const [isHistoryUploadVisible, setIsHistoryUploadVisible] = React.useState(false);
   const [interactionFeedback, setInteractionFeedback] = React.useState<InteractionFeedbackEvent | null>(null);
-  const [contextPanel, setContextPanel] = React.useState<ContextPanelState>({
-    view: initialPanelView,
-  });
+  const [contextPanel, setContextPanel] = React.useState<ContextPanelState | null>(null);
   const feedbackTimeoutRef = React.useRef<number | null>(null);
+  const wasJourneyHydratedRef = React.useRef(false);
+  const hydratedInvoiceHistory = isJourneyHydrated ? invoiceHistory : [];
+  const hydratedLatestInvoice = isJourneyHydrated ? latestInvoice : undefined;
+  const hydratedLatestAnalysis = isJourneyHydrated ? latestAnalysis : undefined;
+  const hydratedNextActions = isJourneyHydrated ? nextActions : [];
+  const currentJourneyInvoice = getCurrentJourneyInvoice(
+    hydratedInvoiceHistory,
+    hydratedLatestInvoice
+  );
 
   const triggerInteractionFeedback = React.useCallback((source: InteractionFeedbackSource) => {
     const nextEvent = {
@@ -167,39 +194,103 @@ const Index = () => {
   }, [invoiceHistory.length, latestInvoice]);
 
   React.useEffect(() => {
+    if (!isJourneyHydrated) {
+      wasJourneyHydratedRef.current = false;
+      setSelectedInvoice(undefined);
+      setIsHistoryUploadVisible(false);
+      setContextPanel(null);
+      return;
+    }
+
     setSelectedInvoice((currentSelection) => {
-      if (!latestInvoice) {
+      if (!currentJourneyInvoice) {
         return undefined;
       }
 
       if (!currentSelection) {
-        return latestInvoice;
+        return currentJourneyInvoice;
       }
 
       const preservedSelection = invoiceHistory.find(
         (invoice) => invoice.fingerprint === currentSelection.fingerprint
       );
 
-      return preservedSelection ?? latestInvoice;
+      return preservedSelection ?? currentJourneyInvoice;
     });
-  }, [invoiceHistory, latestInvoice]);
+
+    if (!wasJourneyHydratedRef.current) {
+      setIsHistoryUploadVisible(invoiceHistory.length === 0);
+      setContextPanel({
+        view: resolveInitialPanelView({
+          isProfileComplete,
+          latestAnalysis,
+          nextActions,
+        }),
+      });
+    }
+
+    wasJourneyHydratedRef.current = true;
+  }, [
+    currentJourneyInvoice,
+    invoiceHistory,
+    isJourneyHydrated,
+    isProfileComplete,
+    latestAnalysis,
+    nextActions,
+  ]);
 
   const completedSteps = [
     isProfileComplete,
-    Boolean(latestInvoice),
-    Boolean(latestAnalysis),
+    Boolean(hydratedLatestInvoice),
+    Boolean(hydratedLatestAnalysis),
   ].filter(Boolean).length;
 
-  const efficiencyLabel = latestAnalysis?.efficiencyLabel || 'Aguardando primeira leitura';
+  const efficiencyLabel = hydratedLatestAnalysis?.efficiencyLabel || 'Aguardando primeira leitura';
+  const focusedInvoice = selectedInvoice ?? currentJourneyInvoice;
+  const isCurrentJourneyFocus = isCurrentJourneyInvoice(
+    hydratedInvoiceHistory,
+    focusedInvoice,
+    hydratedLatestInvoice
+  );
   const selectedAnalysis = React.useMemo(() => {
-    if (!selectedInvoice) {
+    if (!isJourneyHydrated || !focusedInvoice) {
       return undefined;
     }
 
-    return buildAnalysisSummary(selectedInvoice, profile, invoiceHistory);
-  }, [invoiceHistory, profile, selectedInvoice]);
+    if (isCurrentJourneyFocus) {
+      return hydratedLatestAnalysis;
+    }
+
+    return buildAnalysisSummary(
+      focusedInvoice,
+      profile,
+      hydratedInvoiceHistory,
+      energyBehaviorProfile
+    );
+  }, [
+    energyBehaviorProfile,
+    focusedInvoice,
+    hydratedInvoiceHistory,
+    hydratedLatestAnalysis,
+    isCurrentJourneyFocus,
+    isJourneyHydrated,
+    profile,
+  ]);
+  const activeNextActions = isJourneyHydrated
+    ? isCurrentJourneyFocus
+      ? hydratedNextActions
+      : focusedInvoice && selectedAnalysis
+        ? buildNextActions(
+            focusedInvoice,
+            selectedAnalysis,
+            profile,
+            userContext,
+            energyBehaviorProfile
+          )
+        : []
+    : [];
   const primaryJourneyAction =
-    nextActions.find((action) => action.status !== 'completed') || nextActions[0];
+    activeNextActions.find((action) => action.status !== 'completed') || activeNextActions[0];
 
   const focusContextPanel = React.useCallback(
     (view: DynamicContextPanelView, payload?: Omit<ContextPanelState, 'view'>) => {
@@ -218,12 +309,12 @@ const Index = () => {
   const handleQuickAccessSelect = React.useCallback(
     (shortcutId: JourneyQuickAccessId) => {
       if (shortcutId === 'history') {
-        setIsHistoryUploadVisible(invoiceHistory.length === 0);
+        setIsHistoryUploadVisible(hydratedInvoiceHistory.length === 0);
       }
 
       focusContextPanel(panelViewByShortcut[shortcutId]);
     },
-    [focusContextPanel, invoiceHistory.length]
+    [focusContextPanel, hydratedInvoiceHistory.length]
   );
 
   const focusJourneyTarget = React.useCallback(
@@ -238,34 +329,40 @@ const Index = () => {
 
       if (nextView) {
         if (nextView === 'history') {
-          setIsHistoryUploadVisible(invoiceHistory.length === 0);
+          setIsHistoryUploadVisible(hydratedInvoiceHistory.length === 0);
         }
 
         focusContextPanel(nextView);
       }
     },
-    [focusContextPanel, invoiceHistory.length]
+    [focusContextPanel, hydratedInvoiceHistory.length]
   );
 
+  const contextPanelView = contextPanel?.view;
+
   const activeQuickAccessId = React.useMemo<JourneyQuickAccessId>(() => {
-    if (contextPanel.view === 'history') {
+    if (!contextPanelView) {
       return 'history';
     }
 
-    if (contextPanel.view === 'actions') {
+    if (contextPanelView === 'history') {
+      return 'history';
+    }
+
+    if (contextPanelView === 'actions') {
       return 'actions';
     }
 
-    if (contextPanel.view === 'summary' || contextPanel.view === 'co2') {
+    if (contextPanelView === 'summary' || contextPanelView === 'co2') {
       return 'summary';
     }
 
-    if (contextPanel.view === 'profile') {
+    if (contextPanelView === 'profile') {
       return 'profile';
     }
 
     return 'history';
-  }, [contextPanel.view]);
+  }, [contextPanelView]);
 
   const handleInvoiceProcessed = async (file: File) => {
     const processedInvoice = await completeInvoiceFlow(file);
@@ -303,11 +400,11 @@ const Index = () => {
       <main className="mx-auto flex w-[93vw] max-w-[1460px] flex-col gap-7 px-0 py-8">
         <LiveMascotJourney
           guidance={mascotGuidance}
-          nextActions={nextActions}
-          invoiceCount={invoiceHistory.length}
+          nextActions={activeNextActions}
+          invoiceCount={hydratedInvoiceHistory.length}
           isProfileComplete={isProfileComplete}
           currentScore={scoreState.score}
-          latestAnalysis={latestAnalysis}
+          latestAnalysis={hydratedLatestAnalysis}
           customization={mascotCustomization}
           profile={profile}
           onNavigate={focusJourneyTarget}
@@ -324,7 +421,7 @@ const Index = () => {
                 mascotCustomization={mascotCustomization}
                 latestScoreLabel={scoreExplanation.summary}
                 completedSteps={completedSteps}
-                activeActionsCount={nextActions.length}
+                activeActionsCount={activeNextActions.length}
                 efficiencyLabel={efficiencyLabel}
                 showMascot={false}
                 variant="compact"
@@ -339,50 +436,55 @@ const Index = () => {
             </div>
           }
           contextPanel={
-            <DynamicContextPanel
-              activeView={contextPanel.view}
-              activeTip={contextPanel.tip}
-              activeObjective={contextPanel.objective}
-              guidance={mascotGuidance}
-              nextAction={primaryJourneyAction}
-              actions={nextActions}
-              latestAnalysis={latestAnalysis}
-              invoiceHistory={invoiceHistory}
-              selectedInvoice={selectedInvoice}
-              profileCompletion={profileCompletion}
-              profile={profile}
-              isProfileComplete={isProfileComplete}
-              onOpenActions={() => focusContextPanel('actions')}
-              onOpenHistory={() => focusContextPanel('history')}
-              onOpenSummary={() => focusContextPanel('summary')}
-              onOpenProfileDetails={() => focusContextPanel('profile')}
-              onSelectInvoice={(invoice) => {
-                setSelectedInvoice(invoice);
-                focusContextPanel('history');
-              }}
-              onActionStatusChange={handleActionStatusChange}
-              onProfileUpdate={updateProfile}
-              isHistoryUploadVisible={isHistoryUploadVisible}
-              onToggleHistoryUpload={() =>
-                setIsHistoryUploadVisible((currentValue) => !currentValue)
-              }
-              historyUploadContent={
-                <InvoiceUpload
-                  profile={profile}
-                  onUploadStarted={startInvoiceProcessing}
-                  onInvoiceProcessed={handleInvoiceProcessed}
-                  onUploadCompleted={(invoice) => {
-                    if (invoice) {
-                      setSelectedInvoice(invoice);
-                    }
-                  }}
-                  variant="embedded"
-                />
-              }
-              contextQuestion={mascotContextQuestion}
-              onContextQuestionAnswer={handleContextQuestionAnswer}
-              onContextQuestionIgnore={ignoreMascotContextQuestion}
-            />
+            contextPanel ? (
+              <DynamicContextPanel
+                activeView={contextPanel.view}
+                activeTip={contextPanel.tip}
+                activeObjective={contextPanel.objective}
+                guidance={mascotGuidance}
+                nextAction={primaryJourneyAction}
+                actions={activeNextActions}
+                latestAnalysis={hydratedLatestAnalysis}
+                invoiceHistory={hydratedInvoiceHistory}
+                selectedInvoice={focusedInvoice}
+                isCurrentJourneyFocus={isCurrentJourneyFocus}
+                profileCompletion={profileCompletion}
+                profile={profile}
+                isProfileComplete={isProfileComplete}
+                userContext={userContext}
+                energyBehaviorProfile={energyBehaviorProfile}
+                onOpenActions={() => focusContextPanel('actions')}
+                onOpenHistory={() => focusContextPanel('history')}
+                onOpenSummary={() => focusContextPanel('summary')}
+                onOpenProfileDetails={() => focusContextPanel('profile')}
+                onSelectInvoice={(invoice) => {
+                  setSelectedInvoice(invoice);
+                  focusContextPanel('history');
+                }}
+                onActionStatusChange={handleActionStatusChange}
+                onProfileUpdate={updateProfile}
+                isHistoryUploadVisible={isHistoryUploadVisible}
+                onToggleHistoryUpload={() =>
+                  setIsHistoryUploadVisible((currentValue) => !currentValue)
+                }
+                historyUploadContent={
+                  <InvoiceUpload
+                    profile={profile}
+                    onUploadStarted={startInvoiceProcessing}
+                    onInvoiceProcessed={handleInvoiceProcessed}
+                    onUploadCompleted={(invoice) => {
+                      if (invoice) {
+                        setSelectedInvoice(invoice);
+                      }
+                    }}
+                    variant="embedded"
+                  />
+                }
+                contextQuestion={isJourneyHydrated ? mascotContextQuestion : undefined}
+                onContextQuestionAnswer={handleContextQuestionAnswer}
+                onContextQuestionIgnore={ignoreMascotContextQuestion}
+              />
+            ) : null
           }
         />
 
@@ -449,7 +551,7 @@ const Index = () => {
                           progress={scoreState.progressToNextLevel}
                         />
                         <EnergyProgressVisual
-                          invoiceCount={invoiceHistory.length}
+                          invoiceCount={hydratedInvoiceHistory.length}
                           interactionEvent={interactionFeedback}
                         />
                       </div>
@@ -482,11 +584,13 @@ const Index = () => {
 
                   {activeSection === 'summary' && (
                     <AnalysisSummary
-                      invoice={selectedInvoice}
-                      selectedInvoice={selectedInvoice}
+                      invoice={focusedInvoice}
+                      selectedInvoice={focusedInvoice}
                       analysis={selectedAnalysis}
                       profile={profile}
-                      invoiceHistory={invoiceHistory}
+                      energyBehaviorProfile={energyBehaviorProfile}
+                      invoiceHistory={hydratedInvoiceHistory}
+                      isCurrentJourneyFocus={isCurrentJourneyFocus}
                       onSelectInvoice={setSelectedInvoice}
                       isExpanded
                       showHeader={false}
@@ -495,13 +599,15 @@ const Index = () => {
 
                   {activeSection === 'actions' && (
                     <SmartRecommendations
-                      actions={nextActions}
+                      actions={activeNextActions}
                       viewedActionIds={viewedActionIds}
                       analysis={selectedAnalysis}
-                      invoiceHistory={invoiceHistory}
-                      selectedInvoice={selectedInvoice}
+                      invoiceHistory={hydratedInvoiceHistory}
+                      selectedInvoice={focusedInvoice}
+                      isCurrentJourneyFocus={isCurrentJourneyFocus}
                       profile={profile}
                       userContext={userContext}
+                      energyBehaviorProfile={energyBehaviorProfile}
                       onSelectInvoice={setSelectedInvoice}
                       onActionStatusChange={handleActionStatusChange}
                       isExpanded
@@ -511,8 +617,8 @@ const Index = () => {
 
                   {activeSection === 'history' && (
                     <InvoiceHistory
-                      invoices={invoiceHistory}
-                      selectedInvoice={selectedInvoice}
+                      invoices={hydratedInvoiceHistory}
+                      selectedInvoice={focusedInvoice}
                       onSelectInvoice={setSelectedInvoice}
                       onDeleteInvoice={handleInvoiceRemoved}
                       userContext={userContext}

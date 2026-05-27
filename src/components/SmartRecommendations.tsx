@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { buildAnalysisSummary, buildNextActions, describeAdaptiveAnswer } from '@/lib/mvpCoreFlow';
 import {
   AnalysisSummary,
+  EnergyBehaviorProfile,
   InvoiceData,
   NextAction,
   NextActionStatus,
@@ -24,8 +25,10 @@ interface SmartRecommendationsProps {
   analysis?: AnalysisSummary;
   invoiceHistory?: InvoiceData[];
   selectedInvoice?: InvoiceData;
+  isCurrentJourneyFocus?: boolean;
   profile: UserProfileData;
   userContext?: Partial<UserContextState>;
+  energyBehaviorProfile: EnergyBehaviorProfile;
   onSelectInvoice?: (invoice: InvoiceData) => void;
   isExpanded?: boolean;
   onToggle?: () => void;
@@ -687,8 +690,10 @@ const SmartRecommendations = ({
   analysis,
   invoiceHistory,
   selectedInvoice,
+  isCurrentJourneyFocus = true,
   profile,
   userContext,
+  energyBehaviorProfile,
   onSelectInvoice,
   isExpanded = false,
   onToggle,
@@ -702,27 +707,40 @@ const SmartRecommendations = ({
   const previousExpandedRef = React.useRef(isExpanded);
   const contextInvoice = selectedInvoice;
   const contextInvoiceLabel = contextInvoice ? getInvoiceReferenceLabel(contextInvoice) : undefined;
-  const latestJourneyInvoice = invoiceHistory?.[invoiceHistory.length - 1];
-  const isJourneyFocus =
-    !selectedInvoice || selectedInvoice.fingerprint === latestJourneyInvoice?.fingerprint;
   const contextAnalysis = React.useMemo(
     () =>
-      contextInvoice && !isJourneyFocus
-        ? buildAnalysisSummary(contextInvoice, profile, invoiceHistory ?? [])
+      contextInvoice
+        ? isCurrentJourneyFocus
+          ? analysis
+          : buildAnalysisSummary(contextInvoice, profile, invoiceHistory ?? [], energyBehaviorProfile)
         : analysis,
-    [analysis, contextInvoice, invoiceHistory, isJourneyFocus, profile]
+    [analysis, contextInvoice, energyBehaviorProfile, invoiceHistory, isCurrentJourneyFocus, profile]
   );
   const recommendedActions = React.useMemo(
     () => {
-      if (isJourneyFocus) {
+      if (isCurrentJourneyFocus) {
         return actions.slice(0, 2);
       }
 
       return contextInvoice && contextAnalysis
-        ? buildNextActions(contextInvoice, contextAnalysis, profile, userContext).slice(0, 2)
+        ? buildNextActions(
+            contextInvoice,
+            contextAnalysis,
+            profile,
+            userContext,
+            energyBehaviorProfile
+          ).slice(0, 2)
         : actions;
     },
-    [actions, contextAnalysis, contextInvoice, isJourneyFocus, profile, userContext]
+    [
+      actions,
+      contextAnalysis,
+      contextInvoice,
+      energyBehaviorProfile,
+      isCurrentJourneyFocus,
+      profile,
+      userContext,
+    ]
   );
   const educationItems = contextAnalysis?.educationItems ?? [];
   const evidenceItems = contextAnalysis?.evidenceItems ?? [];

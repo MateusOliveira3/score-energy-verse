@@ -535,9 +535,15 @@ export const normalizeEnergyBehaviorProfile = (
           : undefined,
     },
     confidence: {
-      applianceConfidence: normalizeConfidenceRatio(applianceAnsweredCount, 4),
-      habitConfidence: normalizeConfidenceRatio(habitAnsweredCount, 8),
-      leadConfidence: normalizeConfidenceRatio(leadAnsweredCount, 4),
+      applianceConfidence: isFiniteNumber(mergedEnergyBehaviorProfile.confidence?.applianceConfidence)
+        ? clampConfidence(mergedEnergyBehaviorProfile.confidence.applianceConfidence)
+        : normalizeConfidenceRatio(applianceAnsweredCount, 4),
+      habitConfidence: isFiniteNumber(mergedEnergyBehaviorProfile.confidence?.habitConfidence)
+        ? clampConfidence(mergedEnergyBehaviorProfile.confidence.habitConfidence)
+        : normalizeConfidenceRatio(habitAnsweredCount, 8),
+      leadConfidence: isFiniteNumber(mergedEnergyBehaviorProfile.confidence?.leadConfidence)
+        ? clampConfidence(mergedEnergyBehaviorProfile.confidence.leadConfidence)
+        : normalizeConfidenceRatio(leadAnsweredCount, 4),
     },
     updatedAt:
       typeof mergedEnergyBehaviorProfile.updatedAt === 'string' &&
@@ -1157,7 +1163,30 @@ export const pruneInvoiceHistory = (
   fingerprint: string
 ): InvoiceData[] => invoiceHistory.filter((invoice) => invoice.fingerprint !== fingerprint);
 
-export const getLatestInvoiceHistoryEntry = (invoiceHistory: InvoiceData[]) => invoiceHistory[0];
+export const getCurrentJourneyInvoice = (
+  invoiceHistory: InvoiceData[],
+  latestInvoice?: InvoiceData
+) => invoiceHistory[0] ?? latestInvoice;
+
+export const isCurrentJourneyInvoice = (
+  invoiceHistory: InvoiceData[],
+  invoice?: InvoiceData,
+  latestInvoice?: InvoiceData
+) => {
+  if (!invoice) {
+    return true;
+  }
+
+  const currentJourneyInvoice = getCurrentJourneyInvoice(invoiceHistory, latestInvoice);
+  if (!currentJourneyInvoice) {
+    return false;
+  }
+
+  return currentJourneyInvoice.fingerprint === invoice.fingerprint;
+};
+
+export const getLatestInvoiceHistoryEntry = (invoiceHistory: InvoiceData[]) =>
+  getCurrentJourneyInvoice(invoiceHistory);
 
 const PT_BR_MONTH_INDEX: Record<string, number> = {
   janeiro: 0,

@@ -389,6 +389,8 @@ export const useMvpJourney = () => {
     mascotCustomization: state.mascot,
     profileCompletion,
     isProfileComplete: isProfileComplete(state.profile),
+    isJourneyHydrated: storageLoaded,
+    energyBehaviorProfile: state.energyBehaviorProfile,
     latestInvoice: state.analysis.latestInvoice,
     invoiceHistory: state.analysis.invoiceHistory,
     latestAnalysis: state.analysis.summary as AnalysisSummary | undefined,

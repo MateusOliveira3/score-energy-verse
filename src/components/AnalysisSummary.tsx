@@ -3,14 +3,21 @@ import { ChevronDown, ChevronRight, FileBarChart, ScanSearch, Wallet } from 'luc
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { buildAnalysisSummary } from '@/lib/mvpCoreFlow';
-import { AnalysisSummary as AnalysisSummaryType, InvoiceData, UserProfileData } from '@/types/mvp';
+import {
+  AnalysisSummary as AnalysisSummaryType,
+  EnergyBehaviorProfile,
+  InvoiceData,
+  UserProfileData,
+} from '@/types/mvp';
 
 interface AnalysisSummaryProps {
   invoice?: InvoiceData;
   selectedInvoice?: InvoiceData;
   analysis?: AnalysisSummaryType;
   profile: UserProfileData;
+  energyBehaviorProfile: EnergyBehaviorProfile;
   invoiceHistory?: InvoiceData[];
+  isCurrentJourneyFocus?: boolean;
   onSelectInvoice?: (invoice: InvoiceData) => void;
   isExpanded?: boolean;
   onToggle?: () => void;
@@ -308,7 +315,9 @@ const AnalysisSummary = ({
   selectedInvoice,
   analysis,
   profile,
+  energyBehaviorProfile,
   invoiceHistory,
+  isCurrentJourneyFocus = true,
   onSelectInvoice,
   isExpanded = false,
   onToggle,
@@ -400,8 +409,11 @@ const AnalysisSummary = ({
   const referenceLabel = getInvoiceReferenceLabel(contextInvoice);
   const averageCostPerKwh = getAverageCostPerKwh(contextInvoice);
   const contextAnalysis = React.useMemo(
-    () => buildAnalysisSummary(contextInvoice, profile, history),
-    [contextInvoice, history, profile]
+    () =>
+      isCurrentJourneyFocus
+        ? analysis
+        : buildAnalysisSummary(contextInvoice, profile, history, energyBehaviorProfile),
+    [analysis, contextInvoice, energyBehaviorProfile, history, isCurrentJourneyFocus, profile]
   );
   const consultativeInsights = contextAnalysis.consultativeInsights ?? [];
   const educationItems = contextAnalysis.educationItems ?? [];
