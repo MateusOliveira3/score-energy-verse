@@ -8,14 +8,14 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import LandingPage from "./pages/LandingPage";
-import Index from "./pages/Index"; // Página de Perfil
+import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import Ranking from "./pages/Ranking";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-// Componente para rotas protegidas
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
 
@@ -43,7 +43,14 @@ const AppRoutes = () => (
         </ProtectedRoute>
       }
     />
-    <Route path="/ranking" element={<div>Ranking Page</div>} />
+    <Route
+      path="/ranking"
+      element={
+        <ProtectedRoute>
+          <Ranking />
+        </ProtectedRoute>
+      }
+    />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );

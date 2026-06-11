@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabase';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
 const SupabaseTest = () => {
@@ -16,50 +16,61 @@ const SupabaseTest = () => {
   }, []);
 
   const testConnection = async () => {
+    if (!isSupabaseConfigured || !supabase) {
+      setConnectionStatus('Modo local ativo: Supabase nao configurado');
+      setTableStatus('Testes remotos desativados');
+      return;
+    }
+
     try {
-      // Teste de conexão básica
-      const { data, error } = await supabase.from('user_profiles').select('count').limit(1);
-      
+      const { error } = await supabase.from('user_profiles').select('count').limit(1);
+
       if (error) {
-        setConnectionStatus('❌ Erro na conexão: ' + error.message);
+        setConnectionStatus('Erro na conexao: ' + error.message);
       } else {
-        setConnectionStatus('✅ Conexão OK');
+        setConnectionStatus('Conexao OK');
       }
     } catch (error) {
-      setConnectionStatus('❌ Erro: ' + (error as Error).message);
+      setConnectionStatus('Erro: ' + (error as Error).message);
     }
   };
 
   const testInvoicesTable = async () => {
+    if (!isSupabaseConfigured || !supabase) {
+      setTableStatus('Modo local ativo: sem tabela remota para testar');
+      return;
+    }
+
     setIsLoading(true);
     setTableStatus('Testando...');
-    
+
     try {
-      // Teste se a tabela invoices existe
-      const { data, error } = await supabase
-        .from('invoices')
-        .select('*')
-        .limit(1);
+      const { error } = await supabase.from('invoices').select('*').limit(1);
 
       if (error) {
         if (error.message.includes('relation "invoices" does not exist')) {
-          setTableStatus('❌ Tabela invoices não existe! Execute o script SQL primeiro.');
+          setTableStatus('Tabela invoices nao existe. Execute o script SQL primeiro.');
         } else {
-          setTableStatus('❌ Erro na tabela: ' + error.message);
+          setTableStatus('Erro na tabela: ' + error.message);
         }
       } else {
-        setTableStatus('✅ Tabela invoices OK');
+        setTableStatus('Tabela invoices OK');
       }
     } catch (error) {
-      setTableStatus('❌ Erro: ' + (error as Error).message);
+      setTableStatus('Erro: ' + (error as Error).message);
     } finally {
       setIsLoading(false);
     }
   };
 
   const testInsertInvoice = async () => {
+    if (!isSupabaseConfigured || !supabase) {
+      setTestResult('Modo local ativo: use o fluxo MVP para testar armazenamento local de faturas.');
+      return;
+    }
+
     if (!user) {
-      setTestResult('❌ Usuário não autenticado');
+      setTestResult('Usuario nao autenticado');
       return;
     }
 
@@ -74,30 +85,31 @@ const SupabaseTest = () => {
         tax_percentage: 25.5,
         peak_hours: '18:00-22:00',
         month: 'Janeiro 2024',
-        file_name: 'teste.pdf'
+        file_name: 'teste.pdf',
       };
 
-      const { data, error } = await supabase
-        .from('invoices')
-        .insert(testInvoice)
-        .select()
-        .single();
+      const { data, error } = await supabase.from('invoices').insert(testInvoice).select().single();
 
       if (error) {
-        setTestResult('❌ Erro ao inserir: ' + error.message);
+        setTestResult('Erro ao inserir: ' + error.message);
       } else {
-        setTestResult('✅ Fatura inserida com sucesso! ID: ' + data.id);
+        setTestResult('Fatura inserida com sucesso! ID: ' + data.id);
       }
     } catch (error) {
-      setTestResult('❌ Erro: ' + (error as Error).message);
+      setTestResult('Erro: ' + (error as Error).message);
     } finally {
       setIsLoading(false);
     }
   };
 
   const testSelectInvoices = async () => {
+    if (!isSupabaseConfigured || !supabase) {
+      setTestResult('Modo local ativo: as faturas sao lidas do navegador durante os testes locais.');
+      return;
+    }
+
     if (!user) {
-      setTestResult('❌ Usuário não autenticado');
+      setTestResult('Usuario nao autenticado');
       return;
     }
 
@@ -105,21 +117,18 @@ const SupabaseTest = () => {
     setTestResult('Buscando faturas...');
 
     try {
-      const { data, error } = await supabase
-        .from('invoices')
-        .select('*')
-        .eq('user_id', user.id);
+      const { data, error } = await supabase.from('invoices').select('*').eq('user_id', user.id);
 
       if (error) {
-        setTestResult('❌ Erro ao buscar: ' + error.message);
+        setTestResult('Erro ao buscar: ' + error.message);
       } else {
-        setTestResult(`✅ Encontradas ${data?.length || 0} faturas`);
+        setTestResult(`Encontradas ${data?.length || 0} faturas`);
         if (data && data.length > 0) {
           console.log('Faturas encontradas:', data);
         }
       }
     } catch (error) {
-      setTestResult('❌ Erro: ' + (error as Error).message);
+      setTestResult('Erro: ' + (error as Error).message);
     } finally {
       setIsLoading(false);
     }
@@ -133,7 +142,7 @@ const SupabaseTest = () => {
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="p-4 border rounded-lg">
-            <h3 className="font-semibold mb-2">Conexão</h3>
+            <h3 className="font-semibold mb-2">Conexao</h3>
             <p className="text-sm">{connectionStatus}</p>
           </div>
           <div className="p-4 border rounded-lg">
@@ -143,32 +152,20 @@ const SupabaseTest = () => {
         </div>
 
         <div className="p-4 border rounded-lg">
-          <h3 className="font-semibold mb-2">Usuário Atual</h3>
+          <h3 className="font-semibold mb-2">Usuario Atual</h3>
           <p className="text-sm">
-            {user ? `✅ Logado: ${user.email} (ID: ${user.id})` : '❌ Não logado'}
+            {user ? `Logado: ${user.email} (ID: ${user.id})` : 'Nao logado'}
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button 
-            onClick={testInvoicesTable}
-            disabled={isLoading}
-            variant="outline"
-          >
+          <Button onClick={testInvoicesTable} disabled={isLoading} variant="outline">
             Testar Tabela
           </Button>
-          <Button 
-            onClick={testInsertInvoice}
-            disabled={isLoading || !user}
-            variant="outline"
-          >
+          <Button onClick={testInsertInvoice} disabled={isLoading || !user} variant="outline">
             Inserir Teste
           </Button>
-          <Button 
-            onClick={testSelectInvoices}
-            disabled={isLoading || !user}
-            variant="outline"
-          >
+          <Button onClick={testSelectInvoices} disabled={isLoading || !user} variant="outline">
             Buscar Faturas
           </Button>
         </div>
@@ -181,12 +178,11 @@ const SupabaseTest = () => {
         )}
 
         <div className="p-4 border rounded-lg bg-yellow-50">
-          <h3 className="font-semibold mb-2 text-yellow-800">Instruções</h3>
+          <h3 className="font-semibold mb-2 text-yellow-800">Instrucoes</h3>
           <ol className="text-sm text-yellow-700 space-y-1">
-            <li>1. Execute o script SQL no Supabase Dashboard</li>
-            <li>2. Clique em "Testar Tabela" para verificar se existe</li>
-            <li>3. Faça login na aplicação</li>
-            <li>4. Teste inserir e buscar faturas</li>
+            <li>1. Configure o Supabase apenas se quiser testar backend real.</li>
+            <li>2. Sem variaveis de ambiente, o app entra em modo local seguro.</li>
+            <li>3. Use login, perfil e upload para validar o fluxo MVP no navegador.</li>
           </ol>
         </div>
       </CardContent>
@@ -194,4 +190,4 @@ const SupabaseTest = () => {
   );
 };
 
-export default SupabaseTest; 
+export default SupabaseTest;

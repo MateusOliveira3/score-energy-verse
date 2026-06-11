@@ -1,7 +1,26 @@
 import { useState, useEffect } from 'react';
-import { supabase, Invoice } from '@/lib/supabase';
+import { isSupabaseConfigured, supabase, Invoice } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+
+const getLocalInvoiceStorageKey = (userId: string) => `score-energy-local-invoices:${userId}`;
+
+const readLocalInvoices = (userId: string) => {
+  if (typeof window === 'undefined') {
+    return [] as Invoice[];
+  }
+
+  const raw = window.localStorage.getItem(getLocalInvoiceStorageKey(userId));
+  return raw ? (JSON.parse(raw) as Invoice[]) : [];
+};
+
+const writeLocalInvoices = (userId: string, invoices: Invoice[]) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.setItem(getLocalInvoiceStorageKey(userId), JSON.stringify(invoices));
+};
 
 export const useInvoices = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -9,9 +28,16 @@ export const useInvoices = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Buscar faturas do usuário
   const fetchInvoices = async () => {
-    if (!user) return;
+    if (!user) {
+      setInvoices([]);
+      return;
+    }
+
+    if (!isSupabaseConfigured || !supabase) {
+      setInvoices(readLocalInvoices(user.id));
+      return;
+    }
 
     setLoading(true);
     try {
@@ -26,24 +52,50 @@ export const useInvoices = () => {
     } catch (error) {
       console.error('Erro ao buscar faturas:', error);
       toast({
-        title: "Erro",
-        description: "Não foi possível carregar suas faturas.",
-        variant: "destructive"
+        title: 'Erro',
+        description: 'Nao foi possivel carregar suas faturas.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
     }
   };
 
-  // Adicionar nova fatura
-  const addInvoice = async (invoiceData: Omit<Invoice, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+  const addInvoice = async (
+    invoiceData: Omit<Invoice, 'id' | 'user_id' | 'created_at' | 'updated_at'>
+  ) => {
     if (!user) {
       toast({
-        title: "Erro",
-        description: "Você precisa estar logado para adicionar faturas.",
-        variant: "destructive"
+        title: 'Erro',
+        description: 'Voce precisa estar logado para adicionar faturas.',
+        variant: 'destructive',
       });
       return null;
+    }
+
+    if (!isSupabaseConfigured || !supabase) {
+      const now = new Date().toISOString();
+      const localInvoice: Invoice = {
+        id:
+          typeof crypto !== 'undefined' && 'randomUUID' in crypto
+            ? crypto.randomUUID()
+            : `local-invoice-${Date.now()}`,
+        user_id: user.id,
+        created_at: now,
+        updated_at: now,
+        ...invoiceData,
+      };
+
+      const nextInvoices = [localInvoice, ...readLocalInvoices(user.id)];
+      writeLocalInvoices(user.id, nextInvoices);
+      setInvoices(nextInvoices);
+
+      toast({
+        title: 'Fatura salva localmente',
+        description: 'Modo local ativo: a fatura foi guardada no navegador para testes do MVP.',
+      });
+
+      return localInvoice;
     }
 
     try {
@@ -51,47 +103,44 @@ export const useInvoices = () => {
         .from('invoices')
         .insert({
           ...invoiceData,
-          user_id: user.id
+          user_id: user.id,
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      setInvoices(prev => [data, ...prev]);
-      
+      setInvoices((prev) => [data, ...prev]);
+
       toast({
-        title: "Fatura salva! ⚡",
-        description: "Sua fatura foi processada e salva com sucesso.",
+        title: 'Fatura salva! ⚡',
+        description: 'Sua fatura foi processada e salva com sucesso.',
       });
 
       return data;
     } catch (error) {
       console.error('Erro ao salvar fatura:', error);
       toast({
-        title: "Erro",
-        description: "Não foi possível salvar a fatura. Tente novamente.",
-        variant: "destructive"
+        title: 'Erro',
+        description: 'Nao foi possivel salvar a fatura. Tente novamente.',
+        variant: 'destructive',
       });
       return null;
     }
   };
 
-  // Upload de arquivo para storage (opcional)
   const uploadFile = async (file: File): Promise<string | null> => {
-    if (!user) return null;
+    if (!user || !isSupabaseConfigured || !supabase) return null;
 
     try {
       const fileName = `${user.id}/${Date.now()}-${file.name}`;
-      const { data, error } = await supabase.storage
-        .from('invoices')
-        .upload(fileName, file);
+      const { error } = await supabase.storage.from('invoices').upload(fileName, file);
 
       if (error) throw error;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('invoices')
-        .getPublicUrl(fileName);
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from('invoices').getPublicUrl(fileName);
 
       return publicUrl;
     } catch (error) {
@@ -100,34 +149,48 @@ export const useInvoices = () => {
     }
   };
 
-  // Deletar fatura
   const deleteInvoice = async (invoiceId: string) => {
+    if (!user) {
+      return;
+    }
+
+    if (!isSupabaseConfigured || !supabase) {
+      const nextInvoices = readLocalInvoices(user.id).filter((invoice) => invoice.id !== invoiceId);
+      writeLocalInvoices(user.id, nextInvoices);
+      setInvoices(nextInvoices);
+
+      toast({
+        title: 'Fatura removida',
+        description: 'A fatura foi removida do armazenamento local.',
+      });
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('invoices')
         .delete()
         .eq('id', invoiceId)
-        .eq('user_id', user?.id);
+        .eq('user_id', user.id);
 
       if (error) throw error;
 
-      setInvoices(prev => prev.filter(invoice => invoice.id !== invoiceId));
-      
+      setInvoices((prev) => prev.filter((invoice) => invoice.id !== invoiceId));
+
       toast({
-        title: "Fatura removida",
-        description: "A fatura foi removida com sucesso.",
+        title: 'Fatura removida',
+        description: 'A fatura foi removida com sucesso.',
       });
     } catch (error) {
       console.error('Erro ao deletar fatura:', error);
       toast({
-        title: "Erro",
-        description: "Não foi possível remover a fatura.",
-        variant: "destructive"
+        title: 'Erro',
+        description: 'Nao foi possivel remover a fatura.',
+        variant: 'destructive',
       });
     }
   };
 
-  // Calcular estatísticas das faturas
   const getInvoiceStats = () => {
     if (invoices.length === 0) {
       return {
@@ -135,7 +198,7 @@ export const useInvoices = () => {
         averageConsumption: 0,
         totalValue: 0,
         averageValue: 0,
-        totalInvoices: 0
+        totalInvoices: 0,
       };
     }
 
@@ -147,13 +210,15 @@ export const useInvoices = () => {
       averageConsumption: Math.round(totalConsumption / invoices.length),
       totalValue,
       averageValue: Math.round(totalValue / invoices.length),
-      totalInvoices: invoices.length
+      totalInvoices: invoices.length,
     };
   };
 
   useEffect(() => {
     if (user) {
       fetchInvoices();
+    } else {
+      setInvoices([]);
     }
   }, [user]);
 
@@ -164,6 +229,6 @@ export const useInvoices = () => {
     deleteInvoice,
     uploadFile,
     getInvoiceStats,
-    refreshInvoices: fetchInvoices
+    refreshInvoices: fetchInvoices,
   };
-}; 
+};

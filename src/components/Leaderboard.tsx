@@ -1,19 +1,16 @@
-
 import React from 'react';
-import { Trophy, Medal, Award } from 'lucide-react';
+import { Trophy, Medal, Award, ShieldCheck, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { RankingEntry } from '@/services/ranking';
+import { getEntryInitials } from '@/services/ranking/helpers';
 
-const Leaderboard = () => {
-  const users = [
-    { id: 1, name: 'Ana Silva', score: 2456, position: 1, avatar: 'AS' },
-    { id: 2, name: 'Carlos Santos', score: 2234, position: 2, avatar: 'CS' },
-    { id: 3, name: 'Maria Costa', score: 1998, position: 3, avatar: 'MC' },
-    { id: 4, name: 'Você', score: 1247, position: 4, avatar: 'EU', isCurrentUser: true },
-    { id: 5, name: 'João Lima', score: 1156, position: 5, avatar: 'JL' },
-    { id: 6, name: 'Lucia Rocha', score: 1089, position: 6, avatar: 'LR' },
-  ];
+interface LeaderboardProps {
+  entries: RankingEntry[];
+}
 
+const Leaderboard = ({ entries }: LeaderboardProps) => {
   const getPositionIcon = (position: number) => {
     switch (position) {
       case 1:
@@ -28,59 +25,89 @@ const Leaderboard = () => {
   };
 
   return (
-    <Card className="border-2 border-purple-100 shadow-lg h-fit">
+    <Card className="h-fit border-2 border-emerald-100 shadow-lg">
       <CardHeader className="pb-4">
-        <CardTitle className="flex items-center space-x-2 text-purple-700">
-          <Trophy className="h-5 w-5" />
-          <span>Ranking Semanal</span>
-        </CardTitle>
+        <div className="space-y-2">
+          <CardTitle className="flex items-center space-x-2 text-emerald-700">
+            <Trophy className="h-5 w-5" />
+            <span>Jornadas pontuadas</span>
+          </CardTitle>
+          <p className="text-sm text-slate-600">
+            Lista ordenada por score de eventos validos, com nivel e contexto do perfil para dar
+            sentido a cada posicao.
+          </p>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {users.map((user) => (
+          {entries.map((entry) => (
             <div
-              key={user.id}
-              className={`flex items-center space-x-3 p-3 rounded-lg transition-colors ${
-                user.isCurrentUser 
-                  ? 'bg-gradient-to-r from-green-100 to-emerald-100 border-2 border-green-200' 
+              key={entry.userId}
+              className={`flex items-center space-x-3 rounded-lg p-3 transition-colors ${
+                entry.isCurrentUser
+                  ? 'border-2 border-green-200 bg-gradient-to-r from-green-100 to-emerald-100'
                   : 'hover:bg-gray-50'
               }`}
             >
-              <div className="flex items-center justify-center w-8">
-                {getPositionIcon(user.position)}
+              <div className="flex w-8 items-center justify-center">
+                {getPositionIcon(entry.position)}
               </div>
-              
+
               <Avatar className="h-10 w-10">
-                <AvatarFallback className={
-                  user.isCurrentUser 
-                    ? 'bg-green-500 text-white' 
-                    : 'bg-gray-200 text-gray-700'
-                }>
-                  {user.avatar}
+                <AvatarFallback
+                  className={
+                    entry.isCurrentUser ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700'
+                  }
+                >
+                  {getEntryInitials(entry)}
                 </AvatarFallback>
               </Avatar>
-              
+
               <div className="flex-1">
                 <div className="font-medium text-gray-800">
-                  {user.name}
-                  {user.isCurrentUser && (
-                    <span className="ml-2 text-xs bg-green-500 text-white px-2 py-1 rounded-full">
-                      Você
+                  {entry.displayName}
+                  {entry.isCurrentUser && (
+                    <span className="ml-2 rounded-full bg-green-500 px-2 py-1 text-xs text-white">
+                      Voce
                     </span>
                   )}
                 </div>
-                <div className="text-sm text-gray-600">
-                  {user.score.toLocaleString()} pontos
+                <div className="text-sm text-gray-600">{entry.subtitle}</div>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                  <span className="font-semibold text-emerald-700">
+                    {entry.score.toLocaleString('pt-BR')} pontos
+                  </span>
+                  <Badge variant="secondary">Nivel {entry.level}</Badge>
+                  <Badge variant="outline" className="bg-white">
+                    Score explicavel
+                  </Badge>
+                  {entry.badgeLabel && <Badge variant="outline">{entry.badgeLabel}</Badge>}
                 </div>
               </div>
             </div>
           ))}
         </div>
-        
-        <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
-          <div className="text-sm text-center text-gray-600">
-            <span className="font-medium">Próxima atualização:</span>
-            <div className="text-lg font-bold text-purple-600 mt-1">2 dias</div>
+
+        <div className="mt-6 rounded-lg bg-gradient-to-r from-blue-50 to-emerald-50 p-4">
+          <div className="grid gap-3 text-sm text-slate-700 md:grid-cols-2">
+            <div className="flex items-start gap-2">
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
+              <div>
+                <span className="font-medium">Base do ranking</span>
+                <p className="mt-1 text-xs leading-5">
+                  Score salvo na jornada e derivado de eventos validos.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
+              <div>
+                <span className="font-medium">Leitura de progresso</span>
+                <p className="mt-1 text-xs leading-5">
+                  Nivel e contexto ajudam a entender evolucao, nao apenas posicao.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </CardContent>

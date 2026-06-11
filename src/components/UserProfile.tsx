@@ -1,48 +1,59 @@
-
-import React, { useState } from 'react';
-import { User, MapPin, Building, Users, Zap, Settings } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useEffect, useState } from 'react';
+import { User, MapPin, Building, Users, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-
-interface UserProfileData {
-  consumerType: string;
-  location: string;
-  propertySize: number;
-  peopleCount: number;
-  energyPreference: string;
-}
+import { cn } from '@/lib/utils';
+import { UserProfileData } from '@/types/mvp';
 
 interface UserProfileProps {
+  value: UserProfileData;
+  completionPercent: number;
+  isComplete: boolean;
   onProfileUpdate: (data: UserProfileData) => void;
+  triggerClassName?: string;
+  triggerLabel?: string;
 }
 
-const UserProfile = ({ onProfileUpdate }: UserProfileProps) => {
+const UserProfile = ({
+  value,
+  completionPercent,
+  isComplete,
+  onProfileUpdate,
+  triggerClassName,
+  triggerLabel,
+}: UserProfileProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [profileData, setProfileData] = useState<UserProfileData>({
-    consumerType: 'Residencial',
-    location: '',
-    propertySize: 0,
-    peopleCount: 1,
-    energyPreference: 'Convencional'
-  });
+  const [profileData, setProfileData] = useState<UserProfileData>(value);
+  const fieldLabelClassName =
+    'mb-2 flex items-center gap-2 text-sm font-semibold text-slate-800';
+  const fieldClassName =
+    'w-full rounded-md border border-slate-300 bg-white text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200';
 
-  const consumerTypes = ['Residencial', 'Comercial', 'Restaurante', 'Escola', 'Indústria'];
-  const energyPreferences = ['Solar', 'Convencional', 'Híbrido', 'Eólica'];
+  const consumerTypes = ['Residencial', 'Comercial', 'Restaurante', 'Escola', 'Industria'];
+  const energyPreferences = ['Solar', 'Convencional', 'Hibrido', 'Eolica'];
+
+  useEffect(() => {
+    setProfileData(value);
+  }, [value]);
 
   const handleSave = () => {
-    onProfileUpdate(profileData);
+    onProfileUpdate({
+      consumerType: profileData.consumerType,
+      location: profileData.location,
+      propertySize: profileData.propertySize,
+      peopleCount: profileData.peopleCount,
+      energyPreference: profileData.energyPreference,
+    });
     setIsOpen(false);
   };
 
   const getLocationFromGPS = () => {
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((position) => {
-        // Simular conversão de coordenadas para cidade/estado
-        setProfileData(prev => ({
-          ...prev,
-          location: 'São Paulo, SP' // Placeholder - em implementação real usaria API de geocoding
+      navigator.geolocation.getCurrentPosition(() => {
+        setProfileData((currentProfile) => ({
+          ...currentProfile,
+          location: 'Sao Paulo, SP',
         }));
       });
     }
@@ -51,50 +62,83 @@ const UserProfile = ({ onProfileUpdate }: UserProfileProps) => {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="text-emerald-600 hover:text-emerald-700">
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn(
+            'text-emerald-600 hover:text-emerald-700',
+            triggerClassName
+          )}
+        >
           <User className="h-4 w-4 mr-2" />
-          Configurar Perfil
+          {triggerLabel ||
+            (isComplete
+              ? `Editar Perfil (${completionPercent}%)`
+              : `Completar Perfil (${completionPercent}%)`)}
         </Button>
       </DialogTrigger>
-      
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-emerald-700">Perfil do Usuário</DialogTitle>
+
+      <DialogContent className="max-w-md border border-emerald-100 bg-white shadow-2xl">
+        <DialogHeader className="space-y-2">
+          <DialogTitle className="text-emerald-700">Perfil do Usuario</DialogTitle>
+          <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-green-500 transition-all"
+              style={{ width: `${completionPercent}%` }}
+            ></div>
+          </div>
         </DialogHeader>
-        
-        <div className="space-y-4">
-          {/* Tipo de Consumidor */}
-          <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
-              <Building className="h-4 w-4 inline mr-1" />
+
+        <div className="space-y-5">
+          <p className="rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-3 text-sm text-slate-700">
+            Este contexto melhora a leitura da fatura, orienta o mascote e torna o score mais
+            explicavel.
+          </p>
+
+          <div className="space-y-1">
+            <label className={fieldLabelClassName}>
+              <Building className="h-4 w-4 text-emerald-600" />
               Tipo de Consumidor
             </label>
-            <select 
-              className="w-full p-2 border border-gray-300 rounded-md"
+            <select
+              className={`${fieldClassName} px-3 py-2.5`}
               value={profileData.consumerType}
-              onChange={(e) => setProfileData(prev => ({...prev, consumerType: e.target.value}))}
+              onChange={(event) =>
+                setProfileData((currentProfile) => ({
+                  ...currentProfile,
+                  consumerType: event.target.value,
+                }))
+              }
             >
-              {consumerTypes.map(type => (
-                <option key={type} value={type}>{type}</option>
+              {consumerTypes.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
               ))}
             </select>
           </div>
 
-          {/* Localização */}
-          <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
-              <MapPin className="h-4 w-4 inline mr-1" />
-              Localização
+          <div className="space-y-1">
+            <label className={fieldLabelClassName}>
+              <MapPin className="h-4 w-4 text-emerald-600" />
+              Localizacao
             </label>
             <div className="flex space-x-2">
               <Input
+                className={`${fieldClassName} h-11`}
                 placeholder="Cidade, Estado"
                 value={profileData.location}
-                onChange={(e) => setProfileData(prev => ({...prev, location: e.target.value}))}
+                onChange={(event) =>
+                  setProfileData((currentProfile) => ({
+                    ...currentProfile,
+                    location: event.target.value,
+                  }))
+                }
               />
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
+                className="h-11 border-slate-300 text-slate-700 hover:border-emerald-400 hover:bg-emerald-50"
                 onClick={getLocationFromGPS}
               >
                 GPS
@@ -102,51 +146,67 @@ const UserProfile = ({ onProfileUpdate }: UserProfileProps) => {
             </div>
           </div>
 
-          {/* Tamanho do Imóvel */}
-          <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
-              Tamanho do Imóvel (m²)
+          <div className="space-y-1">
+            <label className={fieldLabelClassName}>
+              Tamanho do Imovel (m2)
             </label>
             <Input
+              className={`${fieldClassName} h-11`}
               type="number"
               placeholder="Ex: 120"
               value={profileData.propertySize || ''}
-              onChange={(e) => setProfileData(prev => ({...prev, propertySize: Number(e.target.value)}))}
+              onChange={(event) =>
+                setProfileData((currentProfile) => ({
+                  ...currentProfile,
+                  propertySize: Number(event.target.value),
+                }))
+              }
             />
           </div>
 
-          {/* Número de Pessoas */}
-          <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
-              <Users className="h-4 w-4 inline mr-1" />
-              Número de Pessoas/Funcionários
+          <div className="space-y-1">
+            <label className={fieldLabelClassName}>
+              <Users className="h-4 w-4 text-emerald-600" />
+              Numero de Pessoas ou Funcionarios
             </label>
             <Input
+              className={`${fieldClassName} h-11`}
               type="number"
               placeholder="Ex: 4"
               value={profileData.peopleCount || ''}
-              onChange={(e) => setProfileData(prev => ({...prev, peopleCount: Number(e.target.value)}))}
+              onChange={(event) =>
+                setProfileData((currentProfile) => ({
+                  ...currentProfile,
+                  peopleCount: Number(event.target.value),
+                }))
+              }
             />
           </div>
 
-          {/* Preferência Energética */}
-          <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
-              <Zap className="h-4 w-4 inline mr-1" />
-              Preferência Energética
+          <div className="space-y-1">
+            <label className={fieldLabelClassName}>
+              <Zap className="h-4 w-4 text-emerald-600" />
+              Preferencia Energetica
             </label>
-            <select 
-              className="w-full p-2 border border-gray-300 rounded-md"
+            <select
+              className={`${fieldClassName} px-3 py-2.5`}
               value={profileData.energyPreference}
-              onChange={(e) => setProfileData(prev => ({...prev, energyPreference: e.target.value}))}
+              onChange={(event) =>
+                setProfileData((currentProfile) => ({
+                  ...currentProfile,
+                  energyPreference: event.target.value,
+                }))
+              }
             >
-              {energyPreferences.map(pref => (
-                <option key={pref} value={pref}>{pref}</option>
+              {energyPreferences.map((preference) => (
+                <option key={preference} value={preference}>
+                  {preference}
+                </option>
               ))}
             </select>
           </div>
 
-          <Button onClick={handleSave} className="w-full bg-emerald-600 hover:bg-emerald-700">
+          <Button onClick={handleSave} className="h-11 w-full bg-emerald-600 hover:bg-emerald-700 shadow-sm">
             Salvar Perfil
           </Button>
         </div>
