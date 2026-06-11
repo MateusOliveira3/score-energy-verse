@@ -13,6 +13,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Ranking from "./pages/Ranking";
 import NotFound from "./pages/NotFound";
+import AssistantPage from "./pages/Assistant";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,14 @@ const AppRoutes = () => (
       element={
         <ProtectedRoute>
           <Ranking />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/assistente"
+      element={
+        <ProtectedRoute>
+          <AssistantPage />
         </ProtectedRoute>
       }
     />

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LogOut, Trophy, User } from 'lucide-react';
+import { Bot, LogOut, Trophy, User } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -82,6 +82,14 @@ const Header = () => {
                 Perfil
               </Button>
             </Link>
+            {user ? (
+              <Link to="/assistente">
+                <Button variant="ghost" size="sm" className="text-green-600 hover:text-green-700">
+                  <Bot className="mr-2 h-4 w-4" />
+                  Assistente
+                </Button>
+              </Link>
+            ) : null}
             {user ? (
               <div className="flex items-center gap-2">
                 <span className="hidden max-w-48 truncate text-sm text-gray-600 md:inline">

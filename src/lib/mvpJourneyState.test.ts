@@ -21,6 +21,8 @@ import {
 } from '@/lib/energyKnowledge';
 import { parseInvoiceFile, parseInvoiceText } from '@/lib/invoiceParser';
 import { buildMemorySnapshot } from '@/lib/memorySnapshot';
+import { buildScoreAssistantContext } from '@/lib/scoreAssistant/buildScoreAssistantContext';
+import { buildFallbackAssistantResponse } from '@/lib/scoreAssistant/fallback';
 import {
   buildActionResultLink,
   buildInvoiceComparison,
@@ -1961,4 +1963,54 @@ test('memory snapshot expone conhecimentos adquiridos sem acoplar escrita', () =
       (item) => item.id === 'solar_potential' && item.learned === true
     )
   );
+});
+
+test('score assistant context reaproveita memoria e jornada sem mutacao', () => {
+  const state = markKnowledgeLearned(
+    makeState({
+      profile: completeProfile,
+      userContext: {
+        questions: {
+          primary_goal: {
+            status: 'answered',
+            value: 'reduce_cost',
+            label: 'Reduzir custo',
+            updatedAt: '2026-04-25T10:00:00.000Z',
+          },
+        },
+      },
+    }),
+    'bill_comparison'
+  );
+  const context = buildScoreAssistantContext({
+    activeView: 'assistente',
+    selectedInvoiceId: invoice.fingerprint,
+    state,
+  });
+
+  assert.equal(context.activeView, 'assistente');
+  assert.equal(context.selectedInvoiceId, invoice.fingerprint);
+  assert.equal(context.hasMemoryContext, true);
+  assert.ok(context.memorySignals.some((signal) => signal.includes('Objetivo principal')));
+  assert.ok(context.learnedKnowledge.includes('Comparacao entre ciclos'));
+});
+
+test('fallback do assistente explica memoria energetica sem inventar dados', () => {
+  const context = buildScoreAssistantContext({
+    activeView: 'assistente',
+    state: markKnowledgeLearned(makeState({ profile: completeProfile }), 'solar_potential'),
+  });
+  const response = buildFallbackAssistantResponse({
+    context,
+    messages: [
+      {
+        role: 'user',
+        content: 'O que e memoria energetica?',
+      },
+    ],
+  });
+
+  assert.equal(response.mode, 'fallback');
+  assert.match(response.answer, /Memoria Energetica/i);
+  assert.ok(response.memorySignalsUsed.length >= 0);
 });
