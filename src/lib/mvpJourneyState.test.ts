@@ -6,6 +6,7 @@ import {
   buildAnalysisSummary,
   buildBasicInvoiceSignals,
   buildConsultativeInsights,
+  buildMemoryFeedback,
   buildMascotGuidance,
   buildNextActions,
   getPreviousInvoice,
@@ -13,7 +14,13 @@ import {
   getScoreState,
   interpretInvoiceFile,
 } from '@/lib/mvpCoreFlow';
+import {
+  getLearnedEnergyKnowledgeCount,
+  isEnergyKnowledgeLearned,
+  pickEnergyKnowledge,
+} from '@/lib/energyKnowledge';
 import { parseInvoiceFile, parseInvoiceText } from '@/lib/invoiceParser';
+import { buildMemorySnapshot } from '@/lib/memorySnapshot';
 import {
   buildActionResultLink,
   buildInvoiceComparison,
@@ -24,6 +31,7 @@ import {
   getCurrentJourneyInvoice,
   getScoreExplanation,
   isCurrentJourneyInvoice,
+  markKnowledgeLearned,
   normalizeState,
   answerMascotContextQuestion,
   ignoreMascotContextQuestion,
@@ -278,6 +286,32 @@ test('nextActions ajusta microcopy com contexto leve do usuario', () => {
 
   assert.ok(peakUsageAction?.suggestion?.includes('chuveiro'));
   assert.equal(costCutAction?.value, 'Buscar impacto direto na fatura');
+});
+
+test('buildMemoryFeedback explica melhor respostas sobre climatizacao', () => {
+  const feedback = buildMemoryFeedback('air_conditioning_presence', 'yes');
+
+  assert.equal(feedback.badgeLabel, 'Memoria atualizada');
+  assert.equal(feedback.ctaLabel, 'Ver memoria');
+  assert.match(feedback.message, /climatizacao/i);
+});
+
+test('buildMemoryFeedback explica abertura para geracao propria', () => {
+  const feedback = buildMemoryFeedback('solar_analysis_interest', 'sim');
+
+  assert.match(feedback.message, /geracao propria/i);
+});
+
+test('buildMemoryFeedback equilibra conforto e economia quando esse interesse e informado', () => {
+  const feedback = buildMemoryFeedback('thermal_comfort_interest', 'sim');
+
+  assert.match(feedback.message, /economia e conforto/i);
+});
+
+test('buildMemoryFeedback cobre respostas adaptativas do mascote', () => {
+  const feedback = buildMemoryFeedback('usage_period', 'night');
+
+  assert.match(feedback.message, /horario de maior uso|rotina de consumo/i);
 });
 
 test('nextActions ajusta o retorno do proximo ciclo com foco do usuario', () => {
@@ -995,7 +1029,7 @@ test('mascote ajusta microcopy com objetivo principal do usuario', () => {
   assert.ok(guidance.message.includes('entender melhor o consumo'));
 });
 
-test('mascote pergunta sobre periodo de consumo apos primeira analise', () => {
+test('mascote nao pergunta mais sobre periodo de consumo apos primeira analise', () => {
   const resolved = resolveFullJourneyState(
     makeState({
       profile: completeProfile,
@@ -1009,11 +1043,10 @@ test('mascote pergunta sobre periodo de consumo apos primeira analise', () => {
   );
   const question = buildMascotContextQuestion(resolved);
 
-  assert.equal(question?.id, 'usage_period');
-  assert.equal(question?.question, 'Seu consumo costuma ser maior em qual periodo?');
+  assert.equal(question, undefined);
 });
 
-test('resposta do mascote e salva e a pergunta respondida nao reaparece', () => {
+test('resposta contextual legada continua salva sem reabrir a pergunta', () => {
   const resolved = resolveFullJourneyState(
     makeState({
       profile: completeProfile,
@@ -1037,7 +1070,7 @@ test('resposta do mascote e salva e a pergunta respondida nao reaparece', () => 
   assert.equal(buildMascotContextQuestion(answered), undefined);
 });
 
-test('mascote pergunta sobre chuveiro apos acoes aparecerem e serem iniciadas', () => {
+test('mascote nao pergunta mais sobre chuveiro apos acoes aparecerem e serem iniciadas', () => {
   const baseActions = buildNextActions(invoice, analysis, completeProfile);
   const resolved = resolveFullJourneyState(
     makeState({
@@ -1068,11 +1101,10 @@ test('mascote pergunta sobre chuveiro apos acoes aparecerem e serem iniciadas', 
   );
   const question = buildMascotContextQuestion(resolved);
 
-  assert.equal(question?.id, 'electric_shower');
-  assert.equal(question?.question, 'Voce usa chuveiro eletrico com frequencia?');
+  assert.equal(question, undefined);
 });
 
-test('pergunta ignorada pelo mascote nao reaparece', () => {
+test('estado legado de pergunta ignorada continua sem reaparecer', () => {
   const baseActions = buildNextActions(invoice, analysis, completeProfile);
   const resolved = resolveFullJourneyState(
     makeState({
@@ -1863,4 +1895,70 @@ test('parser preserva ausencia segura quando campo nao existe', () => {
   assert.equal(parsed.fields.totalValue.confidence, 'missing');
   assert.equal(parsed.fields.consumptionKwh.value, undefined);
   assert.equal(parsed.fields.consumptionKwh.confidence, 'missing');
+});
+
+test('markKnowledgeLearned persiste conhecimento na jornada normalizada', () => {
+  const nextState = markKnowledgeLearned(makeState(), 'shower_efficiency');
+  const normalizedState = normalizeState(JSON.parse(JSON.stringify(nextState)));
+
+  assert.equal(isEnergyKnowledgeLearned(normalizedState.knowledge, 'shower_efficiency'), true);
+  assert.equal(getLearnedEnergyKnowledgeCount(normalizedState.knowledge), 1);
+  assert.equal(normalizedState.knowledge.lastLearnedId, 'shower_efficiency');
+});
+
+test('pickEnergyKnowledge prioriza conteudo de banho e ignora conhecimento aprendido', () => {
+  const showerKnowledge = pickEnergyKnowledge({
+    activeView: 'mascot',
+    guidance: {
+      stage: 'analysis-ready',
+      title: 'Banho e consumo',
+      message: 'Seu chuveiro pode estar puxando mais energia que o esperado.',
+    },
+    energyBehaviorProfile: {
+      ...DEFAULT_MVP_STATE.energyBehaviorProfile,
+      appliances: {
+        ...DEFAULT_MVP_STATE.energyBehaviorProfile.appliances,
+        hasElectricShower: true,
+      },
+    },
+    knowledgeState: DEFAULT_MVP_STATE.knowledge,
+  });
+
+  assert.equal(showerKnowledge?.id, 'shower_efficiency');
+
+  const nextKnowledge = pickEnergyKnowledge({
+    activeView: 'mascot',
+    guidance: {
+      stage: 'analysis-ready',
+      title: 'Banho e consumo',
+      message: 'Seu chuveiro pode estar puxando mais energia que o esperado.',
+    },
+    energyBehaviorProfile: {
+      ...DEFAULT_MVP_STATE.energyBehaviorProfile,
+      appliances: {
+        ...DEFAULT_MVP_STATE.energyBehaviorProfile.appliances,
+        hasElectricShower: true,
+      },
+    },
+    knowledgeState: {
+      learned: {
+        shower_efficiency: true,
+      },
+    },
+  });
+
+  assert.notEqual(nextKnowledge?.id, 'shower_efficiency');
+});
+
+test('memory snapshot expone conhecimentos adquiridos sem acoplar escrita', () => {
+  const state = markKnowledgeLearned(makeState({ profile: completeProfile }), 'solar_potential');
+  const snapshot = buildMemorySnapshot(state);
+
+  assert.equal(snapshot.memoryKnowledge.learnedCount, 1);
+  assert.ok(snapshot.memoryKnowledge.totalCount >= 1);
+  assert.ok(
+    snapshot.memoryKnowledge.items.some(
+      (item) => item.id === 'solar_potential' && item.learned === true
+    )
+  );
 });

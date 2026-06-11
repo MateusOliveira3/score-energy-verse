@@ -1616,11 +1616,154 @@ const buildAdaptiveAnswerInsight = (questionId: string, answer: string) => {
   return 'Usarei isso nas proximas recomendacoes.';
 };
 
-export const describeAdaptiveAnswer = (questionId: string, answer: string) => ({
-  insight: buildAdaptiveAnswerInsight(questionId, answer),
-  microFeedback: 'Salvo',
-  summary: formatAdaptiveAnswerValue(questionId, answer),
-});
+export interface MemoryFeedbackCopy {
+  badgeLabel: string;
+  ctaLabel?: string;
+  message: string;
+}
+
+const DEFAULT_MEMORY_FEEDBACK_MESSAGE = 'Agora entendemos melhor sua rotina de consumo.';
+
+export const buildMemoryFeedback = (
+  questionId: string,
+  answer: string,
+  _energyBehaviorProfile?: Partial<EnergyBehaviorProfile>
+): MemoryFeedbackCopy => {
+  const normalizedAnswer = normalizeForMatch(answer);
+  const sharedFeedback = {
+    badgeLabel: 'Memoria atualizada',
+    ctaLabel: 'Ver memoria',
+  } as const;
+
+  if (questionId === 'showers_count') {
+    return {
+      ...sharedFeedback,
+      message:
+        normalizedAnswer === '0'
+          ? 'Agora conseguimos separar melhor o consumo da casa sem depender da rotina de banho.'
+          : 'Agora conseguimos considerar melhor o impacto do banho no seu consumo.',
+    };
+  }
+
+  if (questionId === 'electric_shower_presence' || questionId === 'electric_shower') {
+    return {
+      ...sharedFeedback,
+      message:
+        normalizedAnswer === 'no' || normalizedAnswer === 'none'
+          ? 'Agora conseguimos separar melhor o consumo da casa sem depender da rotina de banho.'
+          : 'Agora conseguimos considerar melhor o impacto do banho no seu consumo.',
+    };
+  }
+
+  if (
+    questionId === 'air_conditioning_presence' ||
+    questionId === 'climate_usage_intensity'
+  ) {
+    return {
+      ...sharedFeedback,
+      message:
+        normalizedAnswer === 'no' || normalizedAnswer === 'nao'
+          ? 'Agora conseguimos calibrar melhor o peso da climatizacao no seu consumo.'
+          : 'Agora conseguimos avaliar melhor o peso da climatizacao no seu consumo.',
+    };
+  }
+
+  if (questionId === 'extra_fridge_presence') {
+    return {
+      ...sharedFeedback,
+      message: 'Agora conseguimos avaliar melhor o peso das cargas continuas no consumo da casa.',
+    };
+  }
+
+  if (questionId === 'heavy_loads_at_night') {
+    return {
+      ...sharedFeedback,
+      message:
+        normalizedAnswer === 'yes'
+          ? 'Agora conseguimos cruzar melhor seu uso noturno com a leitura da conta.'
+          : 'Agora conseguimos separar melhor o que pesa no consumo fora da noite.',
+    };
+  }
+
+  if (questionId === 'laundry_frequency') {
+    return {
+      ...sharedFeedback,
+      message: 'Agora conseguimos considerar melhor a rotina de lavagem no seu consumo.',
+    };
+  }
+
+  if (questionId === 'dominant_usage_period' || questionId === 'usage_period') {
+    return {
+      ...sharedFeedback,
+      message:
+        normalizedAnswer === 'night' || normalizedAnswer === 'noite'
+          ? 'Agora conseguimos cruzar melhor seu horario de maior uso com a leitura da conta.'
+          : 'Agora conseguimos entender melhor quando sua rotina de consumo pesa mais.',
+    };
+  }
+
+  if (questionId === 'peak_window_intensity' || questionId === 'peak_household_presence') {
+    return {
+      ...sharedFeedback,
+      message: 'Agora conseguimos avaliar melhor a concentracao de uso no fim da tarde e a noite.',
+    };
+  }
+
+  if (questionId === 'thermal_instability') {
+    return {
+      ...sharedFeedback,
+      message: 'Agora conseguimos considerar melhor como temperatura e conforto entram na sua rotina.',
+    };
+  }
+
+  if (questionId === 'thermal_comfort_interest') {
+    return {
+      ...sharedFeedback,
+      message: 'Agora conseguimos equilibrar economia e conforto nas proximas recomendacoes.',
+    };
+  }
+
+  if (questionId === 'solar_analysis_interest') {
+    return {
+      ...sharedFeedback,
+      message: 'Agora conseguimos entender melhor sua abertura para solucoes de geracao propria.',
+    };
+  }
+
+  if (questionId === 'consultant_interest') {
+    return {
+      ...sharedFeedback,
+      message: 'Agora conseguimos entender melhor seu momento para apoio consultivo.',
+    };
+  }
+
+  if (questionId === 'primary_objective' || questionId === 'primary_goal') {
+    return {
+      ...sharedFeedback,
+      message: 'Agora conseguimos alinhar melhor as proximas recomendacoes com seu objetivo principal.',
+    };
+  }
+
+  const adaptiveInsight = buildAdaptiveAnswerInsight(questionId, answer);
+
+  return {
+    ...sharedFeedback,
+    message:
+      adaptiveInsight === 'Usarei isso nas proximas recomendacoes.'
+        ? DEFAULT_MEMORY_FEEDBACK_MESSAGE
+        : adaptiveInsight,
+  };
+};
+
+export const describeAdaptiveAnswer = (questionId: string, answer: string) => {
+  const memoryFeedback = buildMemoryFeedback(questionId, answer);
+
+  return {
+    insight: memoryFeedback.message,
+    microFeedback: memoryFeedback.badgeLabel,
+    summary: formatAdaptiveAnswerValue(questionId, answer),
+  };
+};
 
 const createInteractiveQuestion = (
   id: ActionInteractiveQuestion['id'],

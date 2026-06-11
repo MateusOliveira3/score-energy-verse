@@ -20,6 +20,7 @@ import {
   getLatestInvoiceHistoryEntry,
   getScoreExplanation,
   ignoreMascotContextQuestion as applyMascotContextIgnore,
+  markKnowledgeLearned as applyKnowledgeLearned,
   pruneInvoiceHistory,
   resolveFullJourneyState,
   setAnalysis,
@@ -35,6 +36,7 @@ import { useJourneyIdentity } from '@/hooks/useJourneyIdentity';
 import { getMvpJourneyService } from '@/services/mvpJourney';
 import {
   AnalysisSummary,
+  EnergyKnowledgeId,
   MascotGuidance,
   MascotContextQuestionId,
   MascotContextQuestionValue,
@@ -354,6 +356,10 @@ export const useMvpJourney = () => {
     handleStateUpdate((currentState) => applyMascotContextIgnore(currentState, questionId));
   };
 
+  const markKnowledgeLearned = (knowledgeId: EnergyKnowledgeId) => {
+    handleStateUpdate((currentState) => applyKnowledgeLearned(currentState, knowledgeId));
+  };
+
   const profileCompletion = useMemo(() => getProfileCompletion(state.profile), [state.profile]);
   const scoreState = useMemo(() => getScoreState(state.scoreEvents), [state.scoreEvents]);
   const scoreExplanation = useMemo(() => getScoreExplanation(state), [state]);
@@ -385,12 +391,14 @@ export const useMvpJourney = () => {
   );
 
   return {
+    journeyState: state,
     profile: state.profile,
     mascotCustomization: state.mascot,
     profileCompletion,
     isProfileComplete: isProfileComplete(state.profile),
     isJourneyHydrated: storageLoaded,
     energyBehaviorProfile: state.energyBehaviorProfile,
+    knowledgeState: state.knowledge,
     latestInvoice: state.analysis.latestInvoice,
     invoiceHistory: state.analysis.invoiceHistory,
     latestAnalysis: state.analysis.summary as AnalysisSummary | undefined,
@@ -412,5 +420,6 @@ export const useMvpJourney = () => {
     updateActionStatus,
     answerMascotContextQuestion,
     ignoreMascotContextQuestion,
+    markKnowledgeLearned,
   };
 };

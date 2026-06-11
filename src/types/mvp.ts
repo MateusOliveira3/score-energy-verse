@@ -440,6 +440,29 @@ export interface UserContextState {
   questions: Partial<Record<MascotContextQuestionId, MascotContextAnswer>>;
 }
 
+export type EnergyKnowledgeCategory =
+  | 'consumo'
+  | 'conforto_termico'
+  | 'climatizacao'
+  | 'habitos'
+  | 'sustentabilidade'
+  | 'energia_solar';
+
+export type EnergyKnowledgeId =
+  | 'bill_comparison'
+  | 'shower_efficiency'
+  | 'standby_consumption'
+  | 'thermal_comfort'
+  | 'efficient_cooling'
+  | 'peak_usage_habits'
+  | 'sustainable_routine'
+  | 'solar_potential';
+
+export interface EnergyKnowledgeState {
+  learned: Partial<Record<EnergyKnowledgeId, boolean>>;
+  lastLearnedId?: EnergyKnowledgeId;
+}
+
 export type ScoreEventType =
   | 'profile_completed'
   | 'invoice_uploaded'
@@ -519,6 +542,7 @@ export interface MvpState {
   profile: Profile;
   mascot: Mascot;
   userContext: UserContextState;
+  knowledge: EnergyKnowledgeState;
   energyBehaviorProfile: EnergyBehaviorProfile;
   analysis: AnalysisState;
   scoreEvents: ScoreEvent[];

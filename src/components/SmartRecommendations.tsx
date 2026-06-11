@@ -8,7 +8,12 @@ import {
   Target,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { buildAnalysisSummary, buildNextActions, describeAdaptiveAnswer } from '@/lib/mvpCoreFlow';
+import {
+  buildAnalysisSummary,
+  buildNextActions,
+  buildMemoryFeedback,
+  describeAdaptiveAnswer,
+} from '@/lib/mvpCoreFlow';
 import {
   AnalysisSummary,
   EnergyBehaviorProfile,
@@ -33,6 +38,7 @@ interface SmartRecommendationsProps {
   isExpanded?: boolean;
   onToggle?: () => void;
   showHeader?: boolean;
+  showEducationalContent?: boolean;
   onActionStatusChange: (
     action: NextAction,
     status: Extract<NextActionStatus, 'in_progress' | 'completed'>
@@ -698,6 +704,7 @@ const SmartRecommendations = ({
   isExpanded = false,
   onToggle,
   showHeader = true,
+  showEducationalContent = true,
   onActionStatusChange,
 }: SmartRecommendationsProps) => {
   const [expandedDetailIds, setExpandedDetailIds] = React.useState<string[]>([]);
@@ -994,18 +1001,17 @@ const SmartRecommendations = ({
                 interactionQuestions.length === 0 &&
                 !hasAnsweredThisSession;
               const answeredFeedbackMessage = hasAnsweredThisSession
-                ? interactionQuestions.length === 0
-                  ? 'Ja entendi melhor sua casa.'
-                  : 'Resposta salva. Vou usar isso nas proximas recomendacoes.'
+                ? 'Informacao incorporada a sua Memoria Energetica.'
                 : undefined;
+              const hasMemoryFeedbackState = isDiagnosisUpdated || hasAnsweredThisSession;
               const interactionConfig = hasAdaptiveDiagnosis
                 ? {
-                    title: isDiagnosisUpdated ? 'Diagnostico atualizado' : 'Pergunta rapida',
-                    prompt: isDiagnosisUpdated
-                      ? 'Ja entendi melhor sua casa.'
+                    title: hasMemoryFeedbackState ? 'Memoria Energetica' : 'Pergunta rapida',
+                    prompt: hasMemoryFeedbackState
+                      ? 'Sua resposta melhora a leitura da jornada sem mexer nas regras principais.'
                       : nextInteractionQuestion
-                        ? 'Ajude a refinar sua proxima recomendacao.'
-                        : answeredFeedbackMessage ?? 'Ja entendi melhor sua casa.',
+                        ? 'Ajude a refinar sua Memoria Energetica em 1 toque.'
+                        : answeredFeedbackMessage ?? 'Sua resposta melhora a leitura da jornada.',
                   }
                 : null;
               const hasExpandableDetails = Boolean(
@@ -1074,11 +1080,7 @@ const SmartRecommendations = ({
                             {interactionConfig.title}
                           </p>
                           <span className="text-xs font-medium text-slate-500">
-                            {isDiagnosisUpdated
-                              ? 'Diagnostico atualizado'
-                              : hasAnsweredThisSession
-                                ? 'Ja entendi melhor sua casa'
-                                : '1 pergunta por vez'}
+                            {hasMemoryFeedbackState ? 'Memoria atualizada' : '1 pergunta por vez'}
                           </span>
                         </div>
 
@@ -1088,8 +1090,9 @@ const SmartRecommendations = ({
                           <div className="mt-3 min-h-[42px] space-y-1">
                             {answeredFeedbackMessage && (
                               <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
-                                <span className="rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-700">
-                                  Salvo
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-700">
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                  Memoria atualizada
                                 </span>
                                 <span>{answeredFeedbackMessage}</span>
                               </div>
@@ -1097,7 +1100,8 @@ const SmartRecommendations = ({
 
                             {!answeredFeedbackMessage && actionFeedback?.insight && (
                               <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
-                                <span className="rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-700">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-700">
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
                                   {actionFeedback.message}
                                 </span>
                                 <span>{actionFeedback.insight}</span>
@@ -1108,10 +1112,13 @@ const SmartRecommendations = ({
                               <p className="text-xs leading-5 text-slate-600">{answeredSummaryLine}</p>
                             )}
 
-                            {isDiagnosisUpdated && (
-                              <p className="text-xs font-medium text-emerald-700">
-                                Diagnostico atualizado
-                              </p>
+                            {(actionFeedback?.insight || answeredFeedbackMessage || isDiagnosisUpdated) && (
+                              <a
+                                href="#memory-panel"
+                                className="inline-flex text-xs font-semibold text-blue-700 underline-offset-4 hover:underline"
+                              >
+                                Ver memoria
+                              </a>
                             )}
                           </div>
                         )}
@@ -1139,6 +1146,11 @@ const SmartRecommendations = ({
                                     }`}
                                     onClick={() => {
                                       const answeredAt = new Date().toISOString();
+                                      const memoryFeedback = buildMemoryFeedback(
+                                        nextInteractionQuestion.id,
+                                        option.value,
+                                        energyBehaviorProfile
+                                      );
                                       const adaptiveAnswer = describeAdaptiveAnswer(
                                         nextInteractionQuestion.id,
                                         option.value
@@ -1150,8 +1162,8 @@ const SmartRecommendations = ({
                                           ...currentFeedback[action.id],
                                           answer: option.value,
                                           choice: currentFeedback[action.id]?.choice,
-                                          insight: adaptiveAnswer.insight,
-                                          message: adaptiveAnswer.microFeedback,
+                                          insight: memoryFeedback.message || adaptiveAnswer.insight,
+                                          message: memoryFeedback.badgeLabel,
                                           questionId: nextInteractionQuestion.id,
                                           summary: adaptiveAnswer.summary,
                                           answeredQuestions: [
@@ -1327,7 +1339,7 @@ const SmartRecommendations = ({
             Guarde o detalhe para quando precisar. No dia a dia, acompanhe estas acoes pela proxima fatura.
           </p>
 
-          {educationItems.length > 0 && (
+          {showEducationalContent && educationItems.length > 0 && (
             <div className="rounded-[24px] border border-blue-100 bg-blue-50/70 p-4">
               <p className="text-sm font-semibold text-blue-900">Entenda o sinal da conta</p>
               <div className="mt-3 space-y-2">

@@ -2,9 +2,10 @@ import React from 'react';
 import {
   BarChart3,
   CheckCircle2,
+  Circle,
   Lightbulb,
-  MessageCircleHeart,
   Sparkles,
+  Sprout,
   Upload,
   UserRound,
   Zap,
@@ -13,10 +14,24 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { buildAnalysisSummary, buildNextActions, describeAdaptiveAnswer } from '@/lib/mvpCoreFlow';
+import {
+  getEnergyKnowledgeCatalog,
+  getLastLearnedEnergyKnowledge,
+  getLearnedEnergyKnowledgeCount,
+  getNextEnergyKnowledge,
+  pickEnergyKnowledge,
+} from '@/lib/energyKnowledge';
+import {
+  buildAnalysisSummary,
+  buildMemoryFeedback,
+  buildNextActions,
+  describeAdaptiveAnswer,
+} from '@/lib/mvpCoreFlow';
 import {
   AnalysisSummary,
   EnergyBehaviorProfile,
+  EnergyKnowledgeId,
+  EnergyKnowledgeState,
   InvoiceData,
   MascotContextQuestion,
   MascotContextQuestionValue,
@@ -52,12 +67,14 @@ interface DynamicContextPanelProps {
   isProfileComplete: boolean;
   userContext?: Partial<UserContextState>;
   energyBehaviorProfile: EnergyBehaviorProfile;
+  knowledgeState: EnergyKnowledgeState;
   contextQuestion?: MascotContextQuestion;
   onContextQuestionAnswer?: (
     questionId: MascotContextQuestion['id'],
     value: MascotContextQuestionValue
   ) => void;
   onContextQuestionIgnore?: (questionId: MascotContextQuestion['id']) => void;
+  onKnowledgeLearned: (knowledgeId: EnergyKnowledgeId) => void;
   onOpenActions: () => void;
   onOpenHistory: () => void;
   onOpenSummary: () => void;
@@ -73,14 +90,6 @@ interface DynamicContextPanelProps {
   historyUploadContent?: React.ReactNode;
 }
 
-const stageLabels = {
-  onboarding: 'Comeco',
-  'before-upload': 'Preparacao',
-  'invoice-uploaded': 'Subindo resumo',
-  'analysis-ready': 'Resumo pronto',
-  'return-visit': 'Retomada',
-} as const;
-
 const priorityLabels = {
   high: 'Alta',
   medium: 'Media',
@@ -90,12 +99,12 @@ const priorityLabels = {
 const panelMeta = {
   mascot: {
     title: 'Painel ativo',
-    label: 'Proximo passo',
-    icon: MessageCircleHeart,
+    label: 'Aprendizado Energetico',
+    icon: Sprout,
   },
   co2: {
     title: 'Painel ativo',
-    label: 'Resumo ambiental',
+    label: 'Voce sabia?',
     icon: Zap,
   },
   history: {
@@ -165,6 +174,19 @@ interface AdaptiveActionFeedbackState {
     questionId: string;
     summary: string;
   }>;
+}
+
+interface InlineMemoryFeedbackState {
+  ctaLabel?: string;
+  message: string;
+  questionId: string;
+  title: string;
+}
+
+interface InlineKnowledgeFeedbackState {
+  id: EnergyKnowledgeId;
+  message: string;
+  title: string;
 }
 
 const countOptions: ActionInteractionQuestion['options'] = [
@@ -535,9 +557,11 @@ const DynamicContextPanel = ({
   isProfileComplete,
   userContext,
   energyBehaviorProfile,
+  knowledgeState,
   contextQuestion,
   onContextQuestionAnswer,
   onContextQuestionIgnore,
+  onKnowledgeLearned,
   onOpenActions,
   onOpenHistory,
   onOpenSummary,
@@ -553,6 +577,11 @@ const DynamicContextPanel = ({
   const [localActionFeedback, setLocalActionFeedback] = React.useState<
     Record<string, AdaptiveActionFeedbackState>
   >({});
+  const [contextMemoryFeedback, setContextMemoryFeedback] =
+    React.useState<InlineMemoryFeedbackState | null>(null);
+  const [knowledgeFeedback, setKnowledgeFeedback] =
+    React.useState<InlineKnowledgeFeedbackState | null>(null);
+  const [dismissedKnowledgeIds, setDismissedKnowledgeIds] = React.useState<EnergyKnowledgeId[]>([]);
   const [historyFeedback, setHistoryFeedback] = React.useState<string | null>(null);
   const previousInvoiceCountRef = React.useRef(invoiceHistory.length);
   const previousActiveViewRef = React.useRef(activeView);
@@ -635,9 +664,51 @@ const DynamicContextPanel = ({
     profile,
     userContext,
   ]);
-  const educationItems = contextAnalysis?.educationItems ?? [];
   const consultiveInsight = contextAnalysis?.consultiveInsight;
   const contextLines = getInsightContextLines(consultiveInsight);
+  const activeKnowledge = React.useMemo(() => {
+    if (activeView !== 'mascot' && activeView !== 'co2') {
+      return null;
+    }
+
+    return pickEnergyKnowledge({
+      activeObjective,
+      activeTip,
+      activeView,
+      analysis: contextAnalysis,
+      dismissedKnowledgeIds,
+      energyBehaviorProfile,
+      guidance,
+      knowledgeState,
+      nextAction,
+      profile,
+    });
+  }, [
+    activeObjective,
+    activeTip,
+    activeView,
+    contextAnalysis,
+    dismissedKnowledgeIds,
+    energyBehaviorProfile,
+    guidance,
+    knowledgeState,
+    nextAction,
+    profile,
+  ]);
+  const knowledgeCatalog = React.useMemo(() => getEnergyKnowledgeCatalog(), []);
+  const learnedKnowledgeCount = React.useMemo(
+    () => getLearnedEnergyKnowledgeCount(knowledgeState),
+    [knowledgeState]
+  );
+  const totalKnowledgeCount = knowledgeCatalog.length;
+  const lastLearnedKnowledge = React.useMemo(
+    () => getLastLearnedEnergyKnowledge(knowledgeState),
+    [knowledgeState]
+  );
+  const nextKnowledge = React.useMemo(
+    () => getNextEnergyKnowledge(knowledgeState) ?? activeKnowledge ?? undefined,
+    [activeKnowledge, knowledgeState]
+  );
 
   React.useEffect(() => {
     setIsVisible(false);
@@ -678,12 +749,83 @@ const DynamicContextPanel = ({
   }, [focusedInvoice?.fingerprint]);
 
   React.useEffect(() => {
+    setDismissedKnowledgeIds([]);
+    setKnowledgeFeedback(null);
+  }, [panelSignature]);
+
+  React.useEffect(() => {
+    if (contextQuestion?.id) {
+      setContextMemoryFeedback(null);
+    }
+  }, [contextQuestion?.id]);
+
+  React.useEffect(() => {
     if (activeView === 'actions' && previousActiveViewRef.current !== 'actions') {
       setLocalActionFeedback({});
     }
 
+    if (activeView !== 'mascot' && previousActiveViewRef.current === 'mascot') {
+      setContextMemoryFeedback(null);
+    }
+
     previousActiveViewRef.current = activeView;
   }, [activeView]);
+
+  const handleKnowledgeLearned = (knowledgeId: EnergyKnowledgeId, title: string) => {
+    onKnowledgeLearned(knowledgeId);
+    setDismissedKnowledgeIds((currentValue) =>
+      currentValue.includes(knowledgeId) ? currentValue : [...currentValue, knowledgeId]
+    );
+    setKnowledgeFeedback({
+      id: knowledgeId,
+      message: 'Agora a Score sabe que este conteudo ja foi apresentado.',
+      title,
+    });
+  };
+
+  const renderKnowledgeCard = () => {
+    if (knowledgeFeedback) {
+      return (
+        <div className="rounded-[18px] border border-[#365f58] bg-[#113731] p-4">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-[#c5d8c8]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#215147] px-2 py-1 font-semibold text-[#8fd08e]">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Conhecimento adquirido
+            </span>
+            <span>{knowledgeFeedback.title}</span>
+          </div>
+          <p className="mt-2 text-sm leading-6 text-[#d9ead8]">{knowledgeFeedback.message}</p>
+          <a
+            href="#memory-panel"
+            className="mt-3 inline-flex text-xs font-semibold text-[#bfe7bc] underline-offset-4 hover:underline"
+          >
+            Ver conhecimentos
+          </a>
+        </div>
+      );
+    }
+
+    if (!activeKnowledge) {
+      return null;
+    }
+
+    return (
+      <div className="rounded-[18px] border border-[#365f58] bg-[#113731] p-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9dbfa6]">
+          Voce sabia?
+        </p>
+        <p className="mt-2 text-base font-semibold text-[#f5f8f3]">{activeKnowledge.title}</p>
+        <p className="mt-2 text-sm leading-6 text-[#c5d8c8]">{activeKnowledge.message}</p>
+        <Button
+          size="sm"
+          className="mt-3 rounded-[12px] bg-[#5f925c] text-white hover:bg-[#517d4f]"
+          onClick={() => handleKnowledgeLearned(activeKnowledge.id, activeKnowledge.title)}
+        >
+          Entendi
+        </Button>
+      </div>
+    );
+  };
 
   const renderHistoryBars = () => {
     if (sortedInvoices.length === 0) {
@@ -745,26 +887,133 @@ const DynamicContextPanel = ({
           <div className="rounded-[18px] border border-[#365f58] bg-[#163f39] p-5">
             <div className="flex items-start gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[#7bc683] text-[#0f342f]">
-                <MessageCircleHeart className="h-5 w-5" />
+                <Sprout className="h-5 w-5" />
               </div>
               <div className="space-y-2">
                 <p className="text-xl font-semibold leading-tight text-[#f5f8f3]">
-                  {nextAction?.title || guidance.title}
+                  Aprendizado Energetico
                 </p>
                 <p className="text-sm leading-6 text-[#c5d8c8]">
-                  {compactText(nextAction?.value || nextAction?.description || guidance.message, 136)}
+                  O mascote agora organiza o que voce ja aprendeu com a Score, sem misturar isso com a Memoria Energetica da jornada.
                 </p>
               </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-[16px] border border-[#365f58] bg-[#113731] p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#9dbfa6]">
+                Conhecimentos adquiridos
+              </div>
+              <div className="mt-2 text-2xl font-semibold text-[#f5f8f3]">
+                {learnedKnowledgeCount} / {totalKnowledgeCount}
+              </div>
+              <p className="mt-2 text-sm leading-6 text-[#c5d8c8]">
+                Conhecimento Energetico registra o que voce aprendeu com a Score.
+              </p>
+            </div>
+            <div className="rounded-[16px] border border-[#365f58] bg-[#113731] p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#9dbfa6]">
+                Ultimo aprendizado
+              </div>
+              <div className="mt-2 text-base font-semibold text-[#f5f8f3]">
+                {lastLearnedKnowledge?.title || 'Nenhum conhecimento confirmado ainda'}
+              </div>
+              <p className="mt-2 text-sm leading-6 text-[#c5d8c8]">
+                {lastLearnedKnowledge
+                  ? 'Esse foi o ultimo conteudo marcado como compreendido.'
+                  : 'Toque em Entendi em um conteudo educativo para registrar o primeiro conhecimento.'}
+              </p>
+            </div>
+          </div>
+
+          {knowledgeFeedback ? (
+            <div className="rounded-[18px] border border-[#365f58] bg-[#113731] p-4">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-[#c5d8c8]">
+                <span className="inline-flex items-center gap-1 rounded-full bg-[#215147] px-2 py-1 font-semibold text-[#8fd08e]">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Conhecimento adquirido
+                </span>
+                <span>{knowledgeFeedback.title}</span>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-[#d9ead8]">{knowledgeFeedback.message}</p>
+              <a
+                href="#memory-panel"
+                className="mt-3 inline-flex text-xs font-semibold text-[#bfe7bc] underline-offset-4 hover:underline"
+              >
+                Ver memoria e conhecimento
+              </a>
+            </div>
+          ) : nextKnowledge ? (
+            <div className="rounded-[18px] border border-[#365f58] bg-[#113731] p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9dbfa6]">
+                Proximo aprendizado
+              </p>
+              <p className="mt-2 text-base font-semibold text-[#f5f8f3]">{nextKnowledge.title}</p>
+              <p className="mt-2 text-sm leading-6 text-[#c5d8c8]">{nextKnowledge.message}</p>
+              <Button
+                size="sm"
+                className="mt-3 rounded-[12px] bg-[#5f925c] text-white hover:bg-[#517d4f]"
+                onClick={() => handleKnowledgeLearned(nextKnowledge.id, nextKnowledge.title)}
+              >
+                Entendi
+              </Button>
+            </div>
+          ) : null}
+
+          <div className="rounded-[18px] border border-[#365f58] bg-[#113731] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9dbfa6]">
+                  O que voce ja aprendeu
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[#c5d8c8]">
+                  O mascote ensina. O painel abaixo mostra quais conhecimentos ja foram apresentados e compreendidos.
+                </p>
+              </div>
+              <a
+                href="#memory-panel"
+                className="text-xs font-semibold text-[#bfe7bc] underline-offset-4 hover:underline"
+              >
+                Ver painel completo
+              </a>
+            </div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              {knowledgeCatalog.map((knowledge) => {
+                const isLearned = knowledgeState.learned[knowledge.id] === true;
+
+                return (
+                  <div
+                    key={knowledge.id}
+                    className="flex items-start gap-3 rounded-[14px] border border-[#2d5b54] bg-[#123f39] px-3 py-3"
+                  >
+                    {isLearned ? (
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#8fd08e]" />
+                    ) : (
+                      <Circle className="mt-0.5 h-4 w-4 shrink-0 text-[#9dbfa6]" />
+                    )}
+                    <div>
+                      <p className="text-sm font-medium text-[#f5f8f3]">{knowledge.title}</p>
+                      <p className="text-[11px] uppercase tracking-[0.12em] text-[#9dbfa6]">
+                        {knowledge.category.replaceAll('_', ' ')}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
           {contextQuestion && (
             <div className="rounded-[18px] border border-[#365f58] bg-[#113731] p-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9dbfa6]">
-                Pergunta do mascote
+                Pergunta estrategica
               </p>
               <p className="mt-2 text-sm font-medium leading-6 text-[#f5f8f3]">
                 {contextQuestion.question}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-[#c5d8c8]">
+                Essa resposta continua aqui porque ajuda a personalizar recomendacoes. Ela nao faz parte do conteudo educativo.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {contextQuestion.options.map((option) => (
@@ -773,7 +1022,21 @@ const DynamicContextPanel = ({
                     size="sm"
                     variant="outline"
                     className="rounded-[12px] border-[#365f58] bg-[#163f39] text-[#f5f8f3] hover:bg-[#1b4a43]"
-                    onClick={() => onContextQuestionAnswer?.(contextQuestion.id, option.value)}
+                    onClick={() => {
+                      const memoryFeedback = buildMemoryFeedback(
+                        contextQuestion.id,
+                        option.value,
+                        energyBehaviorProfile
+                      );
+
+                      setContextMemoryFeedback({
+                        ctaLabel: memoryFeedback.ctaLabel,
+                        message: memoryFeedback.message,
+                        questionId: contextQuestion.id,
+                        title: memoryFeedback.badgeLabel,
+                      });
+                      onContextQuestionAnswer?.(contextQuestion.id, option.value);
+                    }}
                   >
                     {option.label}
                   </Button>
@@ -790,42 +1053,25 @@ const DynamicContextPanel = ({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-[16px] border border-[#365f58] bg-[#113731] p-4">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#9dbfa6]">
-                Perfil
+          {contextMemoryFeedback && (
+            <div className="rounded-[18px] border border-[#365f58] bg-[#113731] p-4">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-[#c5d8c8]">
+                <span className="inline-flex items-center gap-1 rounded-full bg-[#215147] px-2 py-1 font-semibold text-[#8fd08e]">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  {contextMemoryFeedback.title}
+                </span>
+                <span>{contextMemoryFeedback.message}</span>
               </div>
-              <div className="mt-2 text-xl font-semibold text-[#f5f8f3]">{profileCompletion}%</div>
+              {contextMemoryFeedback.ctaLabel && (
+                <a
+                  href="#memory-panel"
+                  className="mt-3 inline-flex text-xs font-semibold text-[#bfe7bc] underline-offset-4 hover:underline"
+                >
+                  {contextMemoryFeedback.ctaLabel}
+                </a>
+              )}
             </div>
-            <div className="rounded-[16px] border border-[#365f58] bg-[#113731] p-4">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#9dbfa6]">
-                Etapa
-              </div>
-              <div className="mt-2 text-base font-semibold text-[#f5f8f3]">
-                {stageLabels[guidance.stage]}
-              </div>
-            </div>
-          </div>
-
-          <Button
-            onClick={() => {
-              if (nextAction) {
-                onOpenActions();
-                return;
-              }
-
-              if (latestAnalysis) {
-                onOpenSummary();
-                return;
-              }
-
-              onOpenProfileDetails();
-            }}
-            className="mt-auto w-full justify-between rounded-[16px] border border-[#365f58] bg-[#0f342f] text-[#f5f8f3] hover:bg-[#18453f]"
-          >
-            {nextAction ? 'Abrir acao atual' : latestAnalysis ? 'Abrir resumo' : 'Editar perfil'}
-            <Lightbulb className="h-4 w-4" />
-          </Button>
+          )}
         </div>
       );
     }
@@ -834,17 +1080,28 @@ const DynamicContextPanel = ({
       return (
         <div className="flex h-full flex-col gap-4">
           <div className="rounded-[18px] border border-[#365f58] bg-[#163f39] p-5">
-            <p className="text-xl font-semibold leading-tight text-[#f5f8f3]">
-              {activeTip || 'Toque em um CO2 para ver o resumo do momento.'}
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9dbfa6]">
+              Voce sabia?
             </p>
-            <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9dbfa6]">
-              {activeObjective || 'Acompanhe o proximo passo da jornada'}
+            <p className="mt-2 text-xl font-semibold leading-tight text-[#f5f8f3]">
+              {activeKnowledge?.title || activeTip || 'Ponto educativo da jornada'}
+            </p>
+            <p className="mt-3 text-sm leading-6 text-[#c5d8c8]">
+              {activeObjective || 'O CO2 agora funciona como um atalho para conhecimento energetico.'}
             </p>
           </div>
 
           <div className="rounded-[18px] border border-[#365f58] bg-[#113731] p-5 text-sm leading-6 text-[#c5d8c8]">
-            {compactText(contextAnalysis?.whatMattersNext || guidance.message, 148)}
+            {compactText(
+              activeKnowledge?.message ||
+                activeTip ||
+                contextAnalysis?.whatMattersNext ||
+                guidance.message,
+              148
+            )}
           </div>
+
+          {renderKnowledgeCard()}
 
           <div className="grid grid-cols-2 gap-2">
             <Button
@@ -1013,18 +1270,17 @@ const DynamicContextPanel = ({
                 interactionQuestions.length === 0 &&
                 !hasAnsweredThisSession;
               const answeredFeedbackMessage = hasAnsweredThisSession
-                ? interactionQuestions.length === 0
-                  ? 'Ja entendi melhor sua casa.'
-                  : 'Resposta salva. Vou usar isso nas proximas recomendacoes.'
+                ? 'Informacao incorporada a sua Memoria Energetica.'
                 : undefined;
+              const hasMemoryFeedbackState = isDiagnosisUpdated || hasAnsweredThisSession;
               const interactionConfig = hasAdaptiveDiagnosis
                 ? {
-                    title: isDiagnosisUpdated ? 'Diagnostico atualizado' : 'Pergunta rapida',
-                    prompt: isDiagnosisUpdated
-                      ? 'Ja entendi melhor sua casa.'
+                    title: hasMemoryFeedbackState ? 'Memoria Energetica' : 'Pergunta rapida',
+                    prompt: hasMemoryFeedbackState
+                      ? 'Sua resposta melhora a leitura da jornada sem mudar o fluxo principal.'
                       : nextInteractionQuestion
-                        ? 'Ajude a refinar sua proxima recomendacao.'
-                        : answeredFeedbackMessage ?? 'Ja entendi melhor sua casa.',
+                        ? 'Ajude a refinar sua Memoria Energetica em 1 toque.'
+                        : answeredFeedbackMessage ?? 'Sua resposta melhora a leitura da jornada.',
                   }
                 : null;
 
@@ -1072,11 +1328,7 @@ const DynamicContextPanel = ({
                           {interactionConfig.title}
                         </p>
                         <span className="text-xs font-medium text-[#bfe7bc]">
-                          {isDiagnosisUpdated
-                            ? 'Diagnostico atualizado'
-                            : hasAnsweredThisSession
-                              ? 'Ja entendi melhor sua casa'
-                              : '1 pergunta por vez'}
+                          {hasMemoryFeedbackState ? 'Memoria atualizada' : '1 pergunta por vez'}
                         </span>
                       </div>
 
@@ -1086,8 +1338,9 @@ const DynamicContextPanel = ({
                         <div className="mt-3 min-h-[42px] space-y-1">
                           {answeredFeedbackMessage && (
                             <div className="flex flex-wrap items-center gap-2 text-xs text-[#c5d8c8]">
-                              <span className="rounded-full bg-[#215147] px-2 py-1 font-semibold text-[#8fd08e]">
-                                Salvo
+                              <span className="inline-flex items-center gap-1 rounded-full bg-[#215147] px-2 py-1 font-semibold text-[#8fd08e]">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                Memoria atualizada
                               </span>
                               <span>{answeredFeedbackMessage}</span>
                             </div>
@@ -1095,7 +1348,8 @@ const DynamicContextPanel = ({
 
                           {!answeredFeedbackMessage && statusFeedback?.insight && (
                             <div className="flex flex-wrap items-center gap-2 text-xs text-[#c5d8c8]">
-                              <span className="rounded-full bg-[#215147] px-2 py-1 font-semibold text-[#8fd08e]">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-[#215147] px-2 py-1 font-semibold text-[#8fd08e]">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
                                 {statusFeedback.microFeedback}
                               </span>
                               <span>{statusFeedback.insight}</span>
@@ -1106,8 +1360,13 @@ const DynamicContextPanel = ({
                             <p className="text-xs leading-5 text-[#9dbfa6]">{answeredSummaryLine}</p>
                           )}
 
-                          {isDiagnosisUpdated && (
-                            <p className="text-xs font-medium text-[#8fd08e]">Diagnostico atualizado</p>
+                          {(statusFeedback?.insight || answeredFeedbackMessage || isDiagnosisUpdated) && (
+                            <a
+                              href="#memory-panel"
+                              className="inline-flex text-xs font-semibold text-[#bfe7bc] underline-offset-4 hover:underline"
+                            >
+                              Ver memoria
+                            </a>
                           )}
                         </div>
                       )}
@@ -1307,18 +1566,6 @@ const DynamicContextPanel = ({
                   {formatConsumption(focusedInvoice.consumption)}
                 </div>
               </div>
-            </div>
-          )}
-
-          {educationItems[0] && (
-            <div className="rounded-[18px] border border-[#365f58] bg-[#113731] p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9dbfa6]">
-                Microeducacao
-              </p>
-              <p className="mt-2 text-sm leading-6 text-[#c5d8c8]">
-                <span className="font-semibold text-[#f5f8f3]">{educationItems[0].label}:</span>{' '}
-                {educationItems[0].explanation}
-              </p>
             </div>
           )}
 

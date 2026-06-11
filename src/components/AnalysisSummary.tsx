@@ -22,6 +22,7 @@ interface AnalysisSummaryProps {
   isExpanded?: boolean;
   onToggle?: () => void;
   showHeader?: boolean;
+  showEducationalContent?: boolean;
 }
 
 const consumptionVariant = {
@@ -322,6 +323,7 @@ const AnalysisSummary = ({
   isExpanded = false,
   onToggle,
   showHeader = true,
+  showEducationalContent = true,
 }: AnalysisSummaryProps) => {
   const expansionIcon = isExpanded ? ChevronDown : ChevronRight;
   const contextInvoice = selectedInvoice ?? invoice;
@@ -408,13 +410,9 @@ const AnalysisSummary = ({
 
   const referenceLabel = getInvoiceReferenceLabel(contextInvoice);
   const averageCostPerKwh = getAverageCostPerKwh(contextInvoice);
-  const contextAnalysis = React.useMemo(
-    () =>
-      isCurrentJourneyFocus
-        ? analysis
-        : buildAnalysisSummary(contextInvoice, profile, history, energyBehaviorProfile),
-    [analysis, contextInvoice, energyBehaviorProfile, history, isCurrentJourneyFocus, profile]
-  );
+  const contextAnalysis = isCurrentJourneyFocus
+    ? analysis
+    : buildAnalysisSummary(contextInvoice, profile, history, energyBehaviorProfile);
   const consultativeInsights = contextAnalysis.consultativeInsights ?? [];
   const educationItems = contextAnalysis.educationItems ?? [];
   const evidenceItems = contextAnalysis.evidenceItems ?? [];
@@ -629,7 +627,7 @@ const AnalysisSummary = ({
             </div>
           )}
 
-          {educationItems.length > 0 && (
+          {showEducationalContent && educationItems.length > 0 && (
             <div className="rounded-xl border border-blue-100 bg-blue-50/80 p-4">
               <div className="text-sm font-semibold text-blue-900">Micro-educacao</div>
               <div className="mt-3 space-y-2">

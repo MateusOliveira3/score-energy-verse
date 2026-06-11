@@ -9,9 +9,16 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  getLastLearnedEnergyKnowledge,
+  getLearnedEnergyKnowledgeCount,
+  getNextEnergyKnowledge,
+  getUnlearnedEnergyKnowledgeItems,
+} from '@/lib/energyKnowledge';
 import { cn } from '@/lib/utils';
 import {
   AnalysisSummary,
+  EnergyKnowledgeState,
   MascotCustomizationData,
   MascotGuidance,
   NextAction,
@@ -31,6 +38,7 @@ interface LiveMascotJourneyProps {
   latestAnalysis?: AnalysisSummary;
   customization?: MascotCustomizationData;
   profile: UserProfileData;
+  knowledgeState: EnergyKnowledgeState;
   onNavigate: (target: JourneyTarget) => void;
   onMascotInteract?: () => void;
   onCo2Interact?: (payload: { tip: string; objective: string }) => void;
@@ -249,6 +257,7 @@ const LiveMascotJourney = ({
   latestAnalysis,
   customization,
   profile,
+  knowledgeState,
   onNavigate,
   onMascotInteract,
   onCo2Interact,
@@ -284,10 +293,16 @@ const LiveMascotJourney = ({
   const reachTier = getReachTier(currentScore);
   const reachVisual = reachVisualByTier[reachTier];
   const sceneMascotLevel = Math.max(journeyLevel, reachVisual.visualLevel);
+  const learnedKnowledgeCount = getLearnedEnergyKnowledgeCount(knowledgeState);
+  const totalKnowledgeCount = getLearnedEnergyKnowledgeCount(knowledgeState) + getUnlearnedEnergyKnowledgeItems(knowledgeState).length;
+  const lastLearnedKnowledge = getLastLearnedEnergyKnowledge(knowledgeState);
+  const nextKnowledge = getNextEnergyKnowledge(knowledgeState);
 
   React.useEffect(() => {
+    const timeoutIds = timeoutIdsRef.current;
+
     return () => {
-      timeoutIdsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
     };
   }, []);
 
@@ -300,8 +315,8 @@ const LiveMascotJourney = ({
 
     if (bubble.requiredLevel > journeyLevel) {
       onCo2Interact?.({
-        tip: 'Ainda fora do alcance da planta.',
-        objective: currentTarget.cta,
+        tip: 'Este ponto educativo vai ficar mais claro conforme a planta avancar.',
+        objective: 'Volte depois para registrar esse aprendizado.',
       });
       return;
     }
@@ -312,7 +327,7 @@ const LiveMascotJourney = ({
 
     const nextPayload = {
       tip: visualCo2Tips[tipIndex % visualCo2Tips.length],
-      objective: currentTarget.cta,
+      objective: 'Toque em Entendi para registrar este conhecimento.',
     };
 
     setTipIndex((currentIndex) => currentIndex + 1);
@@ -350,9 +365,9 @@ const LiveMascotJourney = ({
             }
           `}
         </style>
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.66fr)_minmax(0,0.82fr)]">
-          <div className="rounded-[28px] border border-[#29554f] bg-[#103a35] p-5 text-white shadow-[0_18px_40px_rgba(0,0,0,0.18)] sm:p-7">
-            <div className="space-y-5">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.66fr)_minmax(0,0.82fr)]">
+          <div className="rounded-[28px] border border-[#29554f] bg-[#103a35] p-4 text-white shadow-[0_18px_40px_rgba(0,0,0,0.18)] sm:p-5">
+            <div className="space-y-4">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="space-y-3">
                   <div className="inline-flex items-center gap-2 rounded-full border border-[#365f58] bg-[#123f39] px-3 py-1.5 text-[12px] font-semibold uppercase tracking-[0.18em] text-[#b8d9bd]">
@@ -374,11 +389,26 @@ const LiveMascotJourney = ({
                   <div className="rounded-full border border-[#365f58] bg-[#194641] px-3 py-1.5 text-sm text-[#f0f7ef]">
                     {invoiceCount} fatura{invoiceCount === 1 ? '' : 's'}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onMascotInteract) {
+                        onMascotInteract();
+                        return;
+                      }
+
+                      onNavigate(currentTarget.target);
+                    }}
+                    className="rounded-full border border-[#4a7a63] bg-[#1c4b3e] px-3 py-1.5 text-sm text-[#e7f6de] transition-colors hover:bg-[#215448]"
+                  >
+                    Conhecimentos {learnedKnowledgeCount} / {totalKnowledgeCount}
+                  </button>
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-[#29554f] bg-[#0f342f] p-4">
-                <div className="relative h-[366px] overflow-hidden rounded-[20px] border border-[#c8d9d4]/80 bg-[linear-gradient(180deg,#EEF7FF_0%,#F1F8F7_44%,#EAF4EE_100%)]">
+              <div className="rounded-[24px] border border-[#29554f] bg-[#0f342f] p-3">
+                <div className="relative h-[188px] overflow-hidden rounded-[20px] border border-[#c8d9d4]/80 bg-[linear-gradient(180deg,#EEF7FF_0%,#F1F8F7_44%,#EAF4EE_100%)]">
+                  <div className="absolute inset-x-0 bottom-0 h-[336px] origin-bottom scale-[0.76]">
                   <div className="pointer-events-none absolute inset-[10px] rounded-[16px] border border-white/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.32)]" />
                   <div className="pointer-events-none absolute inset-x-0 top-0 h-[52%] bg-[linear-gradient(180deg,rgba(255,255,255,0.18),rgba(255,255,255,0.02)_58%,rgba(255,255,255,0))]" />
                   <div className="pointer-events-none absolute left-[9.8%] top-[9.8%] h-[58px] w-[58px] rounded-full bg-[#fff6d7]/32 blur-[10px]" />
@@ -532,6 +562,7 @@ const LiveMascotJourney = ({
                   })}
 
                   <div className="pointer-events-none absolute left-1/2 bottom-[49px] z-[11] h-[10px] w-[42px] -translate-x-1/2 rounded-[100%] bg-[#8eb57c]/76 blur-[1px]" />
+                  </div>
                 </div>
               </div>
 
@@ -580,18 +611,34 @@ const LiveMascotJourney = ({
                 <div className="rounded-[22px] border border-[#29554f] bg-[#123f39] p-4">
                   <div className="space-y-3">
                     <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#9dbfa6]">
-                      Proxima chamada
+                      Minha evolucao
                     </p>
                     <p className="text-2xl font-semibold leading-tight text-[#f5f8f3]">
-                      {currentTarget.title}
+                      {learnedKnowledgeCount} de {totalKnowledgeCount} conhecimentos
                     </p>
-                    <p className="text-sm leading-5 text-[#c5d8c8]">{currentTarget.objective}</p>
+                    <p className="text-sm leading-5 text-[#c5d8c8]">
+                      {lastLearnedKnowledge
+                        ? `Ultimo aprendizado: ${lastLearnedKnowledge.title}.`
+                        : 'A planta agora concentra o que voce ja aprendeu com a Score.'}
+                    </p>
+                    {nextKnowledge && (
+                      <p className="text-sm leading-5 text-[#bfe7bc]">
+                        Proximo conhecimento: {nextKnowledge.title}
+                      </p>
+                    )}
                     <Button
                       type="button"
-                      onClick={() => onNavigate(currentTarget.target)}
+                      onClick={() => {
+                        if (onMascotInteract) {
+                          onMascotInteract();
+                          return;
+                        }
+
+                        onNavigate(currentTarget.target);
+                      }}
                       className="w-full justify-between rounded-[14px] border border-[#365f58] bg-[#113731] text-[#f5f8f3] hover:bg-[#18453f]"
                     >
-                      {currentTarget.cta}
+                      Abrir Minha Evolucao
                       <Target className="h-4 w-4" />
                     </Button>
                   </div>
@@ -633,7 +680,7 @@ const LiveMascotJourney = ({
             </div>
           </div>
 
-          <div className="grid gap-5 xl:grid-rows-[minmax(430px,auto)_minmax(425px,1fr)]">
+          <div className="grid gap-4 xl:grid-rows-[minmax(390px,auto)_minmax(390px,1fr)]">
             {scorePanel}
             {contextPanel}
           </div>

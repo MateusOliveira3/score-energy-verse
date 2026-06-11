@@ -4,6 +4,7 @@ import {
   AnalysisStatus,
   ActionResultLink,
   EnergyBehaviorLaundryFrequency,
+  EnergyKnowledgeId,
   EnergyBehaviorProfile,
   EnergyBehaviorUsagePeriod,
   InvoiceComparisonBasis,
@@ -38,6 +39,7 @@ import {
   isProfileComplete,
   normalizeScoreEvents,
 } from '@/lib/mvpCoreFlow';
+import { normalizeKnowledgeState } from '@/lib/energyKnowledge';
 import { getInvoiceFlowSnapshot, logInvoiceFlow } from '@/lib/invoiceFlowDebug';
 
 const RETURN_VISIT_MS = 1000 * 60 * 30;
@@ -253,6 +255,11 @@ export const DEFAULT_ACTIONS_STATE: NextActionsState = {
 export const DEFAULT_USER_CONTEXT_STATE: UserContextState = {
   questions: {},
 };
+
+export const DEFAULT_KNOWLEDGE_STATE = {
+  learned: {},
+  lastLearnedId: undefined,
+} as const;
 
 export const DEFAULT_ENERGY_BEHAVIOR_PROFILE: EnergyBehaviorProfile = {
   appliances: {},
@@ -557,6 +564,7 @@ export const DEFAULT_MVP_STATE: MvpState = {
   profile: DEFAULT_PROFILE,
   mascot: DEFAULT_MASCOT,
   userContext: DEFAULT_USER_CONTEXT_STATE,
+  knowledge: DEFAULT_KNOWLEDGE_STATE,
   energyBehaviorProfile: DEFAULT_ENERGY_BEHAVIOR_PROFILE,
   analysis: DEFAULT_ANALYSIS_STATE,
   scoreEvents: [],
@@ -1076,6 +1084,7 @@ export const normalizeState = (
     profile: normalizeProfile(state?.profile ?? legacyState?.profile),
     mascot: normalizeMascot(state?.mascot ?? legacyState?.mascotCustomization),
     userContext: normalizeUserContext(state?.userContext),
+    knowledge: normalizeKnowledgeState(state?.knowledge),
     energyBehaviorProfile,
     analysis,
     scoreEvents: normalizeScoreEvents(
@@ -1109,6 +1118,26 @@ export const updateMascot = (state: MvpState, mascot: Mascot): MvpState => ({
   ...state,
   mascot: normalizeMascot(mascot),
 });
+
+export const markKnowledgeLearned = (
+  state: MvpState,
+  knowledgeId: EnergyKnowledgeId
+): MvpState => {
+  if (state.knowledge.learned[knowledgeId] === true) {
+    return state;
+  }
+
+  return {
+    ...state,
+    knowledge: normalizeKnowledgeState({
+      learned: {
+        ...state.knowledge.learned,
+        [knowledgeId]: true,
+      },
+      lastLearnedId: knowledgeId,
+    }),
+  };
+};
 
 export const setJourneyStage = (state: MvpState, journeyStage: JourneyStage): MvpState => ({
   ...state,
@@ -1624,28 +1653,9 @@ export const buildMascotContextQuestion = (
   const comparison = buildInvoiceComparison(state.analysis.invoiceHistory);
   const hasObservedComparison =
     comparison.status !== 'insufficient' && Boolean(comparison.previousInvoice);
-  const hasActionInteraction =
-    state.actions.viewedActionIds.length > 0 ||
-    state.actions.items.some((action) => action.status && action.status !== 'new');
-  const isAfterFirstAnalysis =
-    Boolean(state.analysis.latestInvoice && state.analysis.summary) &&
-    state.analysis.invoiceHistory.length === 1;
 
   if (hasObservedComparison && !hasHandledMascotQuestion(userContext, 'primary_goal')) {
     return MASCOT_CONTEXT_QUESTIONS.primary_goal;
-  }
-
-  if (
-    !hasObservedComparison &&
-    hasActionInteraction &&
-    state.actions.items.length > 0 &&
-    !hasHandledMascotQuestion(userContext, 'electric_shower')
-  ) {
-    return MASCOT_CONTEXT_QUESTIONS.electric_shower;
-  }
-
-  if (isAfterFirstAnalysis && !hasHandledMascotQuestion(userContext, 'usage_period')) {
-    return MASCOT_CONTEXT_QUESTIONS.usage_period;
   }
 
   return undefined;

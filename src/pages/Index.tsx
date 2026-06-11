@@ -10,6 +10,7 @@ import UserProfile from '../components/UserProfile';
 import MascotCustomization from '../components/MascotCustomization';
 import ProfileMascotAmbient from '../components/ProfileMascotAmbient';
 import AnalysisSummary from '../components/AnalysisSummary';
+import MemoryPanel from '../components/MemoryPanel';
 import DynamicContextPanel, {
   DynamicContextPanelView,
 } from '../components/DynamicContextPanel';
@@ -22,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMvpJourney } from '@/hooks/useMvpJourney';
 import { getInvoiceFlowSnapshot, logInvoiceFlow } from '@/lib/invoiceFlowDebug';
 import { buildAnalysisSummary, buildNextActions } from '@/lib/mvpCoreFlow';
+import { buildMemorySnapshot } from '@/lib/memorySnapshot';
 import { getCurrentJourneyInvoice, isCurrentJourneyInvoice } from '@/lib/mvpJourneyState';
 import { InvoiceData, NextAction, NextActionStatus } from '@/types/mvp';
 
@@ -116,12 +118,14 @@ const resolveInitialPanelView = ({
 
 const Index = () => {
   const {
+    journeyState,
     profile,
     mascotCustomization,
     profileCompletion,
     isProfileComplete,
     isJourneyHydrated,
     energyBehaviorProfile,
+    knowledgeState,
     latestInvoice,
     invoiceHistory,
     latestAnalysis,
@@ -140,6 +144,7 @@ const Index = () => {
     updateActionStatus,
     answerMascotContextQuestion,
     ignoreMascotContextQuestion,
+    markKnowledgeLearned,
   } = useMvpJourney();
   const [selectedInvoice, setSelectedInvoice] = React.useState<InvoiceData | undefined>(undefined);
   const [activeSection, setActiveSection] = React.useState<DashboardSectionKey>('summary');
@@ -149,10 +154,22 @@ const Index = () => {
   const [contextPanel, setContextPanel] = React.useState<ContextPanelState | null>(null);
   const feedbackTimeoutRef = React.useRef<number | null>(null);
   const wasJourneyHydratedRef = React.useRef(false);
-  const hydratedInvoiceHistory = isJourneyHydrated ? invoiceHistory : [];
-  const hydratedLatestInvoice = isJourneyHydrated ? latestInvoice : undefined;
-  const hydratedLatestAnalysis = isJourneyHydrated ? latestAnalysis : undefined;
-  const hydratedNextActions = isJourneyHydrated ? nextActions : [];
+  const hydratedInvoiceHistory = React.useMemo(
+    () => (isJourneyHydrated ? invoiceHistory : []),
+    [invoiceHistory, isJourneyHydrated]
+  );
+  const hydratedLatestInvoice = React.useMemo(
+    () => (isJourneyHydrated ? latestInvoice : undefined),
+    [isJourneyHydrated, latestInvoice]
+  );
+  const hydratedLatestAnalysis = React.useMemo(
+    () => (isJourneyHydrated ? latestAnalysis : undefined),
+    [isJourneyHydrated, latestAnalysis]
+  );
+  const hydratedNextActions = React.useMemo(
+    () => (isJourneyHydrated ? nextActions : []),
+    [isJourneyHydrated, nextActions]
+  );
   const currentJourneyInvoice = getCurrentJourneyInvoice(
     hydratedInvoiceHistory,
     hydratedLatestInvoice
@@ -291,6 +308,13 @@ const Index = () => {
     : [];
   const primaryJourneyAction =
     activeNextActions.find((action) => action.status !== 'completed') || activeNextActions[0];
+  const memorySnapshot = React.useMemo(
+    () =>
+      isJourneyHydrated
+        ? buildMemorySnapshot(journeyState, focusedInvoice)
+        : undefined,
+    [focusedInvoice, isJourneyHydrated, journeyState]
+  );
 
   const focusContextPanel = React.useCallback(
     (view: DynamicContextPanelView, payload?: Omit<ContextPanelState, 'view'>) => {
@@ -407,6 +431,7 @@ const Index = () => {
           latestAnalysis={hydratedLatestAnalysis}
           customization={mascotCustomization}
           profile={profile}
+          knowledgeState={knowledgeState}
           onNavigate={focusJourneyTarget}
           onMascotInteract={() => focusContextPanel('mascot')}
           onCo2Interact={(payload) => focusContextPanel('co2', payload)}
@@ -453,10 +478,12 @@ const Index = () => {
                 isProfileComplete={isProfileComplete}
                 userContext={userContext}
                 energyBehaviorProfile={energyBehaviorProfile}
+                knowledgeState={knowledgeState}
                 onOpenActions={() => focusContextPanel('actions')}
                 onOpenHistory={() => focusContextPanel('history')}
                 onOpenSummary={() => focusContextPanel('summary')}
                 onOpenProfileDetails={() => focusContextPanel('profile')}
+                onKnowledgeLearned={markKnowledgeLearned}
                 onSelectInvoice={(invoice) => {
                   setSelectedInvoice(invoice);
                   focusContextPanel('history');
@@ -487,6 +514,8 @@ const Index = () => {
             ) : null
           }
         />
+
+        {memorySnapshot && <MemoryPanel snapshot={memorySnapshot} />}
 
         <section className="rounded-[24px] border border-[#264c46] bg-[#0a2c28]/85 p-5 text-white">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -594,6 +623,7 @@ const Index = () => {
                       onSelectInvoice={setSelectedInvoice}
                       isExpanded
                       showHeader={false}
+                      showEducationalContent={false}
                     />
                   )}
 
@@ -612,6 +642,7 @@ const Index = () => {
                       onActionStatusChange={handleActionStatusChange}
                       isExpanded
                       showHeader={false}
+                      showEducationalContent={false}
                     />
                   )}
 
