@@ -121,6 +121,33 @@ export type EnergyBehaviorLaundryFrequency =
   | 'alta'
   | 'nao_informado';
 
+export type EnergyBehaviorResidenceType =
+  | 'casa'
+  | 'apartamento'
+  | 'sobrado'
+  | 'studio'
+  | 'nao_informado';
+
+export type EnergyBehaviorRoomCountRange =
+  | '1_3'
+  | '4_6'
+  | '7_ou_mais'
+  | 'nao_informado';
+
+export type EnergyBehaviorShowerHeatingType =
+  | 'eletrico'
+  | 'gas'
+  | 'misto'
+  | 'nao_sei'
+  | 'nao_informado';
+
+export type EnergyBehaviorCookingType =
+  | 'gas'
+  | 'eletrico'
+  | 'misto'
+  | 'nao_sei'
+  | 'nao_informado';
+
 export type EnergyBehaviorHouseholdRoutinePeriod =
   | 'manha'
   | 'tarde'
@@ -171,12 +198,23 @@ export interface EnergyBehaviorPromptMemoryEntry {
 
 export interface EnergyBehaviorProfile {
   appliances: {
+    bathrooms?: number;
     showers?: number;
     hasElectricShower?: boolean;
+    showerHeatingType?: EnergyBehaviorShowerHeatingType;
     hasAirConditioning?: boolean;
+    airConditioningCount?: number;
     hasExtraFridge?: boolean;
+    cookingType?: EnergyBehaviorCookingType;
+    hasElectricOven?: boolean;
+    hasWashingMachine?: boolean;
+    hasDryer?: boolean;
   };
   habits: {
+    residenceType?: EnergyBehaviorResidenceType;
+    roomCountRange?: EnergyBehaviorRoomCountRange;
+    hasChildren?: boolean;
+    hasElderly?: boolean;
     dominantUsagePeriod?: EnergyBehaviorUsagePeriod;
     usesHeavyLoadsAtNight?: boolean;
     laundryFrequency?: EnergyBehaviorLaundryFrequency;
@@ -248,10 +286,21 @@ export type ConsultiveInsightDriver =
 export type InsightSeason = 'verao' | 'inverno' | 'meia_estacao';
 
 export type ActionInteractiveQuestionId =
+  | 'residence_type'
+  | 'room_count'
+  | 'children_presence'
+  | 'elderly_presence'
+  | 'bathrooms_count'
   | 'showers_count'
   | 'electric_shower_presence'
+  | 'shower_heating_type'
   | 'air_conditioning_presence'
+  | 'air_conditioning_count'
+  | 'cooking_type'
+  | 'electric_oven_presence'
   | 'extra_fridge_presence'
+  | 'washing_machine_presence'
+  | 'dryer_presence'
   | 'heavy_loads_at_night'
   | 'laundry_frequency'
   | 'dominant_usage_period'
@@ -265,12 +314,48 @@ export type ActionInteractiveQuestionId =
   | 'primary_objective';
 
 export type EnergyDiagnosisQuestionCategory =
-  | 'cargas'
-  | 'horarios'
+  | 'estrutura'
+  | 'ocupacao'
+  | 'banheiro'
   | 'climatizacao'
+  | 'cozinha'
+  | 'lavanderia'
   | 'rotina'
-  | 'perfil_de_consumo'
   | 'intencao';
+
+export type InvestigationQuestionRole =
+  | 'initial'
+  | 'confirmation'
+  | 'refinement'
+  | 'disambiguation';
+
+export type InvestigationTargetArea =
+  | 'bathroom'
+  | 'refrigeration'
+  | 'lighting'
+  | 'occupancy'
+  | 'residence_structure'
+  | 'comfort'
+  | 'kitchen'
+  | 'laundry'
+  | 'routine'
+  | 'tariff'
+  | 'seasonality'
+  | 'unknown';
+
+export type InvestigationQuestionPriorityHint = 'high' | 'medium' | 'low';
+
+export interface InvestigationQuestionMetadata {
+  hypothesisId?: string;
+  targetArea: InvestigationTargetArea;
+  energyMapBlock?: Array<'bathroom' | 'refrigeration' | 'lighting'>;
+  evidenceProduced: string[];
+  questionRole: InvestigationQuestionRole;
+  unlocks?: ActionInteractiveQuestionId[];
+  dependsOn?: ActionInteractiveQuestionId[];
+  expectedBenefit: string;
+  priorityHint: InvestigationQuestionPriorityHint;
+}
 
 export interface ActionInteractiveQuestionOption {
   value: string;
@@ -289,6 +374,7 @@ export interface EnergyDiagnosisQuestionDefinition {
   mapsToField: string;
   whyItMatters: string;
   followUpPriority: number;
+  investigation: InvestigationQuestionMetadata;
 }
 
 export interface ActionInteractiveQuestion {
@@ -296,6 +382,7 @@ export interface ActionInteractiveQuestion {
   prompt: string;
   options: ActionInteractiveQuestionOption[];
   helperText?: string;
+  investigation?: InvestigationQuestionMetadata;
 }
 
 export interface NextActionPendingAnswer {

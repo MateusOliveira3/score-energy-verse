@@ -1,7 +1,5 @@
 import React from 'react';
-import { Trophy, Medal, Award, ShieldCheck, TrendingUp } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Award, Medal, ShieldCheck, Trophy } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { RankingEntry } from '@/services/ranking';
 import { getEntryInitials } from '@/services/ranking/helpers';
@@ -10,109 +8,95 @@ interface LeaderboardProps {
   entries: RankingEntry[];
 }
 
-const Leaderboard = ({ entries }: LeaderboardProps) => {
-  const getPositionIcon = (position: number) => {
-    switch (position) {
-      case 1:
-        return <Trophy className="h-4 w-4 text-yellow-500" />;
-      case 2:
-        return <Medal className="h-4 w-4 text-gray-400" />;
-      case 3:
-        return <Award className="h-4 w-4 text-amber-600" />;
-      default:
-        return <span className="text-sm font-bold text-gray-500">#{position}</span>;
-    }
-  };
+const medalIconByPosition = {
+  1: Trophy,
+  2: Medal,
+  3: Award,
+} as const;
 
-  return (
-    <Card className="h-fit border-2 border-emerald-100 shadow-lg">
-      <CardHeader className="pb-4">
-        <div className="space-y-2">
-          <CardTitle className="flex items-center space-x-2 text-emerald-700">
-            <Trophy className="h-5 w-5" />
-            <span>Jornadas pontuadas</span>
-          </CardTitle>
-          <p className="text-sm text-slate-600">
-            Lista ordenada por score de eventos validos, com nivel e contexto do perfil para dar
-            sentido a cada posicao.
-          </p>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {entries.map((entry) => (
-            <div
-              key={entry.userId}
-              className={`flex items-center space-x-3 rounded-lg p-3 transition-colors ${
-                entry.isCurrentUser
-                  ? 'border-2 border-green-200 bg-gradient-to-r from-green-100 to-emerald-100'
-                  : 'hover:bg-gray-50'
-              }`}
-            >
-              <div className="flex w-8 items-center justify-center">
-                {getPositionIcon(entry.position)}
+const Leaderboard = ({ entries }: LeaderboardProps) => (
+  <div className="score-card rounded-[28px] p-5">
+    <div className="mb-5 space-y-2">
+      <p className="score-caption">Ranking</p>
+      <h2 className="text-2xl font-semibold text-[var(--score-ink)]">Jornadas pontuadas</h2>
+      <p className="text-sm leading-6 text-[var(--score-ink-soft)]">
+        O ranking continua vindo da mesma fonte atual. O visual novo so torna mais claro como score,
+        nivel e contexto leve se conectam.
+      </p>
+    </div>
+
+    <div className="space-y-3">
+      {entries.map((entry) => {
+        const MedalIcon = medalIconByPosition[entry.position as 1 | 2 | 3];
+
+        return (
+          <div
+            key={entry.userId}
+            className={`rounded-[22px] border px-4 py-4 transition ${
+              entry.isCurrentUser
+                ? 'border-[rgba(21,163,90,0.22)] bg-[var(--score-green-soft)]'
+                : 'border-[var(--score-line)] bg-[var(--score-surface)]'
+            }`}
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--score-surface-soft)] text-[var(--score-green-deep)]">
+                {MedalIcon ? (
+                  <MedalIcon className="h-5 w-5" />
+                ) : (
+                  <span className="score-display text-sm font-bold">#{entry.position}</span>
+                )}
               </div>
 
-              <Avatar className="h-10 w-10">
-                <AvatarFallback
-                  className={
-                    entry.isCurrentUser ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700'
-                  }
-                >
-                  {getEntryInitials(entry)}
-                </AvatarFallback>
-              </Avatar>
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--score-green)] text-sm font-bold text-white">
+                {getEntryInitials(entry)}
+              </div>
 
-              <div className="flex-1">
-                <div className="font-medium text-gray-800">
-                  {entry.displayName}
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="truncate font-semibold text-[var(--score-ink)]">{entry.displayName}</p>
                   {entry.isCurrentUser && (
-                    <span className="ml-2 rounded-full bg-green-500 px-2 py-1 text-xs text-white">
+                    <Badge className="bg-[var(--score-green)] text-white hover:bg-[var(--score-green)]">
                       Voce
-                    </span>
+                    </Badge>
                   )}
                 </div>
-                <div className="text-sm text-gray-600">{entry.subtitle}</div>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-                  <span className="font-semibold text-emerald-700">
-                    {entry.score.toLocaleString('pt-BR')} pontos
-                  </span>
-                  <Badge variant="secondary">Nivel {entry.level}</Badge>
-                  <Badge variant="outline" className="bg-white">
-                    Score explicavel
-                  </Badge>
-                  {entry.badgeLabel && <Badge variant="outline">{entry.badgeLabel}</Badge>}
-                </div>
+                <p className="text-sm text-[var(--score-ink-soft)]">{entry.subtitle}</p>
               </div>
-            </div>
-          ))}
-        </div>
 
-        <div className="mt-6 rounded-lg bg-gradient-to-r from-blue-50 to-emerald-50 p-4">
-          <div className="grid gap-3 text-sm text-slate-700 md:grid-cols-2">
-            <div className="flex items-start gap-2">
-              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
-              <div>
-                <span className="font-medium">Base do ranking</span>
-                <p className="mt-1 text-xs leading-5">
-                  Score salvo na jornada e derivado de eventos validos.
+              <div className="text-right">
+                <p className="score-display text-2xl font-bold text-[var(--score-ink)]">
+                  {entry.score.toLocaleString('pt-BR')}
+                </p>
+                <p className="text-xs uppercase tracking-[0.14em] text-[var(--score-ink-faint)]">
+                  nivel {entry.level}
                 </p>
               </div>
             </div>
-            <div className="flex items-start gap-2">
-              <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
-              <div>
-                <span className="font-medium">Leitura de progresso</span>
-                <p className="mt-1 text-xs leading-5">
-                  Nivel e contexto ajudam a entender evolucao, nao apenas posicao.
-                </p>
-              </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Badge variant="outline" className="border-[var(--score-line)] bg-white text-[var(--score-ink-soft)]">
+                Score explicavel
+              </Badge>
+              {entry.badgeLabel && (
+                <Badge variant="outline" className="border-[var(--score-line)] bg-white text-[var(--score-ink-soft)]">
+                  {entry.badgeLabel}
+                </Badge>
+              )}
             </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
+        );
+      })}
+    </div>
+
+    <div className="mt-5 rounded-[22px] border border-[var(--score-line)] bg-[var(--score-surface-soft)] px-4 py-4">
+      <div className="flex items-start gap-3">
+        <ShieldCheck className="mt-0.5 h-4 w-4 text-[var(--score-green-deep)]" />
+        <p className="text-sm leading-6 text-[var(--score-ink-soft)]">
+          O ranking continua refletindo eventos validos de score e nao vira competicao paralela sem base de jornada.
+        </p>
+      </div>
+    </div>
+  </div>
+);
 
 export default Leaderboard;

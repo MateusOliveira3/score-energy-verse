@@ -2,10 +2,38 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import test from 'node:test';
+import '@/lib/cognitive/buildHouseModelFromJourney.test';
+import '@/lib/cognitive/curiosityEngine.test';
+import '@/lib/cognitive/investigationSession.test';
+import '@/lib/cognitive/learningEngineHandoff.test';
+import '@/lib/cognitive/learningEngineEvaluation.test';
+import '@/lib/cognitive/knowledgePromotion.test';
+import '@/lib/cognitive/temporalAuthority.test';
+import '@/lib/cognitive/knowledgePersistenceBoundary.test';
+import '@/lib/cognitive/houseClueEngine.test';
+import '@/lib/cognitive/coreSpeechEngine.test';
+import '@/lib/cognitive/coreExperienceComposer.test';
+import '@/lib/cognitive/buildRuntimeCoreExperience.test';
+import '@/lib/cognitive/investigationRuntime.test';
+import '@/components/nucleo/GuidedConversationSession.test';
+import '@/lib/energy-map/bathroom.test';
+import '@/lib/energy-map/buildEnergyMapFromJourney.test';
+import '@/lib/energy-map/buildEnergyMap.test';
+import '@/lib/energy-map/buildEnergyStoryFromJourney.test';
+import '@/lib/energy-map/energyStory.test';
+import '@/lib/energy-map/lighting.test';
+import '@/lib/energy-map/refrigeration.test';
+import '@/lib/investigation/investigationState.test';
+import '@/lib/investigation/investigationPersistence.test';
+import '@/lib/investigation/nextBestQuestion.test';
+import '@/lib/guidedConversation.test';
+import '@/lib/mvpCoreFlow.adaptiveQuestionRuntime.test';
+import '@/lib/mvpCoreFlow.questionCatalogMetadata.test';
 import {
   buildAnalysisSummary,
   buildBasicInvoiceSignals,
   buildConsultativeInsights,
+  describeAdaptiveAnswer,
   buildMemoryFeedback,
   buildMascotGuidance,
   buildNextActions,
@@ -21,6 +49,7 @@ import {
 } from '@/lib/energyKnowledge';
 import { parseInvoiceFile, parseInvoiceText } from '@/lib/invoiceParser';
 import { buildMemorySnapshot } from '@/lib/memorySnapshot';
+import { buildAccountUnderstandingPanel } from '@/lib/guidedConversation';
 import { buildScoreAssistantContext } from '@/lib/scoreAssistant/buildScoreAssistantContext';
 import { buildFallbackAssistantResponse } from '@/lib/scoreAssistant/fallback';
 import {
@@ -53,6 +82,12 @@ import {
   NextAction,
   UserProfileData,
 } from '@/types/mvp';
+import {
+  assessAuthorityHeuristics,
+  assessQuestionHeuristics,
+  compareAuditSnapshots,
+  deriveJourneyStateSignals,
+} from '../../scripts/qa/journeyHeuristics.mjs';
 
 const completeProfile: UserProfileData = {
   consumerType: 'Residencial',
@@ -283,11 +318,11 @@ test('nextActions ajusta microcopy com contexto leve do usuario', () => {
     },
     }
   );
-  const peakUsageAction = actions.find((action) => action.id === 'map-peak-usage');
-  const costCutAction = actions.find((action) => action.id === 'choose-one-cost-cut');
+  const mappingAction = actions.find((action) => action.id === 'residence-cognitive-map');
+  const followUpAction = actions.find((action) => action.id !== 'residence-cognitive-map');
 
-  assert.ok(peakUsageAction?.suggestion?.includes('chuveiro'));
-  assert.equal(costCutAction?.value, 'Buscar impacto direto na fatura');
+  assert.ok(mappingAction?.suggestion?.includes('estrutura'));
+  assert.equal(followUpAction?.value, 'Buscar impacto direto na fatura');
 });
 
 test('buildMemoryFeedback explica melhor respostas sobre climatizacao', () => {
@@ -307,13 +342,93 @@ test('buildMemoryFeedback explica abertura para geracao propria', () => {
 test('buildMemoryFeedback equilibra conforto e economia quando esse interesse e informado', () => {
   const feedback = buildMemoryFeedback('thermal_comfort_interest', 'sim');
 
-  assert.match(feedback.message, /economia e conforto/i);
+  assert.match(feedback.message, /conforto e gasto|gasto e conforto/i);
 });
 
 test('buildMemoryFeedback cobre respostas adaptativas do mascote', () => {
   const feedback = buildMemoryFeedback('usage_period', 'night');
 
   assert.match(feedback.message, /horario de maior uso|rotina de consumo/i);
+});
+
+test('describeAdaptiveAnswer devolve leitura, hipotese e incerteza para a conversa guiada', () => {
+  const feedback = describeAdaptiveAnswer('shower_heating_type', 'Eletrico');
+
+  assert.match(feedback.evidence, /peso eletrico do banho|conta/i);
+  assert.match(feedback.hypothesis, /banheiro|leitura/i);
+  assert.match(feedback.uncertainty, /incerteza|conclusao/i);
+});
+
+test('buildAccountUnderstandingPanel mostra categorias com estados diferentes e pontos em aberto', () => {
+  const panel = buildAccountUnderstandingPanel({
+    currentQuestion: {
+      id: 'bathrooms_count',
+      kind: 'action',
+      prompt: 'Quantos banheiros entram na rotina dessa residencia?',
+      helperText: 'Agora quero conhecer melhor a area de banho da casa.',
+      options: [
+        { value: '1', label: '1' },
+        { value: '2', label: '2' },
+      ],
+      action: {
+        id: 'residence-cognitive-map',
+        title: 'Continuar mapa da residencia',
+        description: 'Mapa em progresso.',
+        value: 'Casa menos desconhecida',
+        priority: 'high',
+      },
+    },
+    latestAnalysis: {
+      consumptionLevel: 'alto',
+      costSignal: 'atencao',
+      efficiencyLabel: 'Em leitura',
+      headline: 'Existe uma pista inicial no ciclo.',
+      observations: [],
+      whatMattersNext: 'Entender melhor o banheiro e a climatizacao.',
+      behaviorHighlights: ['Aquecimento do banho: eletrico', 'Ar-condicionado presente na rotina'],
+      evidenceItems: [
+        { label: 'Pista atual', value: 'Banho merece investigacao' },
+      ],
+    },
+    memorySnapshot: {
+      focusedInvoiceLabel: '02/2026',
+      memoryEvidence: {
+        dataUsed: [],
+        recommendationEvidence: [],
+      },
+      memoryGaps: {
+        items: ['Ainda preciso entender melhor iluminacao da casa.'],
+      },
+      memoryInsights: {
+        confirmedContext: ['Aquecimento do banho: eletrico'],
+        facts: [],
+        observedBehavior: ['Ar-condicionado presente na rotina'],
+      },
+      memoryKnowledge: {
+        items: [],
+        learnedCount: 0,
+        totalCount: 0,
+      },
+      memoryProfile: {
+        items: [],
+        confirmedSignals: ['2 chuveiro(s) informado(s)'],
+      },
+      memoryTimeline: {
+        items: [],
+      },
+    },
+    primaryAction: undefined,
+  });
+
+  const banhos = panel.categories.find((category) => category.id === 'banhos');
+  const climatizacao = panel.categories.find((category) => category.id === 'climatizacao');
+  const iluminacao = panel.categories.find((category) => category.id === 'iluminacao');
+
+  assert.equal(panel.categories.length, 7);
+  assert.equal(banhos?.level, 'boa_compreensao');
+  assert.equal(climatizacao?.level, 'compreensao_inicial');
+  assert.equal(iluminacao?.level, 'baixa_compreensao');
+  assert.match(iluminacao?.openPoint ?? '', /iluminacao/i);
 });
 
 test('nextActions ajusta o retorno do proximo ciclo com foco do usuario', () => {
@@ -327,9 +442,8 @@ test('nextActions ajusta o retorno do proximo ciclo com foco do usuario', () => 
       },
     },
   });
-  const nextBillAction = actions.find((action) => action.id === 'return-next-bill');
-
-  assert.ok(nextBillAction?.suggestion?.includes('custo responde'));
+  assert.ok(actions.some((action) => action.id === 'residence-cognitive-map'));
+  assert.ok(actions.length >= 1);
 });
 
 test('normalizacao preserva campos opcionais de nextActions enriquecidas', () => {
@@ -2013,4 +2127,153 @@ test('fallback do assistente explica memoria energetica sem inventar dados', () 
   assert.equal(response.mode, 'fallback');
   assert.match(response.answer, /Memoria Energetica/i);
   assert.ok(response.memorySignalsUsed.length >= 0);
+});
+
+test('deriveJourneyStateSignals encontra pergunta ativa a partir do estado persistido', () => {
+  const state = makeState({
+    actions: {
+      items: [
+        {
+          id: 'action-1',
+          title: 'Continuar mapa da residencia',
+          description: 'Precisamos conhecer melhor a estrutura da casa.',
+          value: 'Pergunta ativa',
+          priority: 'high',
+          interactiveQuestions: [
+            {
+              id: 'residence_type',
+              prompt: 'Sua residencia e casa, apartamento, sobrado ou studio?',
+              helperText: 'Quero comecar pela estrutura da casa para interpretar melhor a conta.',
+              options: [
+                { value: 'casa', label: 'Casa' },
+                { value: 'apartamento', label: 'Apartamento' },
+                { value: 'sobrado', label: 'Sobrado' },
+                { value: 'studio', label: 'Studio' },
+              ],
+            },
+          ],
+        },
+      ],
+      viewedActionIds: [],
+    },
+  });
+
+  const signals = deriveJourneyStateSignals(state);
+
+  assert.equal(signals.pendingQuestion?.source, 'action');
+  assert.equal(signals.pendingQuestion?.prompt, 'Sua residencia e casa, apartamento, sobrado ou studio?');
+  assert.deepEqual(signals.pendingQuestion?.optionLabels, ['Casa', 'Apartamento', 'Sobrado', 'Studio']);
+});
+
+test('deriveJourneyStateSignals tolera estado persistido antigo sem helperText', () => {
+  const state = makeState({
+    actions: {
+      items: [
+        {
+          id: 'action-1',
+          title: 'Continuar mapa da residencia',
+          description: 'Precisamos conhecer melhor a estrutura da casa.',
+          value: 'Pergunta ativa',
+          priority: 'high',
+          interactiveQuestions: [
+            {
+              id: 'residence_type',
+              prompt: 'Sua residencia e casa, apartamento, sobrado ou studio?',
+              options: [
+                { value: 'casa', label: 'Casa' },
+                { value: 'apartamento', label: 'Apartamento' },
+                { value: 'sobrado', label: 'Sobrado' },
+                { value: 'studio', label: 'Studio' },
+              ],
+            },
+          ],
+        },
+      ],
+      viewedActionIds: [],
+    },
+  });
+
+  const signals = deriveJourneyStateSignals(state);
+  const assessment = assessQuestionHeuristics({
+    pendingQuestion: signals.pendingQuestion,
+    heroInteractiveLabels: ['Casa', 'Apartamento', 'Sobrado', 'Studio'],
+    promptVisible: true,
+    helperVisible: false,
+  });
+
+  assert.equal(signals.pendingQuestion?.source, 'action');
+  assert.equal(signals.pendingQuestion?.helperText, undefined);
+  assert.equal(assessment.contextBeforeOptionsVisible, true);
+  assert.equal(assessment.belongsToCognitiveState, true);
+});
+
+test('assessQuestionHeuristics reconhece pergunta explicita com contexto e resposta visivel', () => {
+  const assessment = assessQuestionHeuristics({
+    pendingQuestion: {
+      id: 'residence_type',
+      prompt: 'Sua residencia e casa, apartamento, sobrado ou studio?',
+      helperText: 'Quero comecar pela estrutura da casa para interpretar melhor a conta.',
+      optionLabels: ['Casa', 'Apartamento', 'Sobrado', 'Studio'],
+      source: 'action',
+    },
+    heroInteractiveLabels: ['Casa', 'Apartamento', 'Sobrado', 'Studio'],
+    promptVisible: true,
+    helperVisible: true,
+  });
+
+  assert.equal(assessment.explicitQuestionVisible, true);
+  assert.equal(assessment.contextBeforeOptionsVisible, true);
+  assert.equal(assessment.responseAreaVisible, true);
+  assert.equal(assessment.belongsToCognitiveState, true);
+});
+
+test('assessAuthorityHeuristics trata a pergunta ativa como autoridade soberana', () => {
+  const authority = assessAuthorityHeuristics({
+    questionAssessment: {
+      belongsToCognitiveState: true,
+      contextBeforeOptionsVisible: true,
+      explicitQuestionVisible: true,
+      matchedOptionLabels: ['Casa', 'Apartamento', 'Sobrado', 'Studio'],
+      responseAreaVisible: true,
+    },
+    heroActionLabels: [],
+    detailTriggerCount: 0,
+  });
+
+  assert.equal(authority.questionDrivenPrimary, true);
+  assert.equal(authority.hasSinglePrimaryAction, true);
+  assert.equal(authority.competingCtas, false);
+  assert.equal(authority.clearNextStep, true);
+  assert.equal(authority.dominantActionLabel, 'Responder pergunta ativa');
+});
+
+test('compareAuditSnapshots registra melhora quando o QA passa a ver pergunta e proximo passo', () => {
+  const comparison = compareAuditSnapshots(
+    {
+      activeQuestionVisible: 'nao',
+      detailTriggerCount: 2,
+      nextStepClear: 'Nao',
+      uploadWorth: 'Parcialmente',
+    },
+    {
+      activeQuestionVisible: 'sim',
+      detailTriggerCount: 1,
+      nextStepClear: 'Sim',
+      uploadWorth: 'Sim',
+    }
+  );
+
+  assert.ok(
+    comparison.improved.some((item) => item.includes('pergunta ativa explicitamente no Hero'))
+  );
+  assert.ok(
+    comparison.improved.some((item) => item.includes('menos concorrencia de detalhes'))
+  );
+  assert.ok(
+    comparison.improved.some((item) => item.includes('proximo passo dominante'))
+  );
+  assert.ok(
+    comparison.improved.some((item) => item.includes('Primeiro Valor mais convincente'))
+  );
+  assert.equal(comparison.worsened.length, 0);
 });

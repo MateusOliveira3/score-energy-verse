@@ -1,365 +1,300 @@
-import React, { useState, useEffect } from 'react';
+import { ArrowRight, BrainCircuit, Compass, Leaf, ScanSearch, Sparkles, Target } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import LivingCore from '@/components/nucleo/LivingCore';
 
-// === ICONS (using inline SVGs for portability) ===
-// Using inline SVGs instead of a library like lucide-react to ensure it works without extra setup.
-
-const Lightbulb = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>
-  </svg>
-);
-
-const BarChart = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/>
-  </svg>
-);
-
-const BrainCircuit = ({ className }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 5a3 3 0 1 0-5.993.142M12 5a3 3 0 1 1 5.993.142M11 12h2"/><path d="M12 12a3 3 0 1 1-6 0 3 3 0 1 1 6 0z"/><path d="M12 12a3 3 0 1 0 6 0 3 3 0 1 0-6 0z"/><path d="M6 12a3 3 0 1 1-6 0 3 3 0 1 1 6 0z"/><path d="M18 12a3 3 0 1 0 6 0 3 3 0 1 0-6 0z"/><path d="M12 19a3 3 0 1 0-5.993-.142"/><path d="M12 19a3 3 0 1 1 5.993.142"/><path d="M12 5v7m-6 0h12m-6 0v7"/>
-    </svg>
-);
-
-const Globe = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20z"/><path d="M2 12h20"/>
-  </svg>
-);
-
-const Trophy = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.87 18.75 7.03 19 6 19c-1.03 0-1.87-.25-2.97-.79-.5-.23-.97-.66-.97-1.21V14.66"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.13 18.75 16.97 19 18 19c1.03 0 1.87-.25 2.97-.79.5-.23-.97-.66-.97-1.21V14.66"/><path d="M12 12.01V22"/><path d="M8 4h8"/><path d="M12 4v8"/>
-  </svg>
-);
-
-// Novo ícone: Network (para representar integração/ecossistema)
-const Network = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="6" cy="6" r="2" />
-    <circle cx="18" cy="6" r="2" />
-    <circle cx="12" cy="18" r="2" />
-    <path d="M8 6h8" />
-    <path d="M12 18V8" />
-    <path d="M6 6l6 12" />
-    <path d="M18 6l-6 12" />
-  </svg>
-);
-
-const Quote = ({ className }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.75-2-2-2H4c-1.25 0-2 .75-2 2v6c0 7 4 8 8 8Z"/><path d="M14 21c3 0 7-1 7-8V5c0-1.25-.75-2-2-2h-4c-1.25 0-2 .75-2 2v6c0 7 4 8 8 8Z"/>
-    </svg>
-);
-
-// === DATA MOCKS ===
-const heroSlides = [
-    {
-        headline: "Sua conta de luz parece um mistério?",
-        subtext: "O Score Energy descomplica sua relação com a energia. Conectamos tecnologia e gamificação para você economizar de forma divertida e construir um futuro mais sustentável.",
-        cta: "Descubra seu Score Energético"
-    },
-    {
-        headline: "E se economizar energia virasse um jogo?",
-        subtext: "Com o Score Energy, você cumpre desafios, sobe de nível e ganha recompensas reais. Transforme uma tarefa em uma jornada divertida para toda a família.",
-        cta: "Comece a Jogar e Economizar"
-    },
-    {
-        headline: "Tenha o poder de reduzir sua conta na palma da mão.",
-        subtext: "Nossa tecnologia analisa seu consumo e revela oportunidades de economia que você nunca viu. Assuma o controle e veja seu impacto no bolso e no planeta.",
-        cta: "Quero ter o Controle Agora!"
-    }
+const pillars = [
+  {
+    icon: ScanSearch,
+    title: 'Diagnostico Adaptativo',
+    text: 'Sua fatura deixa de ser um PDF parado e vira leitura energetica com contexto real.',
+  },
+  {
+    icon: BrainCircuit,
+    title: 'Memoria Energetica',
+    text: 'A Score guarda sinais da sua rotina para orientar o proximo ciclo sem reinventar a jornada.',
+  },
+  {
+    icon: Compass,
+    title: 'Acao orientada',
+    text: 'A plataforma transforma leitura em proximo passo claro, sem prometer milagres nem inventar causalidade.',
+  },
 ];
 
-const benefits = [
-    { icon: <Lightbulb className="w-8 h-8 text-emerald-500" />, text: "Economia real e mensurável na sua conta de luz" },
-    { icon: <BarChart className="w-8 h-8 text-emerald-500" />, text: "Acompanhamento claro do seu desempenho energético" },
-    { icon: <BrainCircuit className="w-8 h-8 text-emerald-500" />, text: "Educação e consciência através da gamificação" },
-    { icon: <Globe className="w-8 h-8 text-emerald-500" />, text: "Relatórios de impacto ambiental e carbono evitado" },
-    { icon: <Trophy className="w-8 h-8 text-emerald-500" />, text: "Sistema de conquistas, níveis e recompensas" },
-    { icon: <Network className="w-8 h-8 text-emerald-500" />, text: "Integração ao ecossistema ELETROBRAS" },
+const journey = [
+  {
+    step: '01',
+    title: 'Observe',
+    text: 'Envie a conta e deixe a Score organizar os campos essenciais.',
+  },
+  {
+    step: '02',
+    title: 'Relacione',
+    text: 'Compare ciclos, sinais e contexto para entender o que realmente mudou.',
+  },
+  {
+    step: '03',
+    title: 'Memorize',
+    text: 'A Memoria Energetica guarda o que importa sobre a sua jornada.',
+  },
+  {
+    step: '04',
+    title: 'Oriente',
+    text: 'Receba uma direcao pratica para o proximo ciclo, sem trocar a regra de negocio.',
+  },
 ];
 
-const testimonials = [
-    { quote: "Nunca imaginei que poderia transformar minha conta de luz em um jogo. Reduzi 18% do consumo em 3 meses!", author: "Carla Menezes", location: "Florianópolis/SC" },
-    { quote: "O mascote virtual e os desafios tornaram minha rotina mais consciente. Meus filhos também começaram a se interessar!", author: "Rafael Lima", location: "Salvador/BA" },
-    { quote: "Usei o Score Energy em um projeto de escola pública, e os alunos ficaram fascinados. É mais que uma plataforma: é uma experiência.", author: "Juliana Rocha", location: "Professora de Geografia" }
+const culturePoints = [
+  'Score mede sua evolucao ao longo da jornada.',
+  'Memoria lembra quem voce e energeticamente.',
+  'Mascote ensina sem virar chatbot ou ruina visual.',
+  'Conhecimento mostra o que voce ja aprendeu com a Score.',
 ];
 
-const team = [
-    { name: "Bruno Henrique Menegat", role: "Equipe", description: "Empreendedor com foco em soluções de eficiência energética.", img: "https://placehold.co/400x400/E2E8F0/475569?text=BHM" },
-    { name: "Mateus", role: "Equipe", description: "Desenvolvimento e produto com olhar para impacto e usabilidade.", img: "https://placehold.co/400x400/E2E8F0/475569?text=MT" },
-    { name: "3 integrante", role: "Equipe", description: "Operações e parcerias para ampliar o alcance do ecossistema.", img: "https://placehold.co/400x400/E2E8F0/475569?text=3I" }
-];
+const LandingPage = () => {
+  const { user } = useAuth();
+  const primaryCta = user ? '/perfil' : '/registro';
 
-const partners = [
-    { company: "EnergyC", partner: "Luiz", img: "https://placehold.co/400x200/F1F5F9/334155?text=EnergyC" }
-];
+  return (
+    <main className="score-shell min-h-screen">
+      <section className="mx-auto grid w-[min(1200px,92vw)] gap-10 py-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+        <div className="space-y-6">
+          <span className="score-pill score-pill-green">
+            Score Energy
+            <Sparkles className="h-3.5 w-3.5" />
+            cultura energetica visivel
+          </span>
 
-// === COMPONENTS ===
+          <div className="space-y-4">
+            <h1 className="score-display max-w-[12ch] text-5xl font-bold leading-[0.95] text-[var(--score-ink)] sm:text-6xl">
+              Sua energia precisa de contexto, nao de adivinhacao.
+            </h1>
+            <p className="max-w-2xl text-base leading-7 text-[var(--score-ink-soft)]">
+              A Score Energy transforma leitura de fatura, memoria, diagnostico e conhecimento em
+              uma jornada unica. O resultado nao e um dashboard frio: e um sistema que observa,
+              lembra, ensina e orienta.
+            </p>
+          </div>
 
-const RotatingHeroSection = () => {
-    const [currentSlide, setCurrentSlide] = useState(0);
+          <div className="flex flex-wrap gap-3">
+            <Link
+              to={primaryCta}
+              className="inline-flex items-center gap-2 rounded-[16px] bg-[var(--score-green)] px-5 py-3 text-sm font-semibold text-white shadow-[var(--score-shadow-pop)] transition hover:bg-[var(--score-green-deep)]"
+            >
+              {user ? 'Entrar no Nucleo' : 'Comecar a jornada'}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
 
-    useEffect(() => {
-        const timer = setInterval(() => {
-            setCurrentSlide((prevSlide) => (prevSlide + 1) % heroSlides.length);
-        }, 10000); // Change slide every 10 seconds
+            <Link
+              to="/login"
+              className="inline-flex items-center gap-2 rounded-[16px] border border-[var(--score-line)] bg-white px-5 py-3 text-sm font-semibold text-[var(--score-ink-soft)] transition hover:bg-[var(--score-surface-soft)]"
+            >
+              Acessar minha conta
+            </Link>
+          </div>
 
-        return () => clearInterval(timer); // Cleanup timer on component unmount
-    }, []);
-
-    return (
-        <section className="bg-slate-50 text-slate-800 relative overflow-hidden">
-            <div className="container mx-auto px-6 py-24 md:py-32 text-center max-w-7xl relative z-10">
-                <div className="relative h-48 md:h-56">
-                    {heroSlides.map((slide, index) => (
-                        <div
-                            key={index}
-                            className={`absolute inset-0 transition-opacity duration-2000 ease-in-out ${index === currentSlide ? 'opacity-100' : 'opacity-0'}`}
-                        >
-                            <h1 className="text-4xl md:text-6xl font-extrabold leading-tight mb-4">
-                                {slide.headline}
-                            </h1>
-                            <p className="text-lg md:text-xl max-w-3xl mx-auto text-slate-600">
-                                {slide.subtext}
-                            </p>
-                        </div>
-                    ))}
-                </div>
-                <div className="mt-10">
-                     <a href="/registro" className="bg-emerald-500 text-white font-bold py-4 px-8 rounded-full text-lg hover:bg-emerald-600 transition-transform duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl">
-                        Cadastrar agora
-                    </a>
-                </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="score-card rounded-[22px] px-4 py-4">
+              <p className="score-caption">Problema</p>
+              <p className="mt-2 text-sm leading-6 text-[var(--score-ink-soft)]">
+                Contas parecem opacas e o usuario nao entende o que mudou entre ciclos.
+              </p>
             </div>
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex space-x-3">
-                {heroSlides.map((_, index) => (
-                    <button
-                        key={index}
-                        onClick={() => setCurrentSlide(index)}
-                        className={`w-3 h-3 rounded-full transition-all duration-300 ${index === currentSlide ? 'bg-emerald-500 scale-125' : 'bg-slate-300 hover:bg-slate-400'}`}
-                        aria-label={`Go to slide ${index + 1}`}
-                    />
-                ))}
+            <div className="score-card rounded-[22px] px-4 py-4">
+              <p className="score-caption">Proposta</p>
+              <p className="mt-2 text-sm leading-6 text-[var(--score-ink-soft)]">
+                A Score organiza leitura, historico, memoria e recomendacao numa experiencia unica.
+              </p>
             </div>
-        </section>
-    );
+            <div className="score-card rounded-[22px] px-4 py-4">
+              <p className="score-caption">Resultado</p>
+              <p className="mt-2 text-sm leading-6 text-[var(--score-ink-soft)]">
+                Mais clareza para decidir, aprender e acompanhar a propria evolucao energetica.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="score-stage relative overflow-hidden rounded-[34px] px-6 py-8 text-white">
+          <div className="absolute inset-x-10 top-10 h-36 rounded-full bg-[radial-gradient(circle,rgba(43,194,116,0.26)_0%,transparent_72%)] blur-2xl" />
+          <div className="relative z-10 flex flex-col items-center gap-6 text-center">
+            <LivingCore level={4} points={770} size={236} />
+            <div className="space-y-3">
+              <p className="score-caption text-[#7fe3ae]">Nucleo oficial da jornada</p>
+              <h2 className="score-display text-4xl font-bold">A Score observa, relaciona, memoriza e orienta.</h2>
+              <p className="mx-auto max-w-xl text-sm leading-6 text-white/72">
+                O conceito Nucleo deixa visivel o valor que ja existe no produto: leitura real da
+                conta, memoria energetica persistida, conhecimento adquirido e acao orientada.
+              </p>
+            </div>
+            <div className="grid w-full gap-3 sm:grid-cols-3">
+              <div className="rounded-[20px] border border-white/10 bg-white/6 px-4 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
+                  Score
+                </p>
+                <p className="score-display mt-2 text-3xl font-bold text-white">770</p>
+              </div>
+              <div className="rounded-[20px] border border-white/10 bg-white/6 px-4 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
+                  Historico
+                </p>
+                <p className="score-display mt-2 text-3xl font-bold text-white">3 ciclos</p>
+              </div>
+              <div className="rounded-[20px] border border-white/10 bg-white/6 px-4 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
+                  Conhecimento
+                </p>
+                <p className="score-display mt-2 text-3xl font-bold text-white">6/8</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto w-[min(1200px,92vw)] py-6">
+        <div className="grid gap-4 md:grid-cols-3">
+          {pillars.map(({ icon: Icon, title, text }) => (
+            <article key={title} className="score-card rounded-[26px] px-5 py-5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--score-green-soft)] text-[var(--score-green-deep)]">
+                <Icon className="h-5 w-5" />
+              </div>
+              <h3 className="mt-4 text-xl font-semibold text-[var(--score-ink)]">{title}</h3>
+              <p className="mt-2 text-sm leading-6 text-[var(--score-ink-soft)]">{text}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="mx-auto grid w-[min(1200px,92vw)] gap-5 py-8 lg:grid-cols-[1fr_1fr]">
+        <article className="score-card rounded-[28px] px-6 py-6">
+          <p className="score-caption">Memoria Energetica</p>
+          <h2 className="mt-2 text-3xl font-semibold text-[var(--score-ink)]">
+            O que a Score aprende sobre voce
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-[var(--score-ink-soft)]">
+            Cada resposta, cada fatura e cada comparacao ajudam a Score a entender melhor sua
+            rotina. Essa memoria nao e IA magica: e contexto real acumulado ao longo da jornada.
+          </p>
+          <div className="mt-5 space-y-3">
+            <div className="rounded-[18px] bg-[var(--score-surface-soft)] px-4 py-3 text-sm text-[var(--score-ink-soft)]">
+              Perfil, localizacao e tipo de consumo viram base de leitura.
+            </div>
+            <div className="rounded-[18px] bg-[var(--score-surface-soft)] px-4 py-3 text-sm text-[var(--score-ink-soft)]">
+              Historico entre ciclos revela padroes antes invisiveis.
+            </div>
+            <div className="rounded-[18px] bg-[var(--score-surface-soft)] px-4 py-3 text-sm text-[var(--score-ink-soft)]">
+              Memoria organiza o proximo passo sem trocar a regra central do produto.
+            </div>
+          </div>
+        </article>
+
+        <article className="score-card rounded-[28px] px-6 py-6">
+          <p className="score-caption">Conhecimento Energetico</p>
+          <h2 className="mt-2 text-3xl font-semibold text-[var(--score-ink)]">
+            O que voce aprende com a Score
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-[var(--score-ink-soft)]">
+            O mascote deixa de ser decoracao e passa a ensinar. Cada conteudo compreendido deixa de
+            reaparecer como ruido e passa a compor sua evolucao.
+          </p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-[18px] bg-[var(--score-green-soft)] px-4 py-3 text-sm font-medium text-[var(--score-green-deep)]">
+              Chuveiro eficiente
+            </div>
+            <div className="rounded-[18px] bg-[var(--score-green-soft)] px-4 py-3 text-sm font-medium text-[var(--score-green-deep)]">
+              Comparacao entre ciclos
+            </div>
+            <div className="rounded-[18px] bg-[var(--score-surface-soft)] px-4 py-3 text-sm text-[var(--score-ink-soft)]">
+              Consumo em standby
+            </div>
+            <div className="rounded-[18px] bg-[var(--score-surface-soft)] px-4 py-3 text-sm text-[var(--score-ink-soft)]">
+              Climatizacao eficiente
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section className="mx-auto w-[min(1200px,92vw)] py-8">
+        <div className="mb-6 max-w-3xl">
+          <p className="score-caption">Jornada</p>
+          <h2 className="mt-2 text-3xl font-semibold text-[var(--score-ink)]">
+            Uma experiencia unica para leitura, memoria e acao
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-[var(--score-ink-soft)]">
+            A Score nao separa aprendizado, diagnostico e acompanhamento em blocos sem conversa.
+            O fluxo inteiro foi desenhado para uma relacao mais clara com a energia.
+          </p>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-4">
+          {journey.map((item) => (
+            <article key={item.step} className="score-card rounded-[24px] px-5 py-5">
+              <div className="score-display text-4xl font-bold text-[var(--score-green)]">{item.step}</div>
+              <h3 className="mt-3 text-xl font-semibold text-[var(--score-ink)]">{item.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-[var(--score-ink-soft)]">{item.text}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="mx-auto grid w-[min(1200px,92vw)] gap-6 py-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+        <div className="score-stage overflow-hidden rounded-[30px] px-6 py-6 text-white">
+          <div className="space-y-4">
+            <p className="score-caption text-[#7fe3ae]">Cultura energetica</p>
+            <h2 className="score-display max-w-[14ch] text-4xl font-bold">
+              A jornada individual tambem constri inteligencia coletiva.
+            </h2>
+            <p className="max-w-2xl text-sm leading-6 text-white/72">
+              Score, ranking e historico continuam funcionando como antes. O que muda aqui e a
+              legibilidade do valor: o usuario entende por que esta evoluindo.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {culturePoints.map((point) => (
+            <div
+              key={point}
+              className="score-card flex items-start gap-3 rounded-[22px] px-5 py-4"
+            >
+              <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full bg-[var(--score-green-soft)] text-[var(--score-green-deep)]">
+                <Leaf className="h-4 w-4" />
+              </div>
+              <p className="text-sm leading-6 text-[var(--score-ink-soft)]">{point}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="mx-auto w-[min(1200px,92vw)] py-10">
+        <div className="score-card rounded-[34px] px-6 py-8 text-center sm:px-10 sm:py-10">
+          <p className="score-caption">Proximo passo</p>
+          <h2 className="score-display mt-2 text-4xl font-bold text-[var(--score-ink)]">
+            Tornar o valor da Score visivel comecando pelo proximo ciclo.
+          </h2>
+          <p className="mx-auto mt-3 max-w-3xl text-sm leading-6 text-[var(--score-ink-soft)]">
+            O produto ja possui parser, score, historico, recomendacoes, memoria e conhecimento.
+            Agora a experiencia tambem faz tudo isso parecer claro para o usuario.
+          </p>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <Link
+              to={primaryCta}
+              className="inline-flex items-center gap-2 rounded-[16px] bg-[var(--score-green)] px-5 py-3 text-sm font-semibold text-white shadow-[var(--score-shadow-pop)] transition hover:bg-[var(--score-green-deep)]"
+            >
+              <Target className="h-4 w-4" />
+              {user ? 'Abrir meu Nucleo' : 'Criar conta'}
+            </Link>
+            <Link
+              to="/ranking"
+              className="inline-flex items-center gap-2 rounded-[16px] border border-[var(--score-line)] bg-white px-5 py-3 text-sm font-semibold text-[var(--score-ink-soft)] transition hover:bg-[var(--score-surface-soft)]"
+            >
+              Ver ranking
+            </Link>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
 };
 
-
-const HowItWorksSection = () => (
-    <section id="como-funciona" className="py-20 bg-white">
-        <div className="container mx-auto px-6 max-w-7xl">
-            <div className="text-center mb-16">
-                <h2 className="text-3xl md:text-4xl font-bold text-slate-800">Como o Score Energy Descomplica sua Vida</h2>
-                <p className="text-lg text-slate-600 mt-4 max-w-3xl mx-auto">Em 5 passos simples, você assume o controle do seu consumo e começa a economizar.</p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10">
-                <div className="text-center">
-                    <div className="bg-emerald-100 text-emerald-600 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-5 text-3xl font-bold">1</div>
-                    <h3 className="text-xl font-semibold mb-2">Cadastre-se</h3>
-                    <p className="text-slate-600">Crie sua conta em poucos cliques e comece a acompanhar seu desempenho energético.</p>
-                </div>
-                <div className="text-center">
-                    <div className="bg-emerald-100 text-emerald-600 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-5 text-3xl font-bold">2</div>
-                    <h3 className="text-xl font-semibold mb-2">Personalize sua Jornada</h3>
-                    <p className="text-slate-600">Crie seu perfil, responda a um quiz rápido e monte seu mascote virtual para receber dicas e missões.</p>
-                </div>
-                <div className="text-center">
-                    <div className="bg-emerald-100 text-emerald-600 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-5 text-3xl font-bold">3</div>
-                    <h3 className="text-xl font-semibold mb-2">Receba Recomendações</h3>
-                    <p className="text-slate-600">Nossa IA analisa seu perfil para indicar práticas e equipamentos que reduzem custos e ajudam o planeta.</p>
-                </div>
-                <div className="text-center">
-                    <div className="bg-emerald-100 text-emerald-600 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-5 text-3xl font-bold">4</div>
-                    <h3 className="text-xl font-semibold mb-2">Conquiste Recompensas</h3>
-                    <p className="text-slate-600">Participe de desafios, ganhe pontos, suba de nível e veja sua evolução no ranking de economia.</p>
-                </div>
-                <div className="text-center">
-                    <div className="bg-emerald-100 text-emerald-600 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-5 text-3xl font-bold">5</div>
-                    <h3 className="text-xl font-semibold mb-2">Seja um parceiro ELETROBRAS</h3>
-                    <p className="text-slate-600">Amplie o impacto: mais economia, eficiência e educação energética.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-);
-
-const BenefitsSection = () => (
-    <section id="beneficios" className="py-20 bg-slate-50">
-        <div className="container mx-auto px-6 max-w-7xl">
-            <div className="text-center mb-16">
-                <h2 className="text-3xl md:text-4xl font-bold text-slate-800">Vantagens que Iluminam seu Bolso e o Futuro</h2>
-                <p className="text-lg text-slate-600 mt-4 max-w-3xl mx-auto">Mais que economia, uma nova experiência energética.</p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                {benefits.map((benefit, index) => (
-                    <div key={index} className="flex items-start space-x-4 p-6 bg-white rounded-xl shadow-md hover:shadow-lg hover:-translate-y-1 transition-all duration-300 h-full">
-                        <div className="flex-shrink-0 bg-emerald-100 p-3 rounded-full">{benefit.icon}</div>
-                        <p className="text-lg text-slate-700 font-medium pt-2">{benefit.text}</p>
-                    </div>
-                ))}
-            </div>
-        </div>
-    </section>
-);
-
-const NewsSection = () => (
-    <section id="noticias" className="py-20 bg-white">
-        <div className="container mx-auto px-6 max-w-7xl">
-            <div className="text-center mb-16">
-                <h2 className="text-3xl md:text-4xl font-bold text-slate-800">Fique por Dentro</h2>
-                <p className="text-lg text-slate-600 mt-4 max-w-2xl mx-auto">Notícias e tendências sobre energia, sustentabilidade e inovação no Brasil.</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div className="bg-slate-50 rounded-xl shadow-md overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col h-full">
-                    <img src="https://placehold.co/600x400/34D399/FFFFFF?text=Energia+Solar" alt="Energia Solar" className="w-full h-48 object-cover" />
-                    <div className="p-6 flex flex-col flex-grow">
-                        <h3 className="font-bold text-xl mb-2">O Futuro é Solar: Geração Distribuída no Brasil</h3>
-                        <p className="text-slate-600 text-base flex-grow">Descubra os avanços e benefícios da energia solar para residências e pequenos negócios...</p>
-                        <a href="#" className="text-emerald-600 hover:text-emerald-700 font-semibold mt-4 inline-block self-start">Leia mais &rarr;</a>
-                    </div>
-                </div>
-                <div className="bg-slate-50 rounded-xl shadow-md overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col h-full">
-                    <img src="https://placehold.co/600x400/60A5FA/FFFFFF?text=Efici%C3%AAncia" alt="Eficiência Energética" className="w-full h-48 object-cover" />
-                    <div className="p-6 flex flex-col flex-grow">
-                        <h3 className="font-bold text-xl mb-2">5 Dicas Práticas para Reduzir sua Conta de Luz</h3>
-                        <p className="text-slate-600 text-base flex-grow">Pequenas mudanças de hábito que fazem uma grande diferença no seu bolso e no meio ambiente...</p>
-                        <a href="#" className="text-emerald-600 hover:text-emerald-700 font-semibold mt-4 inline-block self-start">Leia mais &rarr;</a>
-                    </div>
-                </div>
-                <div className="bg-slate-50 rounded-xl shadow-md overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col h-full">
-                     <img src="https://placehold.co/600x400/FBBF24/FFFFFF?text=Inova%C3%A7%C3%A3o" alt="Inovação" className="w-full h-48 object-cover" />
-                    <div className="p-6 flex flex-col flex-grow">
-                        <h3 className="font-bold text-xl mb-2">Gamificação: A Chave para o Consumo Consciente</h3>
-                        <p className="text-slate-600 text-base flex-grow">Entenda como a mecânica de jogos está ajudando pessoas a adotarem hábitos mais sustentáveis...</p>
-                        <a href="#" className="text-emerald-600 hover:text-emerald-700 font-semibold mt-4 inline-block self-start">Leia mais &rarr;</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-);
-
-const TestimonialsSection = () => (
-    <section id="depoimentos" className="py-20 bg-slate-50">
-        <div className="container mx-auto px-6 max-w-7xl">
-            <div className="text-center mb-16">
-                <h2 className="text-3xl md:text-4xl font-bold text-slate-800">Recomende e ganhe pontos extras no ecossistema ELETROBRAS</h2>
-            </div>
-            <div className="grid grid-cols-1 gap-8">
-                <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300">
-                    <div className="flex items-start space-x-4">
-                        <Trophy className="w-8 h-8 text-emerald-400" />
-                        <div>
-                            <h3 className="text-2xl font-bold text-slate-800 mb-2">Indique e ganhe pontos</h3>
-                            <p className="text-slate-600">Convide amigos e organizações para o Score Energy. Cada cadastro confirmado rende pontos extras no ecossistema ELETROBRAS.</p>
-                            <ul className="mt-4 space-y-2 text-slate-600">
-                                <li>• Cadastro confirmado: +100 pontos</li>
-                                <li>• Perfil inicial completo: +150 pontos</li>
-                                <li>• Bônus de engajamento: conquiste badges e suba no ranking</li>
-                            </ul>
-                            <a href="#" className="inline-block mt-6 bg-emerald-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-emerald-700 transition-colors">Indicar agora</a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-);
-
-const TeamSection = () => (
-    <section id="equipe" className="py-20 bg-white">
-        <div className="container mx-auto px-6 max-w-7xl">
-            <div className="text-center mb-16">
-                <h2 className="text-3xl md:text-4xl font-bold text-slate-800">Nossa Equipe Apaixonada</h2>
-                <p className="text-lg text-slate-600 mt-4 max-w-3xl mx-auto">Por trás do Score Energy, há uma equipe movida por inovação, sustentabilidade e o propósito de empoderar o consumidor brasileiro.</p>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-x-6 gap-y-12">
-                {team.map((member, index) => (
-                    <div key={index} className="text-center flex flex-col items-center">
-                        <img 
-                            src={member.img} 
-                            alt={`Foto de ${member.name}`} 
-                            className="w-32 h-32 rounded-full mx-auto mb-4 shadow-lg object-cover" 
-                            onError={(e) => { 
-                                const target = e.target as HTMLImageElement;
-                                target.onerror = null;
-                                target.src = 'https://placehold.co/400x400/E2E8F0/475569?text=??';
-                            }}
-                        />
-                        <h3 className="text-xl font-semibold text-slate-800">{member.name}</h3>
-                        <p className="text-emerald-600 font-medium mb-2">{member.role}</p>
-                        <p className="text-slate-600 text-sm">{member.description}</p>
-                        <a href="#" className="text-emerald-600 hover:text-emerald-700 font-semibold mt-3 inline-block">Saber mais →</a>
-                    </div>
-                ))}
-            </div>
-        </div>
-    </section>
-);
-
-const PartnersSection = () => (
-    <section id="parceiros" className="py-16 bg-slate-50">
-        <div className="container mx-auto px-6 max-w-7xl">
-            <div className="text-center mb-10">
-                <h2 className="text-3xl md:text-4xl font-bold text-slate-800">Parceiros</h2>
-                <p className="text-lg text-slate-600 mt-4 max-w-2xl mx-auto">Juntos, ampliamos o impacto com economia, eficiência e educação energética.</p>
-            </div>
-            <div className="grid grid-cols-1 gap-6 place-items-center">
-                {partners.map((p, index) => (
-                    <div key={index} className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-8 flex flex-col items-center justify-center text-center w-full max-w-md">
-                        <div className="w-full max-w-[240px] h-20 flex items-center justify-center mb-4">
-                            <img 
-                                src={p.img} 
-                                alt={`Logo ${p.company}`} 
-                                className="max-h-16 object-contain"
-                                onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.onerror = null;
-                                    target.src = 'https://placehold.co/400x200/F1F5F9/334155?text=Parceiro';
-                                }}
-                            />
-                        </div>
-                        <h3 className="text-lg font-semibold text-slate-800">{p.company}</h3>
-                        <p className="text-sm text-slate-600">Parceiro: {p.partner}</p>
-                        <p className="text-slate-600 text-sm mt-3 min-h-[48px]">Espaço para descrição da parceria.</p>
-                    </div>
-                ))}
-            </div>
-        </div>
-    </section>
-);
-
-const CallToActionSection = () => (
-    <section id="comece-agora" className="bg-emerald-600 text-white">
-        <div className="container mx-auto px-6 py-20 text-center max-w-7xl">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Pronto para ter o controle da sua energia na palma da mão?</h2>
-            <p className="text-lg md:text-xl max-w-3xl mx-auto mb-10 text-emerald-100">
-                Junte-se ao Score Energy. Cadastre-se e inicie uma jornada de economia, diversão e sustentabilidade.
-            </p>
-            <a href="/registro" className="bg-white text-emerald-600 font-bold py-4 px-8 rounded-full text-lg hover:bg-slate-100 transition-transform duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl">
-                Cadastrar agora
-            </a>
-        </div>
-    </section>
-);
-
-// === MAIN APP COMPONENT ===
-export default function App() {
-    return (
-        <div className="bg-white font-sans antialiased">
-            <main>
-                <RotatingHeroSection />
-                <HowItWorksSection />
-                <BenefitsSection />
-                <TestimonialsSection />
-                <NewsSection />
-                <TeamSection />
-                <PartnersSection />
-                <CallToActionSection />
-            </main>
-        </div>
-    );
-}
+export default LandingPage;

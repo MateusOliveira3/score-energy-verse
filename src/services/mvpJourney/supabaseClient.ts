@@ -1,10 +1,14 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { isLocalQaForcedRuntime } from '@/lib/localQaRuntime';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const configuredProvider = import.meta.env.VITE_MVP_JOURNEY_PROVIDER?.toLowerCase();
+const configuredProvider = isLocalQaForcedRuntime()
+  ? 'local'
+  : import.meta.env.VITE_MVP_JOURNEY_PROVIDER?.toLowerCase();
 
-export const isJourneySupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+export const isJourneySupabaseConfigured =
+  !isLocalQaForcedRuntime() && Boolean(supabaseUrl && supabaseAnonKey);
 export const isSupabaseProviderRequested = configuredProvider === 'supabase';
 
 const hasValidSupabaseUrl = () => {
@@ -25,6 +29,7 @@ const hasPublishableAnonKey = () =>
 
 export const getJourneySupabaseConfigDiagnostics = () => ({
   provider: configuredProvider ?? 'local',
+  forcedLocalQa: isLocalQaForcedRuntime(),
   hasUrl: Boolean(supabaseUrl),
   hasAnonKey: Boolean(supabaseAnonKey),
   validUrl: hasValidSupabaseUrl(),

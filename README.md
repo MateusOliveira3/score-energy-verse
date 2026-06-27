@@ -1,6 +1,6 @@
 # Score Energy Verse
 
-This repo is a Vite + React + TypeScript app whose current MVP is centered on a single persisted journey state per user. The main product flow lives in `/perfil`, where the user completes a profile, uploads an energy bill file, receives a deterministic analysis summary, accumulates score events, and unlocks next actions plus ranking visibility.
+This repo is a Vite + React + TypeScript app whose current MVP is centered on a single persisted journey state per user. The main product flow lives in `/perfil`, where the user progresses through the Score Energy Nucleo: completes a profile, uploads an energy bill file, receives a guided reading of the current cycle, accumulates score events, keeps Memory and Knowledge visible, and unlocks the next action plus ranking visibility.
 
 ## Routes that exist today
 
@@ -9,15 +9,19 @@ This repo is a Vite + React + TypeScript app whose current MVP is centered on a 
 - `/registro`: registration form backed by `AuthContext`
 - `/perfil`: protected MVP journey page in `src/pages/Index.tsx`
 - `/ranking`: protected leaderboard page in `src/pages/Ranking.tsx`
+- `/assistente`: protected Score assistant page in `src/pages/Assistant.tsx`
 - `*`: not found page
 
 ## Real runtime architecture
+
+Mandatory reading for any engineer or AI working on this project: `CONSTITUICAO_DA_INTELIGENCIA_SCORE.md`.
+Institutional planning document for the future Teoria Cognitiva da Residencia v2.0: `PLANO_DA_TEORIA_COGNITIVA.md` (architectural plan, not the final theory).
 
 ### App shell
 
 - `src/main.tsx`: boots React and global CSS
 - `src/App.tsx`: wraps the app with `QueryClientProvider`, `AuthProvider`, tooltip/toast providers, `BrowserRouter`, global `Header`, and global `Footer`
-- `ProtectedRoute` in `src/App.tsx`: blocks `/perfil` and `/ranking` until auth loading finishes and a user exists
+- `ProtectedRoute` in `src/App.tsx`: blocks `/perfil`, `/ranking`, and `/assistente` until auth loading finishes and a user exists
 
 `@tanstack/react-query` is configured at the app root, but the current MVP journey itself is not implemented with query hooks. The journey and ranking pages use custom hooks with `useEffect`, `useState`, and `useMemo`.
 
@@ -25,29 +29,31 @@ This repo is a Vite + React + TypeScript app whose current MVP is centered on a 
 
 - `src/pages/Index.tsx`
   - Reads all journey data and mutations from `useMvpJourney()`
-  - Renders the current flow with:
-    - `UserProfile`
-    - `MascotCustomization`
-    - `InvoiceUpload`
-    - `AnalysisSummary`
-    - `MascotGuidanceCard`
-    - `ScoreCard`
-    - `LevelProgress`
-    - `SmartRecommendations`
-    - `InvoiceHistory`
-  - Also renders a local score event feed from `scoreEvents`
+  - Builds the current authenticated shell around:
+    - `NucleoShell`
+    - `DynamicContextPanel`
+    - `MemoryPanel`
+    - embedded `InvoiceUpload`
+    - `MascotCustomization` when profile details are opened
+  - Uses `buildNucleoSessionViewModel()` and `buildMemorySnapshot()` as read-only layers over the same persisted journey state
 
 - `src/pages/Ranking.tsx`
   - Reads leaderboard data from `useRanking()`
   - Renders `Leaderboard`
   - Shows the current user position, current source label, and an implementation limitation string when provided by the service
 
+- `src/pages/Assistant.tsx`
+  - Reads the same persisted journey through `useMvpJourney()`
+  - Builds assistant context with `buildScoreAssistantContext()`
+  - Talks to the Score assistant through `/api/score-assistant/*`
+  - Keeps the assistant contextual, Hermes-ready, and grounded in Memory plus current journey state
+
 - `src/pages/Login.tsx` and `src/pages/Register.tsx`
   - Call `signIn` and `signUp` from `AuthContext`
   - Redirect to `/perfil` after successful login
 
 - `src/pages/LandingPage.tsx`
-  - Static marketing page with rotating hero, benefits, testimonials, news, team, partners, and CTA sections
+  - Public landing page aligned with the Nucleo concept, Memory, Knowledge, and guided energy culture
   - It does not read MVP journey state
 
 ### Hooks
@@ -64,6 +70,10 @@ This repo is a Vite + React + TypeScript app whose current MVP is centered on a 
     - `completeInvoiceFlow`
     - `removeInvoiceFromHistory`
     - `markActionViewed`
+    - `updateActionStatus`
+    - `answerMascotContextQuestion`
+    - `ignoreMascotContextQuestion`
+    - `markKnowledgeLearned`
 
 - `src/hooks/useJourneyIdentity.ts`
   - Converts auth state into a stable `journeyIdentity` used by persistence and ranking services
@@ -88,6 +98,22 @@ This repo is a Vite + React + TypeScript app whose current MVP is centered on a 
     - mascot guidance
     - score event creation
     - score, level, and progress
+
+- `src/lib/memorySnapshot.ts`
+  - Builds the read-only Memory Energy snapshot shown to the user
+  - Separates what Score learned about the user from what the user learned with Score
+
+- `src/lib/energyKnowledge.ts`
+  - Defines the Knowledge Energy catalog
+  - Normalizes learned knowledge state
+  - Selects which educational content can appear next
+
+- `src/lib/nucleoSession.ts`
+  - Builds the Nucleo session view-model
+  - Reorganizes the same journey state into `observa`, `relaciona`, `memoriza`, and `orienta`
+
+- `src/lib/scoreAssistant/buildScoreAssistantContext.ts`
+  - Reuses journey, analysis, Memory, and next action to prepare contextual assistant responses
 
 - `src/lib/mvpJourneyState.ts`
   - Defines defaults and normalization
@@ -176,6 +202,15 @@ The entire flow is built around `MvpState` in `src/types/mvp.ts`:
   - `viewedActionIds`
   - `lastUpdatedAt`
 
+- `userContext`
+  - contextual answers from the mascot flow
+
+- `energyBehaviorProfile`
+  - adaptive diagnosis, appliance, habit, and intention signals confirmed along the journey
+
+- `knowledge`
+  - explicitly learned Knowledge Energy items
+
 - `journeyStage`
   - `onboarding`
   - `before-upload`
@@ -195,13 +230,13 @@ flowchart TD
   D --> E["Profile completion is recalculated"]
   E --> F["If completion >= 80%, add profile_completed score event"]
   F --> G["InvoiceUpload validates file type and starts processing"]
-  G --> H["interpretInvoiceFile(file, profile) derives invoice fields from file metadata + profile"]
+  G --> H["interpretInvoiceFile(file) parses bill text when possible and hydrates canonical invoice fields"]
   H --> I["buildAnalysisSummary(invoice, profile)"]
   I --> J["buildNextActions(invoice, analysis, profile)"]
   J --> K["setAnalysis + updateActions + append invoice history"]
   K --> L["Add invoice_uploaded and analysis_completed score events"]
   L --> M["getScoreState derives score, level, next level, progress"]
-  M --> N["Index renders ScoreCard, LevelProgress, AnalysisSummary, SmartRecommendations, InvoiceHistory"]
+  M --> N["Index renders NucleoShell, DynamicContextPanel, and MemoryPanel"]
   N --> O["User clicks Revisar on an action"]
   O --> P["markActionViewed stores action id and adds action_viewed score event"]
   P --> M
@@ -242,17 +277,7 @@ On upload it:
 - calls `interpretInvoiceFile(file, profile)`
 - passes the original `File` into `completeInvoiceFlow(file)`
 
-Important implementation detail: the current MVP does not parse real invoice contents. `interpretInvoiceFile()` derives invoice values deterministically from:
-
-- file name
-- file size
-- file lastModified
-- file type
-- profile consumer type
-- profile location
-- property size
-- people count
-- energy preference
+Important implementation detail: the current MVP attempts to parse real invoice contents through `parseInvoiceFile()`, especially for text and PDF sources, and then hydrates `InvoiceData` from the extracted fields. When a field cannot be extracted with confidence, the parser preserves safe absence instead of inventing data. The active `/perfil` flow still does not use OCR.
 
 The generated invoice contains:
 
@@ -265,7 +290,7 @@ The generated invoice contains:
 - `taxPercentage`
 - `peakHours`
 - `month`
-- `uploadedAt`
+- `parser`
 
 #### 3. Analysis
 
@@ -558,8 +583,8 @@ Notes:
 
 ## Current implementation boundaries visible in code
 
-- Invoice analysis is deterministic and based on file metadata plus profile context. There is no OCR or real invoice extraction in the active `/perfil` flow.
+- The active `/perfil` flow uses a real parser for text and PDF bill contents, but it still does not use OCR. When a field cannot be extracted safely, the parser keeps absence explicit instead of inventing values.
 - Score is derived only from explicit score events, not from direct invoice totals.
 - The main MVP stores journey data as a single state object, not as separate normalized domain tables.
 - The leaderboard only includes users with at least one score event.
-- The landing page contains static marketing content and does not connect to journey state.
+- The landing page is public and institutional; it does not connect to the persisted journey state.

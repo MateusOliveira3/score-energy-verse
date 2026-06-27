@@ -1,6 +1,7 @@
 import { createLocalMvpJourneyService } from '@/services/mvpJourney/localAdapter';
 import { MvpJourneyService } from '@/services/mvpJourney/contracts';
 import { createSupabaseMvpJourneyService } from '@/services/mvpJourney/supabaseAdapter';
+import { isLocalQaForcedRuntime } from '@/lib/localQaRuntime';
 import {
   getJourneySupabaseConfigDiagnostics,
   isJourneySupabaseConfigured,
@@ -12,6 +13,10 @@ export type MvpJourneyProvider = 'local' | 'supabase';
 const DEFAULT_PROVIDER: MvpJourneyProvider = 'local';
 
 const resolveConfiguredProvider = (): MvpJourneyProvider => {
+  if (isLocalQaForcedRuntime()) {
+    return 'local';
+  }
+
   const configuredProvider = import.meta.env.VITE_MVP_JOURNEY_PROVIDER?.toLowerCase();
 
   if (configuredProvider === 'supabase') {

@@ -1,122 +1,103 @@
 import React from 'react';
-import ScoreCard from '../components/ScoreCard';
-import LevelProgress from '../components/LevelProgress';
-import EnergyProgressVisual from '../components/EnergyProgressVisual';
-import ScoreExplanationCard from '../components/ScoreExplanationCard';
-import InvoiceUpload from '../components/InvoiceUpload';
-import InvoiceHistory from '../components/InvoiceHistory';
-import SmartRecommendations from '../components/SmartRecommendations';
-import UserProfile from '../components/UserProfile';
-import MascotCustomization from '../components/MascotCustomization';
-import ProfileMascotAmbient from '../components/ProfileMascotAmbient';
-import AnalysisSummary from '../components/AnalysisSummary';
-import MemoryPanel from '../components/MemoryPanel';
 import DynamicContextPanel, {
   DynamicContextPanelView,
-} from '../components/DynamicContextPanel';
-import LiveMascotJourney, {
-  JourneyQuickAccessId,
-  JourneyTarget,
-} from '../components/LiveMascotJourney';
+} from '@/components/DynamicContextPanel';
+import InvoiceUpload from '@/components/InvoiceUpload';
+import MascotCustomization from '@/components/MascotCustomization';
+import MemoryPanel from '@/components/MemoryPanel';
+import GuidedConversationSession from '@/components/nucleo/GuidedConversationSession';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useJourneyIdentity } from '@/hooks/useJourneyIdentity';
+import { buildRuntimeCoreExperience } from '@/lib/cognitive';
 import { useMvpJourney } from '@/hooks/useMvpJourney';
-import { getInvoiceFlowSnapshot, logInvoiceFlow } from '@/lib/invoiceFlowDebug';
-import { buildAnalysisSummary, buildNextActions } from '@/lib/mvpCoreFlow';
+import {
+  buildGuidedConversationViewModel,
+  GuidedConversationActionQuestion,
+  GuidedConversationContextQuestion,
+} from '@/lib/guidedConversation';
 import { buildMemorySnapshot } from '@/lib/memorySnapshot';
+import { buildNucleoSessionViewModel } from '@/lib/nucleoSession';
+import { buildAnalysisSummary, buildNextActions } from '@/lib/mvpCoreFlow';
 import { getCurrentJourneyInvoice, isCurrentJourneyInvoice } from '@/lib/mvpJourneyState';
-import { InvoiceData, NextAction, NextActionStatus } from '@/types/mvp';
+import {
+  InvoiceData,
+  NextAction,
+  NextActionStatus,
+} from '@/types/mvp';
 
-type DashboardSectionKey = 'profile' | 'score' | 'summary' | 'actions' | 'history';
-type InteractionFeedbackSource = 'action_started' | 'action_completed' | 'observation_saved';
+type DetailSectionKey = 'profile' | 'summary' | 'actions' | 'history' | 'memory';
 
-interface InteractionFeedbackEvent {
-  id: number;
-  source: InteractionFeedbackSource;
-}
-
-interface ContextPanelState {
-  objective?: string;
-  tip?: string;
-  view: DynamicContextPanelView;
-}
-
-const detailSectionMeta: Record<
-  DashboardSectionKey,
+const detailMeta: Record<
+  DetailSectionKey,
   {
     description: string;
     title: string;
   }
 > = {
   profile: {
-    title: 'Perfil e personalizacao',
-    description: 'Edicao do perfil e ajustes de identidade do mascote.',
-  },
-  score: {
-    title: 'Leitura detalhada do score',
-    description: 'Explicacao do score, progresso e sinais de evolucao.',
+    title: 'Base da jornada',
+    description: 'O contexto que ajuda a conta a parecer mais sua desde o comeco.',
   },
   summary: {
-    title: 'Leitura da fatura',
-    description: 'Analise expandida da fatura em foco.',
+    title: 'Leitura do ciclo',
+    description: 'O que esta conta ja me permite mostrar com honestidade.',
   },
   actions: {
-    title: 'Recomendacoes',
-    description: 'Acoes orientadas pela leitura atual.',
+    title: 'Continuidade do ciclo',
+    description: 'O que vale observar agora para a proxima leitura ficar melhor.',
   },
   history: {
-    title: 'Historico',
-    description: 'Linha do tempo das faturas ja enviadas.',
+    title: 'Evolucao entre contas',
+    description: 'Como a leitura muda quando uma conta encontra a outra.',
+  },
+  memory: {
+    title: 'O que permanece com a Score',
+    description: 'O que a Score continua lembrando da sua casa ao longo do tempo.',
   },
 };
 
-const panelViewByShortcut: Record<JourneyQuickAccessId, DynamicContextPanelView> = {
-  history: 'history',
-  actions: 'actions',
-  summary: 'summary',
-  profile: 'profile',
-};
-
-const panelViewByTarget: Partial<Record<JourneyTarget, DynamicContextPanelView>> = {
+const panelViewBySection: Record<
+  Exclude<DetailSectionKey, 'memory'>,
+  DynamicContextPanelView
+> = {
   profile: 'profile',
   summary: 'summary',
   actions: 'actions',
   history: 'history',
 };
 
-const detailButtons: Array<{ id: DashboardSectionKey; label: string }> = [
-  { id: 'score', label: 'Score' },
-  { id: 'profile', label: 'Perfil' },
-  { id: 'summary', label: 'Leitura' },
-  { id: 'actions', label: 'Acoes' },
-  { id: 'history', label: 'Historico' },
-];
-
-const resolveInitialPanelView = ({
+const resolveInitialDetailSection = ({
+  hasAnalysis,
+  hasInvoice,
+  hasNextActions,
   isProfileComplete,
-  latestAnalysis,
-  nextActions,
 }: {
+  hasAnalysis: boolean;
+  hasInvoice: boolean;
+  hasNextActions: boolean;
   isProfileComplete: boolean;
-  latestAnalysis?: ReturnType<typeof buildAnalysisSummary>;
-  nextActions: NextAction[];
-}): DynamicContextPanelView => {
+}): DetailSectionKey => {
   if (!isProfileComplete) {
     return 'profile';
   }
 
-  if (nextActions.length > 0) {
+  if (hasNextActions) {
     return 'actions';
   }
 
-  if (latestAnalysis) {
+  if (hasAnalysis) {
     return 'summary';
   }
 
-  return 'history';
+  if (hasInvoice) {
+    return 'history';
+  }
+
+  return 'summary';
 };
 
 const Index = () => {
+  const { journeyIdentity } = useJourneyIdentity();
   const {
     journeyState,
     profile,
@@ -130,9 +111,7 @@ const Index = () => {
     invoiceHistory,
     latestAnalysis,
     nextActions,
-    viewedActionIds,
     scoreState,
-    scoreExplanation,
     mascotGuidance,
     mascotContextQuestion,
     userContext,
@@ -147,13 +126,12 @@ const Index = () => {
     markKnowledgeLearned,
   } = useMvpJourney();
   const [selectedInvoice, setSelectedInvoice] = React.useState<InvoiceData | undefined>(undefined);
-  const [activeSection, setActiveSection] = React.useState<DashboardSectionKey>('summary');
-  const [showLegacyDetails, setShowLegacyDetails] = React.useState(false);
+  const [detailSection, setDetailSection] = React.useState<DetailSectionKey>('summary');
+  const [isDetailPanelVisible, setIsDetailPanelVisible] = React.useState(false);
   const [isHistoryUploadVisible, setIsHistoryUploadVisible] = React.useState(false);
-  const [interactionFeedback, setInteractionFeedback] = React.useState<InteractionFeedbackEvent | null>(null);
-  const [contextPanel, setContextPanel] = React.useState<ContextPanelState | null>(null);
-  const feedbackTimeoutRef = React.useRef<number | null>(null);
   const wasJourneyHydratedRef = React.useRef(false);
+  const detailPanelRef = React.useRef<HTMLElement | null>(null);
+
   const hydratedInvoiceHistory = React.useMemo(
     () => (isJourneyHydrated ? invoiceHistory : []),
     [invoiceHistory, isJourneyHydrated]
@@ -170,52 +148,17 @@ const Index = () => {
     () => (isJourneyHydrated ? nextActions : []),
     [isJourneyHydrated, nextActions]
   );
+
   const currentJourneyInvoice = getCurrentJourneyInvoice(
     hydratedInvoiceHistory,
     hydratedLatestInvoice
   );
-
-  const triggerInteractionFeedback = React.useCallback((source: InteractionFeedbackSource) => {
-    const nextEvent = {
-      id: Date.now(),
-      source,
-    };
-
-    setInteractionFeedback(nextEvent);
-
-    if (feedbackTimeoutRef.current !== null) {
-      window.clearTimeout(feedbackTimeoutRef.current);
-    }
-
-    feedbackTimeoutRef.current = window.setTimeout(() => {
-      setInteractionFeedback((currentEvent) =>
-        currentEvent?.id === nextEvent.id ? null : currentEvent
-      );
-      feedbackTimeoutRef.current = null;
-    }, 1400);
-  }, []);
-
-  React.useEffect(() => {
-    return () => {
-      if (feedbackTimeoutRef.current !== null) {
-        window.clearTimeout(feedbackTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  React.useEffect(() => {
-    logInvoiceFlow('ui-received-invoice-data', {
-      invoiceHistoryLength: invoiceHistory.length,
-      latestInvoice: getInvoiceFlowSnapshot(latestInvoice),
-    });
-  }, [invoiceHistory.length, latestInvoice]);
 
   React.useEffect(() => {
     if (!isJourneyHydrated) {
       wasJourneyHydratedRef.current = false;
       setSelectedInvoice(undefined);
       setIsHistoryUploadVisible(false);
-      setContextPanel(null);
       return;
     }
 
@@ -228,7 +171,7 @@ const Index = () => {
         return currentJourneyInvoice;
       }
 
-      const preservedSelection = invoiceHistory.find(
+      const preservedSelection = hydratedInvoiceHistory.find(
         (invoice) => invoice.fingerprint === currentSelection.fingerprint
       );
 
@@ -236,39 +179,34 @@ const Index = () => {
     });
 
     if (!wasJourneyHydratedRef.current) {
-      setIsHistoryUploadVisible(invoiceHistory.length === 0);
-      setContextPanel({
-        view: resolveInitialPanelView({
+      setDetailSection(
+        resolveInitialDetailSection({
+          hasAnalysis: Boolean(hydratedLatestAnalysis),
+          hasInvoice: Boolean(hydratedLatestInvoice),
+          hasNextActions: hydratedNextActions.length > 0,
           isProfileComplete,
-          latestAnalysis,
-          nextActions,
-        }),
-      });
+        })
+      );
+      setIsHistoryUploadVisible(hydratedInvoiceHistory.length === 0);
+      wasJourneyHydratedRef.current = true;
     }
-
-    wasJourneyHydratedRef.current = true;
   }, [
     currentJourneyInvoice,
-    invoiceHistory,
+    hydratedInvoiceHistory,
+    hydratedLatestAnalysis,
+    hydratedLatestInvoice,
+    hydratedNextActions.length,
     isJourneyHydrated,
     isProfileComplete,
-    latestAnalysis,
-    nextActions,
   ]);
 
-  const completedSteps = [
-    isProfileComplete,
-    Boolean(hydratedLatestInvoice),
-    Boolean(hydratedLatestAnalysis),
-  ].filter(Boolean).length;
-
-  const efficiencyLabel = hydratedLatestAnalysis?.efficiencyLabel || 'Aguardando primeira leitura';
   const focusedInvoice = selectedInvoice ?? currentJourneyInvoice;
   const isCurrentJourneyFocus = isCurrentJourneyInvoice(
     hydratedInvoiceHistory,
     focusedInvoice,
     hydratedLatestInvoice
   );
+
   const selectedAnalysis = React.useMemo(() => {
     if (!isJourneyHydrated || !focusedInvoice) {
       return undefined;
@@ -293,6 +231,7 @@ const Index = () => {
     isJourneyHydrated,
     profile,
   ]);
+
   const activeNextActions = isJourneyHydrated
     ? isCurrentJourneyFocus
       ? hydratedNextActions
@@ -306,87 +245,115 @@ const Index = () => {
           )
         : []
     : [];
-  const primaryJourneyAction =
+
+  const detailPrimaryAction =
     activeNextActions.find((action) => action.status !== 'completed') || activeNextActions[0];
-  const memorySnapshot = React.useMemo(
+  const conversationPrimaryAction =
+    hydratedNextActions.find((action) => action.status !== 'completed') || hydratedNextActions[0];
+
+  const detailMemorySnapshot = React.useMemo(
     () =>
       isJourneyHydrated
         ? buildMemorySnapshot(journeyState, focusedInvoice)
         : undefined,
     [focusedInvoice, isJourneyHydrated, journeyState]
   );
-
-  const focusContextPanel = React.useCallback(
-    (view: DynamicContextPanelView, payload?: Omit<ContextPanelState, 'view'>) => {
-      if (view !== 'history') {
-        setIsHistoryUploadVisible(false);
-      }
-
-      setContextPanel({
-        view,
-        ...payload,
-      });
-    },
-    []
+  const conversationMemorySnapshot = React.useMemo(
+    () =>
+      isJourneyHydrated
+        ? buildMemorySnapshot(journeyState, hydratedLatestInvoice)
+        : undefined,
+    [hydratedLatestInvoice, isJourneyHydrated, journeyState]
   );
 
-  const handleQuickAccessSelect = React.useCallback(
-    (shortcutId: JourneyQuickAccessId) => {
-      if (shortcutId === 'history') {
-        setIsHistoryUploadVisible(hydratedInvoiceHistory.length === 0);
-      }
-
-      focusContextPanel(panelViewByShortcut[shortcutId]);
-    },
-    [focusContextPanel, hydratedInvoiceHistory.length]
+  const nucleoViewModel = React.useMemo(
+    () =>
+      buildNucleoSessionViewModel({
+        isJourneyHydrated,
+        isProfileComplete,
+        journeyState,
+        profile,
+        scoreState,
+        latestInvoice: hydratedLatestInvoice,
+        invoiceHistory: hydratedInvoiceHistory,
+        latestAnalysis: hydratedLatestAnalysis,
+        nextActions: hydratedNextActions,
+        knowledgeState,
+        mascotGuidance,
+        memorySnapshot: conversationMemorySnapshot,
+      }),
+    [
+      conversationMemorySnapshot,
+      hydratedInvoiceHistory,
+      hydratedLatestAnalysis,
+      hydratedLatestInvoice,
+      hydratedNextActions,
+      isJourneyHydrated,
+      isProfileComplete,
+      journeyState,
+      knowledgeState,
+      mascotGuidance,
+      profile,
+      scoreState,
+    ]
+  );
+  const guidedConversationViewModel = React.useMemo(
+    () =>
+      buildGuidedConversationViewModel({
+        contextQuestion: isJourneyHydrated ? mascotContextQuestion : undefined,
+        energyBehaviorProfile,
+        knowledgeState,
+        latestAnalysis: hydratedLatestAnalysis,
+        latestInvoice: hydratedLatestInvoice,
+        memorySnapshot: conversationMemorySnapshot,
+        profile,
+        primaryAction: conversationPrimaryAction,
+        viewModel: nucleoViewModel,
+      }),
+    [
+      energyBehaviorProfile,
+      conversationMemorySnapshot,
+      conversationPrimaryAction,
+      hydratedLatestAnalysis,
+      hydratedLatestInvoice,
+      isJourneyHydrated,
+      knowledgeState,
+      mascotContextQuestion,
+      nucleoViewModel,
+      profile,
+    ]
+  );
+  const runtimeCoreExperience = React.useMemo(
+    () =>
+      buildRuntimeCoreExperience({
+        isJourneyHydrated,
+        userId: journeyIdentity?.userId,
+        journeyState,
+        memorySnapshot: conversationMemorySnapshot,
+        scoreState,
+      }),
+    [
+      conversationMemorySnapshot,
+      isJourneyHydrated,
+      journeyIdentity?.userId,
+      journeyState,
+      scoreState,
+    ]
   );
 
-  const focusJourneyTarget = React.useCallback(
-    (target: JourneyTarget) => {
-      if (target === 'upload') {
-        setIsHistoryUploadVisible(true);
-        focusContextPanel('history');
-        return;
-      }
+  const handleOpenDetail = React.useCallback((section: DetailSectionKey) => {
+    setDetailSection(section);
+    setIsDetailPanelVisible(true);
 
-      const nextView = panelViewByTarget[target];
-
-      if (nextView) {
-        if (nextView === 'history') {
-          setIsHistoryUploadVisible(hydratedInvoiceHistory.length === 0);
-        }
-
-        focusContextPanel(nextView);
-      }
-    },
-    [focusContextPanel, hydratedInvoiceHistory.length]
-  );
-
-  const contextPanelView = contextPanel?.view;
-
-  const activeQuickAccessId = React.useMemo<JourneyQuickAccessId>(() => {
-    if (!contextPanelView) {
-      return 'history';
+    if (section === 'history' && hydratedInvoiceHistory.length === 0) {
+      setIsHistoryUploadVisible(true);
+    } else if (section !== 'history') {
+      setIsHistoryUploadVisible(false);
     }
-
-    if (contextPanelView === 'history') {
-      return 'history';
-    }
-
-    if (contextPanelView === 'actions') {
-      return 'actions';
-    }
-
-    if (contextPanelView === 'summary' || contextPanelView === 'co2') {
-      return 'summary';
-    }
-
-    if (contextPanelView === 'profile') {
-      return 'profile';
-    }
-
-    return 'history';
-  }, [contextPanelView]);
+    window.requestAnimationFrame(() => {
+      detailPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [hydratedInvoiceHistory.length]);
 
   const handleInvoiceProcessed = async (file: File) => {
     const processedInvoice = await completeInvoiceFlow(file);
@@ -394,272 +361,318 @@ const Index = () => {
     if (processedInvoice) {
       setSelectedInvoice(processedInvoice);
       setIsHistoryUploadVisible(false);
-      focusContextPanel('history');
+      setIsDetailPanelVisible(false);
     }
 
     return processedInvoice;
   };
 
-  const handleActionStatusChange = (
-    action: NextAction,
-    status: Extract<NextActionStatus, 'in_progress' | 'completed'>
-  ) => {
-    updateActionStatus(action, status);
+  const handleActionStatusChange = React.useCallback(
+    (action: NextAction, status: Extract<NextActionStatus, 'in_progress' | 'completed'>) => {
+      updateActionStatus(action, status);
+    },
+    [updateActionStatus]
+  );
+  const handleGuidedActionAnswer = React.useCallback(
+    (question: GuidedConversationActionQuestion, value: string) => {
+      handleActionStatusChange(
+        {
+          ...question.action,
+          pendingAnswer: {
+            answer: value,
+            answeredAt: new Date().toISOString(),
+            persistOnly: true,
+            questionId: question.id,
+          },
+        },
+        'in_progress'
+      );
+    },
+    [handleActionStatusChange]
+  );
+
+  const handleContextQuestionAnswer = React.useCallback(
+    (
+      questionId: Parameters<typeof answerMascotContextQuestion>[0],
+      value: Parameters<typeof answerMascotContextQuestion>[1]
+    ) => {
+      answerMascotContextQuestion(questionId, value);
+    },
+    [answerMascotContextQuestion]
+  );
+  const handleGuidedContextQuestionAnswer = React.useCallback(
+    (question: GuidedConversationContextQuestion, value: Parameters<typeof answerMascotContextQuestion>[1]) => {
+      handleContextQuestionAnswer(question.id, value);
+    },
+    [handleContextQuestionAnswer]
+  );
+  const handleGuidedContextQuestionIgnore = React.useCallback(
+    (question: GuidedConversationContextQuestion) => {
+      ignoreMascotContextQuestion(question.id);
+    },
+    [ignoreMascotContextQuestion]
+  );
+
+  const renderAccountUnderstandingDetailPanel = () => {
+    if (guidedConversationViewModel.state !== 'ready') {
+      return null;
+    }
+
+    return (
+      <section
+        data-account-understanding-panel="true"
+        className="score-card rounded-[24px] p-5 sm:p-6"
+      >
+        <div className="space-y-2">
+          <p className="score-caption">Detalhes da leitura</p>
+          <h3 className="score-display max-w-[16ch] text-2xl font-bold leading-[1.02] text-[var(--score-ink)] sm:text-[2rem]">
+            {guidedConversationViewModel.accountUnderstanding.title}
+          </h3>
+          <p className="max-w-2xl text-sm leading-6 text-[var(--score-ink-soft)]">
+            {guidedConversationViewModel.accountUnderstanding.intro}
+          </p>
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {guidedConversationViewModel.accountUnderstanding.categories.map((category) => (
+            <article
+              key={category.id}
+              data-understanding-category={category.id}
+              data-understanding-level={category.level}
+              data-understanding-open={category.isOpenQuestion ? 'true' : 'false'}
+              data-understanding-open-point={category.openPoint ?? ''}
+              data-understanding-support-count={category.supportCount}
+              className="rounded-[20px] border border-[var(--score-line)] bg-[var(--score-surface-soft)] p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-[var(--score-ink)]">
+                    {category.label}
+                  </p>
+                </div>
+                <span className="rounded-full border border-[var(--score-line)] bg-white px-2 py-1 text-[11px] text-[var(--score-ink-soft)]">
+                  {category.supportCount} referencia{category.supportCount === 1 ? '' : 's'}
+                </span>
+              </div>
+
+              <p className="mt-3 text-sm leading-6 text-[var(--score-ink)]">{category.reason}</p>
+
+              <p className="mt-3 text-xs leading-5 text-[var(--score-ink-soft)]">
+                {category.openPoint
+                  ? `Ainda falta entender: ${category.openPoint}`
+                  : 'Nada importante ficou pendente aqui por enquanto.'}
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
+    );
   };
 
-  const handleContextQuestionAnswer = (
-    questionId: Parameters<typeof answerMascotContextQuestion>[0],
-    value: Parameters<typeof answerMascotContextQuestion>[1]
-  ) => {
-    triggerInteractionFeedback('observation_saved');
-    answerMascotContextQuestion(questionId, value);
-  };
+  const renderDetailContent = () => {
+    if (detailSection === 'memory') {
+      if (!detailMemorySnapshot) {
+        return (
+          <div className="rounded-[24px] border border-[var(--score-line)] bg-[var(--score-surface)] px-5 py-6 text-sm text-[var(--score-ink-soft)]">
+            A memoria completa aparece assim que a jornada carrega perfil, faturas e sinais da leitura.
+          </div>
+        );
+      }
 
-  const handleInvoiceRemoved = (fingerprint: string) => {
-    removeInvoiceFromHistory(fingerprint);
+      return <MemoryPanel snapshot={detailMemorySnapshot} />;
+    }
+
+    return (
+      <div className="space-y-5">
+        {detailSection === 'summary' && renderAccountUnderstandingDetailPanel()}
+
+        <DynamicContextPanel
+          activeView={panelViewBySection[detailSection]}
+          guidance={mascotGuidance}
+          nextAction={detailPrimaryAction}
+          actions={activeNextActions}
+          latestAnalysis={hydratedLatestAnalysis}
+          invoiceHistory={hydratedInvoiceHistory}
+          selectedInvoice={focusedInvoice}
+          isCurrentJourneyFocus={isCurrentJourneyFocus}
+          profileCompletion={profileCompletion}
+          profile={profile}
+          isProfileComplete={isProfileComplete}
+          userContext={userContext}
+          energyBehaviorProfile={energyBehaviorProfile}
+          knowledgeState={knowledgeState}
+          onOpenActions={() => handleOpenDetail('actions')}
+          onOpenHistory={() => handleOpenDetail('history')}
+          onOpenSummary={() => handleOpenDetail('summary')}
+          onKnowledgeLearned={markKnowledgeLearned}
+          onSelectInvoice={(invoice) => {
+            setSelectedInvoice(invoice);
+            setDetailSection('summary');
+          }}
+          onActionStatusChange={handleActionStatusChange}
+          onProfileUpdate={updateProfile}
+          isHistoryUploadVisible={isHistoryUploadVisible}
+          onToggleHistoryUpload={() =>
+            setIsHistoryUploadVisible((currentValue) => !currentValue)
+          }
+          historyUploadContent={
+            <InvoiceUpload
+              profile={profile}
+              onUploadStarted={startInvoiceProcessing}
+              onInvoiceProcessed={handleInvoiceProcessed}
+              onUploadCompleted={(invoice) => {
+                if (invoice) {
+                  setSelectedInvoice(invoice);
+                }
+              }}
+              variant="embedded"
+            />
+          }
+          contextQuestion={isJourneyHydrated ? mascotContextQuestion : undefined}
+          onContextQuestionAnswer={handleContextQuestionAnswer}
+          onContextQuestionIgnore={ignoreMascotContextQuestion}
+        />
+
+        {detailSection === 'profile' && (
+          <div className="score-card rounded-[24px] p-5">
+            <p className="score-caption">Mascote</p>
+            <h3 className="mt-2 text-xl font-semibold text-[var(--score-ink)]">
+              Personalizacao permanece disponivel
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-[var(--score-ink-soft)]">
+              A identidade visual do mascote continua editavel sem voltar ao shell antigo.
+            </p>
+            <div className="mt-5">
+              <MascotCustomization
+                value={mascotCustomization}
+                onCustomizationUpdate={updateMascotCustomization}
+                currentScore={scoreState.score}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#124640_0%,#0c332f_28%,#082c28_58%,#072521_100%)]">
-      <main className="mx-auto flex w-[93vw] max-w-[1460px] flex-col gap-7 px-0 py-8">
-        <LiveMascotJourney
-          guidance={mascotGuidance}
-          nextActions={activeNextActions}
-          invoiceCount={hydratedInvoiceHistory.length}
-          isProfileComplete={isProfileComplete}
-          currentScore={scoreState.score}
-          latestAnalysis={hydratedLatestAnalysis}
-          customization={mascotCustomization}
-          profile={profile}
-          knowledgeState={knowledgeState}
-          onNavigate={focusJourneyTarget}
-          onMascotInteract={() => focusContextPanel('mascot')}
-          onCo2Interact={(payload) => focusContextPanel('co2', payload)}
-          activeQuickAccessId={activeQuickAccessId}
-          onQuickAccessChange={handleQuickAccessSelect}
-          scorePanel={
-            <div className="min-h-[430px] overflow-hidden rounded-[28px] border border-[#2a5c56] bg-[#3f7959] text-white shadow-[0_18px_40px_rgba(0,0,0,0.18)]">
-              <ScoreCard
-                score={scoreState.score}
-                level={scoreState.level}
-                consumerType={profile.consumerType}
-                mascotCustomization={mascotCustomization}
-                latestScoreLabel={scoreExplanation.summary}
-                completedSteps={completedSteps}
-                activeActionsCount={activeNextActions.length}
-                efficiencyLabel={efficiencyLabel}
-                showMascot={false}
-                variant="compact"
-              />
-              <LevelProgress
-                score={scoreState.score}
-                level={scoreState.level}
-                nextLevelScore={scoreState.nextLevelScore}
-                progress={scoreState.progressToNextLevel}
-                variant="compact"
-              />
-            </div>
-          }
-          contextPanel={
-            contextPanel ? (
+    <div className="score-shell min-h-screen">
+      <main className="mx-auto flex w-[min(760px,calc(100vw-1.25rem))] flex-col gap-5 py-4 sm:w-[min(820px,92vw)] sm:gap-6 sm:py-6 lg:py-8">
+        <GuidedConversationSession
+          experience={runtimeCoreExperience}
+          viewModel={guidedConversationViewModel}
+          profileTask={
+            <div className="score-card rounded-[26px] p-5">
               <DynamicContextPanel
-                activeView={contextPanel.view}
-                activeTip={contextPanel.tip}
-                activeObjective={contextPanel.objective}
+                activeView="profile"
                 guidance={mascotGuidance}
-                nextAction={primaryJourneyAction}
-                actions={activeNextActions}
+                nextAction={conversationPrimaryAction}
+                actions={hydratedNextActions}
                 latestAnalysis={hydratedLatestAnalysis}
                 invoiceHistory={hydratedInvoiceHistory}
-                selectedInvoice={focusedInvoice}
-                isCurrentJourneyFocus={isCurrentJourneyFocus}
+                selectedInvoice={hydratedLatestInvoice}
+                isCurrentJourneyFocus
                 profileCompletion={profileCompletion}
                 profile={profile}
                 isProfileComplete={isProfileComplete}
                 userContext={userContext}
                 energyBehaviorProfile={energyBehaviorProfile}
                 knowledgeState={knowledgeState}
-                onOpenActions={() => focusContextPanel('actions')}
-                onOpenHistory={() => focusContextPanel('history')}
-                onOpenSummary={() => focusContextPanel('summary')}
-                onOpenProfileDetails={() => focusContextPanel('profile')}
+                onOpenActions={() => handleOpenDetail('actions')}
+                onOpenHistory={() => handleOpenDetail('history')}
+                onOpenSummary={() => handleOpenDetail('summary')}
                 onKnowledgeLearned={markKnowledgeLearned}
-                onSelectInvoice={(invoice) => {
-                  setSelectedInvoice(invoice);
-                  focusContextPanel('history');
-                }}
+                onSelectInvoice={(invoice) => setSelectedInvoice(invoice)}
                 onActionStatusChange={handleActionStatusChange}
                 onProfileUpdate={updateProfile}
-                isHistoryUploadVisible={isHistoryUploadVisible}
-                onToggleHistoryUpload={() =>
-                  setIsHistoryUploadVisible((currentValue) => !currentValue)
-                }
-                historyUploadContent={
-                  <InvoiceUpload
-                    profile={profile}
-                    onUploadStarted={startInvoiceProcessing}
-                    onInvoiceProcessed={handleInvoiceProcessed}
-                    onUploadCompleted={(invoice) => {
-                      if (invoice) {
-                        setSelectedInvoice(invoice);
-                      }
-                    }}
-                    variant="embedded"
-                  />
-                }
-                contextQuestion={isJourneyHydrated ? mascotContextQuestion : undefined}
-                onContextQuestionAnswer={handleContextQuestionAnswer}
-                onContextQuestionIgnore={ignoreMascotContextQuestion}
+                isHistoryUploadVisible={false}
+                onToggleHistoryUpload={() => undefined}
               />
-            ) : null
+            </div>
           }
+          uploadTask={
+            <div className="rounded-[28px] border border-white/10 bg-white/6 p-4">
+              <InvoiceUpload
+                profile={profile}
+                variant="embedded"
+                onUploadStarted={startInvoiceProcessing}
+                onInvoiceProcessed={handleInvoiceProcessed}
+                onUploadCompleted={(invoice) => {
+                  if (invoice) {
+                    setSelectedInvoice(invoice);
+                  }
+                }}
+              />
+            </div>
+          }
+          onActionQuestionAnswer={handleGuidedActionAnswer}
+          onContextQuestionAnswer={handleGuidedContextQuestionAnswer}
+          onContextQuestionIgnore={handleGuidedContextQuestionIgnore}
+          onOpenDetails={handleOpenDetail}
         />
 
-        {memorySnapshot && <MemoryPanel snapshot={memorySnapshot} />}
-
-        <section className="rounded-[24px] border border-[#264c46] bg-[#0a2c28]/85 p-5 text-white">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9dbfa6]">
-                Ferramentas complementares
-              </p>
-              <h2 className="text-xl font-semibold text-[#f5f8f3]">Detalhes completos abaixo do hub</h2>
-              <p className="mt-1 text-sm text-[#c5d8c8]">
-                O hub agora concentra historico, leitura, acoes e perfil. Estes paineis ficam abaixo apenas como leitura complementar.
-              </p>
+        <section ref={detailPanelRef} className={isDetailPanelVisible ? 'space-y-4' : 'pt-1'}>
+          {!isDetailPanelVisible && (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                className="text-sm text-[var(--score-ink-soft)] underline-offset-4 transition hover:text-[var(--score-ink)] hover:underline"
+                onClick={() => handleOpenDetail('summary')}
+              >
+                Ver mais sobre esta conta
+              </button>
             </div>
+          )}
 
-            <Button
-              variant="outline"
-              onClick={() => setShowLegacyDetails((currentValue) => !currentValue)}
-              className="rounded-[14px] border-[#365f58] bg-[#103a35] text-[#f5f8f3] hover:bg-[#18453f]"
-            >
-              {showLegacyDetails ? 'Ocultar detalhes' : 'Mostrar detalhes'}
-            </Button>
-          </div>
+          {isDetailPanelVisible && (
+            <>
+              <div className="flex flex-col gap-3 px-1 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="score-caption">Detalhes da leitura</p>
+                  <h2 className="score-display mt-2 text-2xl font-bold text-[var(--score-ink)] sm:text-[2rem]">
+                    Ver mais sobre esta conta
+                  </h2>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--score-ink-soft)]">
+                    Se quiser, voce pode abrir detalhes complementares sem tirar o foco do que mais importa agora.
+                  </p>
+                </div>
 
-          {showLegacyDetails && (
-            <div className="mt-5 space-y-5">
-              <div className="flex flex-wrap gap-2">
-                {detailButtons.map((button) => (
-                  <Button
-                    key={button.id}
-                    variant={activeSection === button.id ? 'default' : 'outline'}
-                    onClick={() => setActiveSection(button.id)}
-                    className={
-                      activeSection === button.id
-                        ? 'rounded-[12px] bg-[#5f925c] hover:bg-[#517d4f]'
-                        : 'rounded-[12px] border-[#365f58] bg-[#103a35] text-[#f5f8f3] hover:bg-[#18453f]'
-                    }
-                  >
-                    {button.label}
-                  </Button>
-                ))}
+                <Button
+                  variant="outline"
+                  className="rounded-full border-[var(--score-line)] bg-white text-[var(--score-ink-soft)] hover:bg-[var(--score-surface-soft)]"
+                  onClick={() => setIsDetailPanelVisible(false)}
+                >
+                  Fechar detalhes
+                </Button>
               </div>
 
-              <Card className="overflow-hidden border border-[#365f58] bg-[#0d332f] text-white shadow-none">
-                <CardHeader className="border-b border-[#264c46] bg-[#103a35]">
-                  <div className="space-y-1">
-                    <CardTitle className="text-[#f5f8f3]">
-                      {detailSectionMeta[activeSection].title}
-                    </CardTitle>
-                    <p className="text-sm text-[#c5d8c8]">
-                      {detailSectionMeta[activeSection].description}
-                    </p>
-                  </div>
-                </CardHeader>
+              <div className="score-card overflow-hidden rounded-[28px]">
+              <div className="border-b border-[var(--score-line)] bg-[var(--score-surface-soft)] px-5 py-5">
+                <p className="score-caption">{detailMeta[detailSection].title}</p>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--score-ink-soft)]">
+                  {detailMeta[detailSection].description}
+                </p>
 
-                <CardContent className="p-4 sm:p-6">
-                  {activeSection === 'score' && (
-                    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(280px,0.75fr)_minmax(0,1fr)]">
-                      <div className="space-y-4">
-                        <LevelProgress
-                          score={scoreState.score}
-                          level={scoreState.level}
-                          nextLevelScore={scoreState.nextLevelScore}
-                          progress={scoreState.progressToNextLevel}
-                        />
-                        <EnergyProgressVisual
-                          invoiceCount={hydratedInvoiceHistory.length}
-                          interactionEvent={interactionFeedback}
-                        />
-                      </div>
-
-                      <ScoreExplanationCard explanation={scoreExplanation} />
-                    </div>
-                  )}
-
-                  {activeSection === 'profile' && (
-                    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(260px,0.6fr)]">
-                      <div className="space-y-5">
-                        <div className="flex flex-wrap gap-3">
-                          <UserProfile
-                            value={profile}
-                            completionPercent={profileCompletion}
-                            isComplete={isProfileComplete}
-                            onProfileUpdate={updateProfile}
-                          />
-                          <MascotCustomization
-                            value={mascotCustomization}
-                            onCustomizationUpdate={updateMascotCustomization}
-                            currentScore={scoreState.score}
-                          />
-                        </div>
-                      </div>
-
-                      <ProfileMascotAmbient />
-                    </div>
-                  )}
-
-                  {activeSection === 'summary' && (
-                    <AnalysisSummary
-                      invoice={focusedInvoice}
-                      selectedInvoice={focusedInvoice}
-                      analysis={selectedAnalysis}
-                      profile={profile}
-                      energyBehaviorProfile={energyBehaviorProfile}
-                      invoiceHistory={hydratedInvoiceHistory}
-                      isCurrentJourneyFocus={isCurrentJourneyFocus}
-                      onSelectInvoice={setSelectedInvoice}
-                      isExpanded
-                      showHeader={false}
-                      showEducationalContent={false}
-                    />
-                  )}
-
-                  {activeSection === 'actions' && (
-                    <SmartRecommendations
-                      actions={activeNextActions}
-                      viewedActionIds={viewedActionIds}
-                      analysis={selectedAnalysis}
-                      invoiceHistory={hydratedInvoiceHistory}
-                      selectedInvoice={focusedInvoice}
-                      isCurrentJourneyFocus={isCurrentJourneyFocus}
-                      profile={profile}
-                      userContext={userContext}
-                      energyBehaviorProfile={energyBehaviorProfile}
-                      onSelectInvoice={setSelectedInvoice}
-                      onActionStatusChange={handleActionStatusChange}
-                      isExpanded
-                      showHeader={false}
-                      showEducationalContent={false}
-                    />
-                  )}
-
-                  {activeSection === 'history' && (
-                    <InvoiceHistory
-                      invoices={hydratedInvoiceHistory}
-                      selectedInvoice={focusedInvoice}
-                      onSelectInvoice={setSelectedInvoice}
-                      onDeleteInvoice={handleInvoiceRemoved}
-                      userContext={userContext}
-                      isExpanded
-                      showHeader={false}
-                    />
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {(Object.keys(detailMeta) as DetailSectionKey[]).map((section) => (
+                    <Button
+                      key={section}
+                      variant={detailSection === section ? 'default' : 'outline'}
+                      className={
+                        detailSection === section
+                          ? 'rounded-full bg-[var(--score-green)] text-white hover:bg-[var(--score-green-deep)]'
+                          : 'rounded-full border-[var(--score-line)] bg-white text-[var(--score-ink-soft)] hover:bg-[var(--score-surface-soft)]'
+                      }
+                      onClick={() => handleOpenDetail(section)}
+                    >
+                      {detailMeta[section].title}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="p-4 sm:p-5">{renderDetailContent()}</div>
+              </div>
+            </>
           )}
         </section>
       </main>

@@ -1,0 +1,4073 @@
+
+> vite_react_shadcn_ts@0.0.0 test
+> node ./scripts/run-domain-tests.mjs
+
+TAP version 13
+# [invoice-parser] raw-text {
+#   rawTextLength: 179,
+#   rawTextSample: 'DISTRIBUIDORA: ENERGIA TESTE\\n' +
+#     ' UNIDADE CONSUMIDORA: 1234567\\n' +
+#     ' REFERENCIA: 04/2026\\n' +
+#     ' VENCIMENTO: 22/04/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 430,00\\n' +
+#     ' CONSUMO FATURADO: 360 kWh',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: true,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 156,
+#   normalizedTextSample: 'DISTRIBUIDORA: ENERGIA TESTE\\n' +
+#     ' UNIDADE CONSUMIDORA: 1234567\\n' +
+#     ' REFERENCIA: 04/2026\\n' +
+#     ' VENCIMENTO: 22/04/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 430,00\\n' +
+#     ' CONSUMO FATURADO: 360 KWH',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: true,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 179,
+#   rawTextSample: 'DISTRIBUIDORA: ENERGIA TESTE\\n' +
+#     ' UNIDADE CONSUMIDORA: 1234567\\n' +
+#     ' REFERENCIA: 04/2026\\n' +
+#     ' VENCIMENTO: 22/04/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 430,00\\n' +
+#     ' CONSUMO FATURADO: 360 kWh',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: true,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 156,
+#   normalizedTextSample: 'DISTRIBUIDORA: ENERGIA TESTE\\n' +
+#     ' UNIDADE CONSUMIDORA: 1234567\\n' +
+#     ' REFERENCIA: 04/2026\\n' +
+#     ' VENCIMENTO: 22/04/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 430,00\\n' +
+#     ' CONSUMO FATURADO: 360 KWH',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: true,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 127,
+#   rawTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 kWh',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 100,
+#   normalizedTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 KWH',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 127,
+#   rawTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 kWh',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 100,
+#   normalizedTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 KWH',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 127,
+#   rawTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 kWh',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 100,
+#   normalizedTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 KWH',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# Subtest: buildHouseModelFromJourney sem fatura cria baseline not_started e baixa confianca
+ok 1 - buildHouseModelFromJourney sem fatura cria baseline not_started e baixa confianca
+  ---
+  duration_ms: 3.2677
+  type: 'test'
+  ...
+# Subtest: buildHouseModelFromJourney com fatura cria evidencia invoice
+ok 2 - buildHouseModelFromJourney com fatura cria evidencia invoice
+  ---
+  duration_ms: 0.5961
+  type: 'test'
+  ...
+# Subtest: buildHouseModelFromJourney com resposta de chuveiro cria evidencia user_answer e melhora bathroom
+ok 3 - buildHouseModelFromJourney com resposta de chuveiro cria evidencia user_answer e melhora bathroom
+  ---
+  duration_ms: 0.4507
+  type: 'test'
+  ...
+# Subtest: buildHouseModelFromJourney com historico cria baseline building
+ok 4 - buildHouseModelFromJourney com historico cria baseline building
+  ---
+  duration_ms: 0.2548
+  type: 'test'
+  ...
+# Subtest: buildHouseModelFromJourney incorpora sinais estruturais da residencia ao identity e entendimento
+ok 5 - buildHouseModelFromJourney incorpora sinais estruturais da residencia ao identity e entendimento
+  ---
+  duration_ms: 0.431
+  type: 'test'
+  ...
+# Subtest: buildHouseModelFromJourney nunca confirma hipotese sem evidencia forte
+ok 6 - buildHouseModelFromJourney nunca confirma hipotese sem evidencia forte
+  ---
+  duration_ms: 0.2264
+  type: 'test'
+  ...
+# Subtest: runCuriosityEngine prioriza pergunta de alto ganho quando existe lacuna clara
+ok 7 - runCuriosityEngine prioriza pergunta de alto ganho quando existe lacuna clara
+  ---
+  duration_ms: 3.2278
+  type: 'test'
+  ...
+# Subtest: runCuriosityEngine migra para outra lacuna apos responder a pergunta anterior
+ok 8 - runCuriosityEngine migra para outra lacuna apos responder a pergunta anterior
+  ---
+  duration_ms: 0.3874
+  type: 'test'
+  ...
+# Subtest: runCuriosityEngine permanece no ambiente quando a pista foi enfraquecida e ainda ha misterio
+ok 9 - runCuriosityEngine permanece no ambiente quando a pista foi enfraquecida e ainda ha misterio
+  ---
+  duration_ms: 0.4844
+  type: 'test'
+  ...
+# Subtest: runCuriosityEngine usa baseline quando ainda nao existe historico suficiente
+ok 10 - runCuriosityEngine usa baseline quando ainda nao existe historico suficiente
+  ---
+  duration_ms: 0.4828
+  type: 'test'
+  ...
+# Subtest: runCuriosityEngine cai para custo quando perguntas e baseline deixam de liderar
+ok 11 - runCuriosityEngine cai para custo quando perguntas e baseline deixam de liderar
+  ---
+  duration_ms: 0.2302
+  type: 'test'
+  ...
+# Subtest: createInvestigationSession abre trilha a partir da nextInvestigation atual
+ok 12 - createInvestigationSession abre trilha a partir da nextInvestigation atual
+  ---
+  duration_ms: 1.2487
+  type: 'test'
+  ...
+# Subtest: updateInvestigationSession marca trilha como em andamento quando ha progresso e o foco permanece
+ok 13 - updateInvestigationSession marca trilha como em andamento quando ha progresso e o foco permanece
+  ---
+  duration_ms: 0.6176
+  type: 'test'
+  ...
+# Subtest: updateInvestigationSession satura a trilha quando nao ha ganho e a curiosidade insiste no mesmo foco
+ok 14 - updateInvestigationSession satura a trilha quando nao ha ganho e a curiosidade insiste no mesmo foco
+  ---
+  duration_ms: 0.333
+  type: 'test'
+  ...
+# Subtest: updateInvestigationSession prepara handoff futuro quando a trilha entrega progresso suficiente e o foco muda
+ok 15 - updateInvestigationSession prepara handoff futuro quando a trilha entrega progresso suficiente e o foco muda
+  ---
+  duration_ms: 0.2121
+  type: 'test'
+  ...
+# Subtest: updateInvestigationSession encerra trilha quando a hipotese perde forca e outra assume a vez
+ok 16 - updateInvestigationSession encerra trilha quando a hipotese perde forca e outra assume a vez
+  ---
+  duration_ms: 0.1863
+  type: 'test'
+  ...
+# Subtest: prepareLearningEngineHandoff aceita trilha madura e gera entrada limpa para avaliacao
+ok 17 - prepareLearningEngineHandoff aceita trilha madura e gera entrada limpa para avaliacao
+  ---
+  duration_ms: 0.5757
+  type: 'test'
+  ...
+# Subtest: prepareLearningEngineHandoff rejeita handoff vazio quando a sessao nao produziu candidato explicito
+ok 18 - prepareLearningEngineHandoff rejeita handoff vazio quando a sessao nao produziu candidato explicito
+  ---
+  duration_ms: 0.1365
+  type: 'test'
+  ...
+# Subtest: prepareLearningEngineHandoff rejeita handoff fragil quando a trilha tem evidencia insuficiente
+ok 19 - prepareLearningEngineHandoff rejeita handoff fragil quando a trilha tem evidencia insuficiente
+  ---
+  duration_ms: 0.1455
+  type: 'test'
+  ...
+# Subtest: prepareLearningEngineHandoff rejeita sessao saturada sem promover avaliacao indevida
+ok 20 - prepareLearningEngineHandoff rejeita sessao saturada sem promover avaliacao indevida
+  ---
+  duration_ms: 0.151
+  type: 'test'
+  ...
+# Subtest: prepareLearningEngineHandoff rejeita trilha pronta sem confianca preliminar minima
+ok 21 - prepareLearningEngineHandoff rejeita trilha pronta sem confianca preliminar minima
+  ---
+  duration_ms: 0.1372
+  type: 'test'
+  ...
+# Subtest: evaluateLearningCandidate aceita como candidato quando a trilha demonstra forca cognitiva suficiente
+ok 22 - evaluateLearningCandidate aceita como candidato quando a trilha demonstra forca cognitiva suficiente
+  ---
+  duration_ms: 0.3259
+  type: 'test'
+  ...
+# Subtest: evaluateLearningCandidate pede mais investigacao quando a confianca ainda e baixa
+ok 23 - evaluateLearningCandidate pede mais investigacao quando a confianca ainda e baixa
+  ---
+  duration_ms: 0.0995
+  type: 'test'
+  ...
+# Subtest: evaluateLearningCandidate mantem como hipotese aberta quando a trilha e plausivel mas ainda moderada
+ok 24 - evaluateLearningCandidate mantem como hipotese aberta quando a trilha e plausivel mas ainda moderada
+  ---
+  duration_ms: 0.0818
+  type: 'test'
+  ...
+# Subtest: evaluateLearningCandidate rejeita material insuficiente quando a base explicativa e fraca
+ok 25 - evaluateLearningCandidate rejeita material insuficiente quando a base explicativa e fraca
+  ---
+  duration_ms: 0.0968
+  type: 'test'
+  ...
+# Subtest: promoteKnowledgeCandidate promove avaliacao aceita para conhecimento candidato explicito
+ok 26 - promoteKnowledgeCandidate promove avaliacao aceita para conhecimento candidato explicito
+  ---
+  duration_ms: 0.2653
+  type: 'test'
+  ...
+# Subtest: promoteKnowledgeCandidate rejeita avaliacao ainda insuficiente
+ok 27 - promoteKnowledgeCandidate rejeita avaliacao ainda insuficiente
+  ---
+  duration_ms: 0.1389
+  type: 'test'
+  ...
+# Subtest: promoteKnowledgeCandidate rejeita hipotese mantida aberta
+ok 28 - promoteKnowledgeCandidate rejeita hipotese mantida aberta
+  ---
+  duration_ms: 0.0759
+  type: 'test'
+  ...
+# Subtest: promoteKnowledgeCandidate rejeita quando ainda falta investigacao
+ok 29 - promoteKnowledgeCandidate rejeita quando ainda falta investigacao
+  ---
+  duration_ms: 0.063
+  type: 'test'
+  ...
+# Subtest: promoteKnowledgeCandidate preserva rastreabilidade da origem
+ok 30 - promoteKnowledgeCandidate preserva rastreabilidade da origem
+  ---
+  duration_ms: 0.1209
+  type: 'test'
+  ...
+# Subtest: promoteKnowledgeCandidate preserva limites explicitos da afirmacao
+ok 31 - promoteKnowledgeCandidate preserva limites explicitos da afirmacao
+  ---
+  duration_ms: 0.6282
+  type: 'test'
+  ...
+# Subtest: deriveInitialTemporalAuthority atribui autoridade estavel quando ha estabilidade observada entre fontes e tempo
+ok 32 - deriveInitialTemporalAuthority atribui autoridade estavel quando ha estabilidade observada entre fontes e tempo
+  ---
+  duration_ms: 0.2029
+  type: 'test'
+  ...
+# Subtest: deriveInitialTemporalAuthority atribui autoridade contextual quando ha base suficiente mas sem estabilidade alta
+ok 33 - deriveInitialTemporalAuthority atribui autoridade contextual quando ha base suficiente mas sem estabilidade alta
+  ---
+  duration_ms: 0.0887
+  type: 'test'
+  ...
+# Subtest: deriveInitialTemporalAuthority atribui autoridade provisional quando a base ainda e curta
+ok 34 - deriveInitialTemporalAuthority atribui autoridade provisional quando a base ainda e curta
+  ---
+  duration_ms: 0.069
+  type: 'test'
+  ...
+# Subtest: evaluateKnowledgePersistenceBoundary aceita conhecimento candidato persistivel e gera artefato com autoridade temporal
+ok 35 - evaluateKnowledgePersistenceBoundary aceita conhecimento candidato persistivel e gera artefato com autoridade temporal
+  ---
+  duration_ms: 0.2354
+  type: 'test'
+  ...
+# Subtest: evaluateKnowledgePersistenceBoundary rejeita conhecimento candidato sem estabilidade observada minima
+ok 36 - evaluateKnowledgePersistenceBoundary rejeita conhecimento candidato sem estabilidade observada minima
+  ---
+  duration_ms: 0.098
+  type: 'test'
+  ...
+# Subtest: evaluateKnowledgePersistenceBoundary rejeita conhecimento candidato sem maturidade investigativa suficiente
+ok 37 - evaluateKnowledgePersistenceBoundary rejeita conhecimento candidato sem maturidade investigativa suficiente
+  ---
+  duration_ms: 0.0727
+  type: 'test'
+  ...
+# Subtest: evaluateKnowledgePersistenceBoundary preserva limites explicitos no artefato persistivel
+ok 38 - evaluateKnowledgePersistenceBoundary preserva limites explicitos no artefato persistivel
+  ---
+  duration_ms: 0.0714
+  type: 'test'
+  ...
+# Subtest: house sem dados retorna pista de descoberta inicial
+ok 39 - house sem dados retorna pista de descoberta inicial
+  ---
+  duration_ms: 1.4251
+  type: 'test'
+  ...
+# Subtest: nextInvestigation com pergunta de alto ganho gera pista com shouldAskQuestion true
+ok 40 - nextInvestigation com pergunta de alto ganho gera pista com shouldAskQuestion true
+  ---
+  duration_ms: 0.2255
+  type: 'test'
+  ...
+# Subtest: hipotese ativa gera pista relacionada a hipotese
+ok 41 - hipotese ativa gera pista relacionada a hipotese
+  ---
+  duration_ms: 0.1917
+  type: 'test'
+  ...
+# Subtest: comodo com mainMystery gera pista relacionada ao comodo
+ok 42 - comodo com mainMystery gera pista relacionada ao comodo
+  ---
+  duration_ms: 0.1631
+  type: 'test'
+  ...
+# Subtest: baseline building gera pista de linha de base
+ok 43 - baseline building gera pista de linha de base
+  ---
+  duration_ms: 0.1404
+  type: 'test'
+  ...
+# Subtest: pista nunca deve conter confianca alta sem evidencia
+ok 44 - pista nunca deve conter confianca alta sem evidencia
+  ---
+  duration_ms: 0.1276
+  type: 'test'
+  ...
+# Subtest: pista sem dados gera fala exploratoria
+ok 45 - pista sem dados gera fala exploratoria
+  ---
+  duration_ms: 0.411
+  type: 'test'
+  ...
+# Subtest: pista com pergunta gera optionalQuestionLine
+ok 46 - pista com pergunta gera optionalQuestionLine
+  ---
+  duration_ms: 0.2796
+  type: 'test'
+  ...
+# Subtest: quando existe Energy Story valida a fala principal nasce da narrativa pronta
+ok 47 - quando existe Energy Story valida a fala principal nasce da narrativa pronta
+  ---
+  duration_ms: 0.2888
+  type: 'test'
+  ...
+# Subtest: narrativa da Energy Story nao aparece duplicada
+ok 48 - narrativa da Energy Story nao aparece duplicada
+  ---
+  duration_ms: 0.0914
+  type: 'test'
+  ...
+# Subtest: educationalInsight nao aparece repetidamente
+ok 49 - educationalInsight nao aparece repetidamente
+  ---
+  duration_ms: 0.1362
+  type: 'test'
+  ...
+# Subtest: pista com baixa confianca admite incerteza
+ok 50 - pista com baixa confianca admite incerteza
+  ---
+  duration_ms: 0.1891
+  type: 'test'
+  ...
+# Subtest: abertura principal do speech fica em no maximo duas frases
+ok 51 - abertura principal do speech fica em no maximo duas frases
+  ---
+  duration_ms: 0.1408
+  type: 'test'
+  ...
+# Subtest: fala nunca usa termos proibidos
+ok 52 - fala nunca usa termos proibidos
+  ---
+  duration_ms: 0.3872
+  type: 'test'
+  ...
+# Subtest: fala nunca promete economia
+ok 53 - fala nunca promete economia
+  ---
+  duration_ms: 0.1097
+  type: 'test'
+  ...
+# Subtest: evidenceLabel fica mais orientado a percepcao quando ha pista real
+ok 54 - evidenceLabel fica mais orientado a percepcao quando ha pista real
+  ---
+  duration_ms: 0.1139
+  type: 'test'
+  ...
+# Subtest: actionLabel deve ser curto
+ok 55 - actionLabel deve ser curto
+  ---
+  duration_ms: 0.1688
+  type: 'test'
+  ...
+# Subtest: input vazio gera CoreExperience no_data ou building_baseline
+ok 56 - input vazio gera CoreExperience no_data ou building_baseline
+  ---
+  duration_ms: 1.0466
+  type: 'test'
+  ...
+# Subtest: input com fatura gera house + clue + speech
+ok 57 - input com fatura gera house + clue + speech
+  ---
+  duration_ms: 0.8262
+  type: 'test'
+  ...
+# Subtest: pista com pergunta gera status question_ready e primaryAction apropriada
+ok 58 - pista com pergunta gera status question_ready e primaryAction apropriada
+  ---
+  duration_ms: 0.735
+  type: 'test'
+  ...
+# Subtest: quando a Energy Story existe a Core usa sua narrativa como voz principal
+ok 59 - quando a Energy Story existe a Core usa sua narrativa como voz principal
+  ---
+  duration_ms: 0.5865
+  type: 'test'
+  ...
+# Subtest: sem Energy Story o fallback atual continua funcionando
+ok 60 - sem Energy Story o fallback atual continua funcionando
+  ---
+  duration_ms: 0.2212
+  type: 'test'
+  ...
+# Subtest: pista sem pergunta gera status clue_ready
+ok 61 - pista sem pergunta gera status clue_ready
+  ---
+  duration_ms: 0.886
+  type: 'test'
+  ...
+# Subtest: composer nunca retorna mais de uma pista principal
+ok 62 - composer nunca retorna mais de uma pista principal
+  ---
+  duration_ms: 0.2739
+  type: 'test'
+  ...
+# Subtest: composer nao altera input original
+ok 63 - composer nao altera input original
+  ---
+  duration_ms: 0.4089
+  type: 'test'
+  ...
+# Subtest: composer preserva confianca conservadora
+ok 64 - composer preserva confianca conservadora
+  ---
+  duration_ms: 0.2711
+  type: 'test'
+  ...
+# Subtest: runtime bridge retorna undefined sem hidratacao ou sem userId
+ok 65 - runtime bridge retorna undefined sem hidratacao ou sem userId
+  ---
+  duration_ms: 0.124
+  type: 'test'
+  ...
+# Subtest: runtime bridge adapta a jornada atual para CoreExperience
+ok 66 - runtime bridge adapta a jornada atual para CoreExperience
+  ---
+  duration_ms: 0.8412
+  type: 'test'
+  ...
+# Subtest: runtime bridge mantem a investigacao coerente quando a Story aponta climatizacao como proxima frente
+ok 67 - runtime bridge mantem a investigacao coerente quando a Story aponta climatizacao como proxima frente
+  ---
+  duration_ms: 0.6382
+  type: 'test'
+  ...
+# Subtest: runtime bridge nao altera a jornada original
+ok 68 - runtime bridge nao altera a jornada original
+  ---
+  duration_ms: 0.6799
+  type: 'test'
+  ...
+# Subtest: applyInvestigationAnswer aplica resposta sem mutar house original
+ok 69 - applyInvestigationAnswer aplica resposta sem mutar house original
+  ---
+  duration_ms: 1.4666
+  type: 'test'
+  ...
+# Subtest: applyInvestigationAnswer toda resposta gera Evidence source user_answer
+ok 70 - applyInvestigationAnswer toda resposta gera Evidence source user_answer
+  ---
+  duration_ms: 0.195
+  type: 'test'
+  ...
+# Subtest: applyInvestigationAnswer resposta positiva ligada a hipotese fortalece hipotese conservadoramente
+ok 71 - applyInvestigationAnswer resposta positiva ligada a hipotese fortalece hipotese conservadoramente
+  ---
+  duration_ms: 0.168
+  type: 'test'
+  ...
+# Subtest: applyInvestigationAnswer resposta negativa nao descarta hipotese automaticamente
+ok 72 - applyInvestigationAnswer resposta negativa nao descarta hipotese automaticamente
+  ---
+  duration_ms: 0.29
+  type: 'test'
+  ...
+# Subtest: applyInvestigationAnswer resposta ligada a room aumenta entendimento do room sem passar de 100
+ok 73 - applyInvestigationAnswer resposta ligada a room aumenta entendimento do room sem passar de 100
+  ---
+  duration_ms: 0.2829
+  type: 'test'
+  ...
+# Subtest: applyInvestigationAnswer retorna nextInvestigation unico
+ok 74 - applyInvestigationAnswer retorna nextInvestigation unico
+  ---
+  duration_ms: 0.2576
+  type: 'test'
+  ...
+# Subtest: applyInvestigationAnswer retorna resultSpeechHint curto
+ok 75 - applyInvestigationAnswer retorna resultSpeechHint curto
+  ---
+  duration_ms: 0.1948
+  type: 'test'
+  ...
+# Subtest: applyInvestigationAnswer nao confirma hipotese com uma unica resposta
+ok 76 - applyInvestigationAnswer nao confirma hipotese com uma unica resposta
+  ---
+  duration_ms: 0.1757
+  type: 'test'
+  ...
+# Subtest: applyInvestigationAnswer input sem hipotese relacionada ainda registra contexto
+ok 77 - applyInvestigationAnswer input sem hipotese relacionada ainda registra contexto
+  ---
+  duration_ms: 0.3089
+  type: 'test'
+  ...
+# Subtest: applyInvestigationAnswer e deterministica para o mesmo input
+ok 78 - applyInvestigationAnswer e deterministica para o mesmo input
+  ---
+  duration_ms: 0.3083
+  type: 'test'
+  ...
+# Subtest: applyInvestigationAnswer prepara handoff explicito quando a trilha amadurece para avaliacao
+ok 79 - applyInvestigationAnswer prepara handoff explicito quando a trilha amadurece para avaliacao
+  ---
+  duration_ms: 0.1403
+  type: 'test'
+  ...
+# Subtest: applyInvestigationAnswer promove conhecimento candidato quando a trilha ja chega forte o bastante
+ok 80 - applyInvestigationAnswer promove conhecimento candidato quando a trilha ja chega forte o bastante
+  ---
+  duration_ms: 0.2172
+  type: 'test'
+  ...
+# Subtest: applyInvestigationAnswer pode promover conhecimento candidato sem ainda tornalo persistivel
+ok 81 - applyInvestigationAnswer pode promover conhecimento candidato sem ainda tornalo persistivel
+  ---
+  duration_ms: 0.1784
+  type: 'test'
+  ...
+# Subtest: applyInvestigationAnswer usa InvestigationSession para evitar reabertura prematura da mesma trilha sem ganho
+ok 82 - applyInvestigationAnswer usa InvestigationSession para evitar reabertura prematura da mesma trilha sem ganho
+  ---
+  duration_ms: 0.1761
+  type: 'test'
+  ...
+# Subtest: GuidedConversationSession consome CoreExperience no hero principal
+not ok 83 - GuidedConversationSession consome CoreExperience no hero principal
+  ---
+  duration_ms: 29.4285
+  type: 'test'
+  location: 'C:\\Users\\Pichau\\score-energy-verse\\node_modules\\.cache\\domain-tests\\mvpJourneyState.test.mjs:109583:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /runtime\?\.cta\.label/. Input:
+    
+    "import React from 'react';\n" +
+      'import {\n' +
+      '  Loader2,\n' +
+      "} from 'lucide-react';\n" +
+      "import type { CoreExperience } from '@/lib/cognitive';\n" +
+      "import CorePresence, { CorePresenceFeedback } from '@/components/nucleo/CorePresence';\n" +
+      "import LivingCore from '@/components/nucleo/LivingCore';\n" +
+      'import {\n' +
+      '  GuidedConversationActionQuestion,\n' +
+      '  GuidedConversationContextQuestion,\n' +
+      '  GuidedConversationViewModel,\n' +
+      "} from '@/lib/guidedConversation';\n" +
+      "import { buildMemoryFeedback, describeAdaptiveAnswer } from '@/lib/mvpCoreFlow';\n" +
+      "import { MascotContextQuestionValue } from '@/types/mvp';\n" +
+      '\n' +
+      "type DetailSectionKey = 'profile' | 'summary' | 'actions' | 'history' | 'memory';\n" +
+      '\n' +
+      'interface GuidedConversationSessionProps {\n' +
+      '  experience?: CoreExperience;\n' +
+      '  onActionQuestionAnswer: (question: GuidedConversationActionQuestion, value: string) => void;\n' +
+      '  onContextQuestionAnswer: (\n' +
+      '    question: GuidedConversationContextQuestion,\n' +
+      '    value: MascotContextQuestionValue\n' +
+      '  ) => void;\n' +
+      '  onContextQuestionIgnore: (question: GuidedConversationContextQuestion) => void;\n' +
+      '  onOpenDetails: (section: DetailSectionKey) => void;\n' +
+      '  profileTask?: React.ReactNode;\n' +
+      '  uploadTask?: React.ReactNode;\n' +
+      '  viewModel: GuidedConversationViewModel;\n' +
+      '}\n' +
+      '\n' +
+      'const stripFeedbackPrefix = (value?: string) =>\n' +
+      '  value\n' +
+      "    ?.replace(/^Nova evidencia:\\s*/i, '')\n" +
+      "    ?.replace(/^Hipotese mais forte agora:\\s*/i, '')\n" +
+      "    ?.replace(/^Hipotese mais forte:\\s*/i, '');\n" +
+      '\n' +
+      'const buildInitialInvestigationFeedback = ({\n' +
+      '  experience,\n' +
+      '  viewModel,\n' +
+      '}: {\n' +
+      '  experience?: CoreExperience;\n' +
+      '  viewModel: GuidedConversationViewModel;\n' +
+      '}): CorePresenceFeedback => {\n' +
+      '  const runtime = viewModel.firstReading?.productRuntime;\n' +
+      '  const surface = runtime?.experience;\n' +
+      '\n' +
+      '  return {\n' +
+      '    continueLabel:\n' +
+      "      runtime?.cta?.target === 'question'\n" +
+      '        ? runtime.cta.label\n' +
+      '        : undefined,\n' +
+      '    evidenceLine:\n' +
+      '      surface?.score.deepReading.preview ||\n' +
+      '      viewModel.firstReading?.support ||\n' +
+      '      experience?.primaryClue.explanation ||\n' +
+      '      viewModel.reading.support,\n' +
+      '    helperText:\n' +
+      '      surface?.score.action?.label ||\n' +
+      '      viewModel.firstReading?.primaryDiscovery.action ||\n' +
+      '      viewModel.firstReading?.nextRefinement ||\n' +
+      '      viewModel.conclusion.nextStepDetail ||\n' +
+      '      viewModel.summary.nextDecision,\n' +
+      '    message:\n' +
+      '      surface?.score.discovery?.headline ||\n' +
+      '      viewModel.firstReading?.intro ||\n' +
+      '      viewModel.firstReading?.primaryDiscovery.headline ||\n' +
+      '      experience?.speech.clueLine ||\n' +
+      '      viewModel.reading.support ||\n' +
+      "      'Ja consigo afirmar alguma coisa util com honestidade antes de perguntar de novo.',\n" +
+      '    reading: viewModel.firstReading,\n' +
+      '    supportLine:\n' +
+      '      surface?.score.meaning ||\n' +
+      '      viewModel.firstReading?.primaryDiscovery.meaning,\n' +
+      '    title:\n' +
+      '      surface?.hermes.line ||\n' +
+      '      viewModel.firstReading?.title ||\n' +
+      '      viewModel.firstReading?.primaryDiscovery.headline ||\n' +
+      "      'Sua conta deste ciclo',\n" +
+      '    uncertaintyLine:\n' +
+      '      surface?.score.uncertainty ||\n' +
+      '      viewModel.firstReading?.uncertainty ||\n' +
+      '      viewModel.reading.caution,\n' +
+      '  };\n' +
+      '};\n' +
+      '\n' +
+      'const buildAnswerValueReturn = (\n' +
+      '  question: GuidedConversationActionQuestion | GuidedConversationContextQuestion,\n' +
+      '  value: string\n' +
+      '): CorePresenceFeedback => {\n' +
+      '  const adaptiveAnswer = describeAdaptiveAnswer(question.id, value);\n' +
+      '\n' +
+      '  return {\n' +
+      "    continueLabel: 'Continuar leitura',\n" +
+      '    evidenceLine: stripFeedbackPrefix(adaptiveAnswer.evidence),\n' +
+      '    helperText: question.helperText,\n' +
+      '    hypothesisLine: stripFeedbackPrefix(adaptiveAnswer.hypothesis),\n' +
+      '    message: adaptiveAnswer.insight,\n' +
+      "    title: 'O que mudou na leitura',\n" +
+      '    uncertaintyLine: adaptiveAnswer.uncertainty,\n' +
+      '  };\n' +
+      '};\n' +
+      '\n' +
+      'const GuidedConversationSession = ({\n' +
+      '  experience,\n' +
+      '  onActionQuestionAnswer,\n' +
+      '  onContextQuestionAnswer,\n' +
+      '  onContextQuestionIgnore,\n' +
+      '  onOpenDetails,\n' +
+      '  profileTask,\n' +
+      '  uploadTask,\n' +
+      '  viewModel,\n' +
+      '}: GuidedConversationSessionProps) => {\n' +
+      '  const [feedback, setFeedback] = React.useState<CorePresenceFeedback | null>(null);\n' +
+      '  const [revealedQuestionId, setRevealedQuestionId] = React.useState<string | null>(null);\n' +
+      "  const runtimeExperience = viewModel.state === 'ready' ? experience : undefined;\n" +
+      '\n' +
+      '  React.useEffect(() => {\n' +
+      '    setFeedback(null);\n' +
+      '    setRevealedQuestionId(null);\n' +
+      '  }, [runtimeExperience?.id, viewModel.sessionKey]);\n' +
+      '\n' +
+      '  React.useEffect(() => {\n' +
+      "    if (viewModel.state !== 'ready') {\n" +
+      '      return;\n' +
+      '    }\n' +
+      '\n' +
+      '    if (feedback) {\n' +
+      '      return;\n' +
+      '    }\n' +
+      '\n' +
+      '    if (viewModel.currentQuestion && revealedQuestionId === viewModel.currentQuestion.id) {\n' +
+      '      return;\n' +
+      '    }\n' +
+      '\n' +
+      '    setFeedback(\n' +
+      '      buildInitialInvestigationFeedback({\n' +
+      '        experience: runtimeExperience,\n' +
+      '        viewModel,\n' +
+      '      })\n' +
+      '    );\n' +
+      '  }, [\n' +
+      '    feedback,\n' +
+      '    revealedQuestionId,\n' +
+      '    runtimeExperience,\n' +
+      '    viewModel,\n' +
+      '    viewModel.currentQuestion,\n' +
+      '    viewModel.state,\n' +
+      '  ]);\n' +
+      '\n' +
+      '  const handleActionQuestionAnswer = React.useCallback(\n' +
+      '    (question: GuidedConversationActionQuestion, value: string) => {\n' +
+      '      setFeedback(buildAnswerValueReturn(question, value));\n' +
+      '      setRevealedQuestionId(null);\n' +
+      '      onActionQuestionAnswer(question, value);\n' +
+      '    },\n' +
+      '    [onActionQuestionAnswer]\n' +
+      '  );\n' +
+      '\n' +
+      '  const handleContextQuestionAnswer = React.useCallback(\n' +
+      '    (question: GuidedConversationContextQuestion, value: MascotContextQuestionValue) => {\n' +
+      '      const memoryFeedback = buildMemoryFeedback(question.id, value);\n' +
+      '\n' +
+      '      setFeedback({\n' +
+      "        continueLabel: 'Continuar leitura',\n" +
+      '        evidenceLine:\n' +
+      '          question.helperText ||\n' +
+      "          'Isso ajuda a encaixar melhor essa parte da casa na leitura.',\n" +
+      '        helperText: question.helperText,\n' +
+      '        memoryLinkLabel: memoryFeedback.ctaLabel,\n' +
+      '        message: memoryFeedback.message,\n' +
+      "        title: 'O que mudou na leitura',\n" +
+      '        uncertaintyLine:\n' +
+      "          'Ainda preciso cruzar esse contexto com o restante da leitura antes de afirmar qualquer conclusao mais forte.',\n" +
+      '      });\n' +
+      '      setRevealedQuestionId(null);\n' +
+      '      onContextQuestionAnswer(question, value);\n' +
+      '    },\n' +
+      '    [onContextQuestionAnswer]\n' +
+      '  );\n' +
+      '\n' +
+      '  const handleFeedbackContinue = React.useCallback(() => {\n' +
+      '    setRevealedQuestionId(viewModel.currentQuestion?.id ?? null);\n' +
+      '    setFeedback(null);\n' +
+      '  }, [viewModel.currentQuestion?.id]);\n' +
+      '\n' +
+      '  const renderAccountUnderstandingPanel = () => {\n' +
+      "    if (viewModel.state !== 'ready') {\n" +
+      '      return null;\n' +
+      '    }\n' +
+      '\n' +
+      '    return (\n' +
+      '      <section\n' +
+      '        data-account-understanding-panel="true"\n' +
+      '        className="rounded-[24px] border border-white/10 bg-white/4 p-4 text-white backdrop-blur-sm sm:p-5"\n' +
+      '      >\n' +
+      '        <div className="space-y-2">\n' +
+      '          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9dd8b1]">\n' +
+      '            O que ja percebi\n' +
+      '          </p>\n' +
+      '          <h3 className="score-display max-w-[16ch] text-xl font-bold leading-[1.02] sm:text-2xl">\n' +
+      '            {viewModel.accountUnderstanding.title}\n' +
+      '          </h3>\n' +
+      '          <p className="max-w-2xl text-sm leading-6 text-white/68">\n' +
+      '            {viewModel.accountUnderstanding.intro}\n' +
+      '          </p>\n' +
+      '        </div>\n' +
+      '\n' +
+      '        <div className="mt-4 flex gap-3 overflow-x-auto pb-1 score-scrollbar-none">\n' +
+      '          {viewModel.accountUnderstanding.categories.map((category) => (\n' +
+      '            <article\n' +
+      '              key={category.id}\n' +
+      '              data-understanding-category={category.id}\n' +
+      '              data-understanding-level={category.level}\n' +
+      "              data-understanding-open={category.isOpenQuestion ? 'true' : 'false'}\n" +
+      "              data-understanding-open-point={category.openPoint ?? ''}\n" +
+      '              data-understanding-support-count={category.supportCount}\n' +
+      '              className="min-w-[220px] max-w-[220px] shrink-0 rounded-[18px] border border-white/10 bg-black/10 p-4"\n' +
+      '            >\n' +
+      '              <div className="flex items-start justify-between gap-3">\n' +
+      '                <div>\n' +
+      '                  <p className="text-sm font-semibold text-white">{category.label}</p>\n' +
+      '                  <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-[#9dd8b1]">\n' +
+      '                    {category.levelLabel}\n' +
+      '                  </p>\n' +
+      '                </div>\n' +
+      '                <span className="rounded-full border border-white/12 bg-white/8 px-2 py-1 text-[11px] text-white/72">\n' +
+      "                  {category.supportCount} pista{category.supportCount === 1 ? '' : 's'}\n" +
+      '                </span>\n' +
+      '              </div>\n' +
+      '\n' +
+      '              <p className="mt-3 text-sm leading-5 text-white/78">{category.reason}</p>\n' +
+      '\n' +
+      '              <p className="mt-3 text-xs leading-5 text-white/58">\n' +
+      '                {category.openPoint\n' +
+      '                  ? `Em aberto: ${category.openPoint}`\n' +
+      "                  : 'Sem frente aberta explicita no momento.'}\n" +
+      '              </p>\n' +
+      '            </article>\n' +
+      '          ))}\n' +
+      '        </div>\n' +
+      '      </section>\n' +
+      '    );\n' +
+      '  };\n' +
+      '\n' +
+      '\n' +
+      "  if (viewModel.state === 'loading') {\n" +
+      '    return (\n' +
+      '      <section className="score-stage relative overflow-hidden rounded-[34px] px-6 py-10 text-white">\n' +
+      '        <div className="absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_top,rgba(43,194,116,0.16),transparent_60%)]" />\n' +
+      '        <div className="relative mx-auto grid max-w-6xl gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center">\n' +
+      '          <div className="space-y-5">\n' +
+      '            <p className="score-caption text-[#7fe3ae]">{viewModel.opening.eyebrow}</p>\n' +
+      '            <h1 className="score-display max-w-[12ch] text-4xl font-bold leading-[0.96] sm:text-5xl">\n' +
+      '              {viewModel.opening.title}\n' +
+      '            </h1>\n' +
+      '            <p className="max-w-2xl text-sm leading-7 text-white/72">{viewModel.opening.body}</p>\n' +
+      '            <div className="flex items-center gap-3 text-white/66">\n' +
+      '              <Loader2 className="h-5 w-5 animate-spin text-[#7fe3ae]" />\n' +
+      '              <span className="text-sm">Memoria, leitura e continuidade estao voltando para a superficie.</span>\n' +
+      '            </div>\n' +
+      '          </div>\n' +
+      '\n' +
+      '          <div className="flex items-center justify-center lg:justify-end">\n' +
+      '            <LivingCore\n' +
+      '              level={viewModel.scoreSummary.level}\n' +
+      '              points={viewModel.scoreSummary.points}\n' +
+      '              size={184}\n' +
+      '            />\n' +
+      '          </div>\n' +
+      '        </div>\n' +
+      '      </section>\n' +
+      '    );\n' +
+      '  }\n' +
+      '\n' +
+      "  if (viewModel.state === 'profile') {\n" +
+      '    return (\n'... 6769 more characters
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    import React from 'react';
+    import {
+      Loader2,
+    } from 'lucide-react';
+    import type { CoreExperience } from '@/lib/cognitive';
+    import CorePresence, { CorePresenceFeedback } from '@/components/nucleo/CorePresence';
+    import LivingCore from '@/components/nucleo/LivingCore';
+    import {
+      GuidedConversationActionQuestion,
+      GuidedConversationContextQuestion,
+      GuidedConversationViewModel,
+    } from '@/lib/guidedConversation';
+    import { buildMemoryFeedback, describeAdaptiveAnswer } from '@/lib/mvpCoreFlow';
+    import { MascotContextQuestionValue } from '@/types/mvp';
+    
+    type DetailSectionKey = 'profile' | 'summary' | 'actions' | 'history' | 'memory';
+    
+    interface GuidedConversationSessionProps {
+      experience?: CoreExperience;
+      onActionQuestionAnswer: (question: GuidedConversationActionQuestion, value: string) => void;
+      onContextQuestionAnswer: (
+        question: GuidedConversationContextQuestion,
+        value: MascotContextQuestionValue
+      ) => void;
+      onContextQuestionIgnore: (question: GuidedConversationContextQuestion) => void;
+      onOpenDetails: (section: DetailSectionKey) => void;
+      profileTask?: React.ReactNode;
+      uploadTask?: React.ReactNode;
+      viewModel: GuidedConversationViewModel;
+    }
+    
+    const stripFeedbackPrefix = (value?: string) =>
+      value
+        ?.replace(/^Nova evidencia:\s*/i, '')
+        ?.replace(/^Hipotese mais forte agora:\s*/i, '')
+        ?.replace(/^Hipotese mais forte:\s*/i, '');
+    
+    const buildInitialInvestigationFeedback = ({
+      experience,
+      viewModel,
+    }: {
+      experience?: CoreExperience;
+      viewModel: GuidedConversationViewModel;
+    }): CorePresenceFeedback => {
+      const runtime = viewModel.firstReading?.productRuntime;
+      const surface = runtime?.experience;
+    
+      return {
+        continueLabel:
+          runtime?.cta?.target === 'question'
+            ? runtime.cta.label
+            : undefined,
+        evidenceLine:
+          surface?.score.deepReading.preview ||
+          viewModel.firstReading?.support ||
+          experience?.primaryClue.explanation ||
+          viewModel.reading.support,
+        helperText:
+          surface?.score.action?.label ||
+          viewModel.firstReading?.primaryDiscovery.action ||
+          viewModel.firstReading?.nextRefinement ||
+          viewModel.conclusion.nextStepDetail ||
+          viewModel.summary.nextDecision,
+        message:
+          surface?.score.discovery?.headline ||
+          viewModel.firstReading?.intro ||
+          viewModel.firstReading?.primaryDiscovery.headline ||
+          experience?.speech.clueLine ||
+          viewModel.reading.support ||
+          'Ja consigo afirmar alguma coisa util com honestidade antes de perguntar de novo.',
+        reading: viewModel.firstReading,
+        supportLine:
+          surface?.score.meaning ||
+          viewModel.firstReading?.primaryDiscovery.meaning,
+        title:
+          surface?.hermes.line ||
+          viewModel.firstReading?.title ||
+          viewModel.firstReading?.primaryDiscovery.headline ||
+          'Sua conta deste ciclo',
+        uncertaintyLine:
+          surface?.score.uncertainty ||
+          viewModel.firstReading?.uncertainty ||
+          viewModel.reading.caution,
+      };
+    };
+    
+    const buildAnswerValueReturn = (
+      question: GuidedConversationActionQuestion | GuidedConversationContextQuestion,
+      value: string
+    ): CorePresenceFeedback => {
+      const adaptiveAnswer = describeAdaptiveAnswer(question.id, value);
+    
+      return {
+        continueLabel: 'Continuar leitura',
+        evidenceLine: stripFeedbackPrefix(adaptiveAnswer.evidence),
+        helperText: question.helperText,
+        hypothesisLine: stripFeedbackPrefix(adaptiveAnswer.hypothesis),
+        message: adaptiveAnswer.insight,
+        title: 'O que mudou na leitura',
+        uncertaintyLine: adaptiveAnswer.uncertainty,
+      };
+    };
+    
+    const GuidedConversationSession = ({
+      experience,
+      onActionQuestionAnswer,
+      onContextQuestionAnswer,
+      onContextQuestionIgnore,
+      onOpenDetails,
+      profileTask,
+      uploadTask,
+      viewModel,
+    }: GuidedConversationSessionProps) => {
+      const [feedback, setFeedback] = React.useState<CorePresenceFeedback | null>(null);
+      const [revealedQuestionId, setRevealedQuestionId] = React.useState<string | null>(null);
+      const runtimeExperience = viewModel.state === 'ready' ? experience : undefined;
+    
+      React.useEffect(() => {
+        setFeedback(null);
+        setRevealedQuestionId(null);
+      }, [runtimeExperience?.id, viewModel.sessionKey]);
+    
+      React.useEffect(() => {
+        if (viewModel.state !== 'ready') {
+          return;
+        }
+    
+        if (feedback) {
+          return;
+        }
+    
+        if (viewModel.currentQuestion && revealedQuestionId === viewModel.currentQuestion.id) {
+          return;
+        }
+    
+        setFeedback(
+          buildInitialInvestigationFeedback({
+            experience: runtimeExperience,
+            viewModel,
+          })
+        );
+      }, [
+        feedback,
+        revealedQuestionId,
+        runtimeExperience,
+        viewModel,
+        viewModel.currentQuestion,
+        viewModel.state,
+      ]);
+    
+      const handleActionQuestionAnswer = React.useCallback(
+        (question: GuidedConversationActionQuestion, value: string) => {
+          setFeedback(buildAnswerValueReturn(question, value));
+          setRevealedQuestionId(null);
+          onActionQuestionAnswer(question, value);
+        },
+        [onActionQuestionAnswer]
+      );
+    
+      const handleContextQuestionAnswer = React.useCallback(
+        (question: GuidedConversationContextQuestion, value: MascotContextQuestionValue) => {
+          const memoryFeedback = buildMemoryFeedback(question.id, value);
+    
+          setFeedback({
+            continueLabel: 'Continuar leitura',
+            evidenceLine:
+              question.helperText ||
+              'Isso ajuda a encaixar melhor essa parte da casa na leitura.',
+            helperText: question.helperText,
+            memoryLinkLabel: memoryFeedback.ctaLabel,
+            message: memoryFeedback.message,
+            title: 'O que mudou na leitura',
+            uncertaintyLine:
+              'Ainda preciso cruzar esse contexto com o restante da leitura antes de afirmar qualquer conclusao mais forte.',
+          });
+          setRevealedQuestionId(null);
+          onContextQuestionAnswer(question, value);
+        },
+        [onContextQuestionAnswer]
+      );
+    
+      const handleFeedbackContinue = React.useCallback(() => {
+        setRevealedQuestionId(viewModel.currentQuestion?.id ?? null);
+        setFeedback(null);
+      }, [viewModel.currentQuestion?.id]);
+    
+      const renderAccountUnderstandingPanel = () => {
+        if (viewModel.state !== 'ready') {
+          return null;
+        }
+    
+        return (
+          <section
+            data-account-understanding-panel="true"
+            className="rounded-[24px] border border-white/10 bg-white/4 p-4 text-white backdrop-blur-sm sm:p-5"
+          >
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9dd8b1]">
+                O que ja percebi
+              </p>
+              <h3 className="score-display max-w-[16ch] text-xl font-bold leading-[1.02] sm:text-2xl">
+                {viewModel.accountUnderstanding.title}
+              </h3>
+              <p className="max-w-2xl text-sm leading-6 text-white/68">
+                {viewModel.accountUnderstanding.intro}
+              </p>
+            </div>
+    
+            <div className="mt-4 flex gap-3 overflow-x-auto pb-1 score-scrollbar-none">
+              {viewModel.accountUnderstanding.categories.map((category) => (
+                <article
+                  key={category.id}
+                  data-understanding-category={category.id}
+                  data-understanding-level={category.level}
+                  data-understanding-open={category.isOpenQuestion ? 'true' : 'false'}
+                  data-understanding-open-point={category.openPoint ?? ''}
+                  data-understanding-support-count={category.supportCount}
+                  className="min-w-[220px] max-w-[220px] shrink-0 rounded-[18px] border border-white/10 bg-black/10 p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-white">{category.label}</p>
+                      <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-[#9dd8b1]">
+                        {category.levelLabel}
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-white/12 bg-white/8 px-2 py-1 text-[11px] text-white/72">
+                      {category.supportCount} pista{category.supportCount === 1 ? '' : 's'}
+                    </span>
+                  </div>
+    
+                  <p className="mt-3 text-sm leading-5 text-white/78">{category.reason}</p>
+    
+                  <p className="mt-3 text-xs leading-5 text-white/58">
+                    {category.openPoint
+                      ? `Em aberto: ${category.openPoint}`
+                      : 'Sem frente aberta explicita no momento.'}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </section>
+        );
+      };
+    
+    
+      if (viewModel.state === 'loading') {
+        return (
+          <section className="score-stage relative overflow-hidden rounded-[34px] px-6 py-10 text-white">
+            <div className="absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_top,rgba(43,194,116,0.16),transparent_60%)]" />
+            <div className="relative mx-auto grid max-w-6xl gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center">
+              <div className="space-y-5">
+                <p className="score-caption text-[#7fe3ae]">{viewModel.opening.eyebrow}</p>
+                <h1 className="score-display max-w-[12ch] text-4xl font-bold leading-[0.96] sm:text-5xl">
+                  {viewModel.opening.title}
+                </h1>
+                <p className="max-w-2xl text-sm leading-7 text-white/72">{viewModel.opening.body}</p>
+                <div className="flex items-center gap-3 text-white/66">
+                  <Loader2 className="h-5 w-5 animate-spin text-[#7fe3ae]" />
+                  <span className="text-sm">Memoria, leitura e continuidade estao voltando para a superficie.</span>
+                </div>
+              </div>
+    
+              <div className="flex items-center justify-center lg:justify-end">
+                <LivingCore
+                  level={viewModel.scoreSummary.level}
+                  points={viewModel.scoreSummary.points}
+                  size={184}
+                />
+              </div>
+            </div>
+          </section>
+        );
+      }
+    
+      if (viewModel.state === 'profile') {
+        return (
+          <section className="score-stage relative overflow-hidden rounded-[34px] px-6 py-8 text-white sm:px-8 sm:py-10">
+            <div className="absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_top,rgba(43,194,116,0.16),transparent_60%)]" />
+            <div className="relative mx-auto grid max-w-6xl gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <span className="score-pill border-white/12 bg-white/8 text-white/82">
+                    Base da jornada
+                  </span>
+                  <h1 className="score-display max-w-[12ch] text-4xl font-bold leading-[0.96] sm:text-5xl">
+                    {viewModel.opening.title}
+                  </h1>
+                  <p className="max-w-2xl text-sm leading-7 text-white/72">{viewModel.opening.body}</p>
+                </div>
+    
+                <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)] md:items-center">
+                  <div className="flex justify-center md:justify-start">
+                    <LivingCore
+                      level={viewModel.scoreSummary.level}
+                      points={viewModel.scoreSummary.points}
+                      size={148}
+                    />
+                  </div>
+                  <div>{profileTask}</div>
+                </div>
+              </div>
+    
+              <CorePresence
+                experience={runtimeExperience}
+                feedback={feedback}
+                onActionQuestionAnswer={handleActionQuestionAnswer}
+                onContextQuestionAnswer={handleContextQuestionAnswer}
+                onContextQuestionIgnore={onContextQuestionIgnore}
+                onFeedbackContinue={handleFeedbackContinue}
+                onOpenDetails={onOpenDetails}
+                viewModel={viewModel}
+              />
+            </div>
+          </section>
+        );
+      }
+    
+      if (viewModel.state === 'upload') {
+        return (
+          <section className="score-stage relative overflow-hidden rounded-[34px] px-6 py-8 text-white sm:px-8 sm:py-10">
+            <div className="absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_top,rgba(43,194,116,0.16),transparent_60%)]" />
+            <div className="relative mx-auto grid max-w-6xl gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <span className="score-pill score-pill-green">Primeira conta</span>
+                  <h1 className="score-display max-w-[12ch] text-4xl font-bold leading-[0.96] sm:text-5xl">
+                    {viewModel.opening.title}
+                  </h1>
+                  <p className="max-w-2xl text-sm leading-7 text-white/72">{viewModel.opening.body}</p>
+                </div>
+    
+                <div className="grid gap-4 lg:grid-cols-[180px_minmax(0,1fr)] lg:items-start">
+                  <div className="flex justify-center lg:justify-start">
+                    <LivingCore
+                      level={viewModel.scoreSummary.level}
+                      points={viewModel.scoreSummary.points}
+                      size={148}
+                    />
+                  </div>
+                  <div>{uploadTask}</div>
+                </div>
+              </div>
+    
+              <CorePresence
+                experience={runtimeExperience}
+                feedback={feedback}
+                onActionQuestionAnswer={handleActionQuestionAnswer}
+                onContextQuestionAnswer={handleContextQuestionAnswer}
+                onContextQuestionIgnore={onContextQuestionIgnore}
+                onFeedbackContinue={handleFeedbackContinue}
+                onOpenDetails={onOpenDetails}
+                viewModel={viewModel}
+              />
+            </div>
+          </section>
+        );
+      }
+    
+      if (viewModel.state === 'processing') {
+        return (
+          <section className="score-stage relative overflow-hidden rounded-[34px] px-6 py-10 text-white">
+            <div className="absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_top,rgba(43,194,116,0.16),transparent_60%)]" />
+            <div className="relative mx-auto grid max-w-6xl gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center">
+              <div className="space-y-6">
+                <span className="score-pill score-pill-green">Leitura em andamento</span>
+                <h1 className="score-display max-w-[12ch] text-4xl font-bold leading-[0.96] sm:text-5xl">
+                  {viewModel.opening.title}
+                </h1>
+                <p className="max-w-2xl text-sm leading-7 text-white/72">{viewModel.opening.body}</p>
+    
+                <div className="flex items-center gap-4">
+                  <LivingCore
+                    level={viewModel.scoreSummary.level}
+                    points={viewModel.scoreSummary.points}
+                    size={132}
+                  />
+                  <div className="flex items-center gap-3 text-white/68">
+                    <Loader2 className="h-5 w-5 animate-spin text-[#7fe3ae]" />
+                    <span className="text-sm">
+                      O parser, a analise e a persistencia continuam exatamente os mesmos.
+                    </span>
+                  </div>
+                </div>
+              </div>
+    
+              <CorePresence
+                experience={runtimeExperience}
+                feedback={feedback}
+                onActionQuestionAnswer={handleActionQuestionAnswer}
+                onContextQuestionAnswer={handleContextQuestionAnswer}
+                onContextQuestionIgnore={onContextQuestionIgnore}
+                onFeedbackContinue={handleFeedbackContinue}
+                onOpenDetails={onOpenDetails}
+                viewModel={viewModel}
+              />
+            </div>
+          </section>
+        );
+      }
+    
+      return (
+        <section className="score-stage relative overflow-hidden rounded-[30px] px-4 py-5 text-white sm:px-6 sm:py-7">
+          <div className="absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_top,rgba(43,194,116,0.16),transparent_60%)]" />
+          <div className="absolute -left-12 bottom-0 h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(43,194,116,0.18),transparent_72%)] blur-3xl" />
+    
+          <div className="relative mx-auto max-w-3xl space-y-5">
+            <div className="flex flex-wrap items-center gap-3 text-xs text-white/66">
+              <span className="score-pill border-white/12 bg-white/8 text-white/82">
+                {`Conta em foco: ${viewModel.summary.cycleLabel}`}
+              </span>
+            </div>
+    
+            <CorePresence
+              experience={runtimeExperience}
+              feedback={feedback}
+              onActionQuestionAnswer={handleActionQuestionAnswer}
+              onContextQuestionAnswer={handleContextQuestionAnswer}
+              onContextQuestionIgnore={onContextQuestionIgnore}
+              onFeedbackContinue={handleFeedbackContinue}
+              onOpenDetails={onOpenDetails}
+              variant="hero"
+              viewModel={viewModel}
+            />
+    
+            <div className="hidden" aria-hidden="true">
+              {renderAccountUnderstandingPanel()}
+            </div>
+          </div>
+        </section>
+      );
+    };
+    
+    export default GuidedConversationSession;
+    
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/Pichau/score-energy-verse/node_modules/.cache/domain-tests/mvpJourneyState.test.mjs:109593:12)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: GuidedConversationSession mantem fallback elegante sem experience
+ok 84 - GuidedConversationSession mantem fallback elegante sem experience
+  ---
+  duration_ms: 2.3847
+  type: 'test'
+  ...
+# [invoice-parser] raw-text {
+#   rawTextLength: 140,
+#   rawTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 kWh\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 120,
+#   normalizedTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 KWH\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 140,
+#   rawTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 kWh\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 120,
+#   normalizedTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 KWH\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 140,
+#   rawTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 kWh\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 120,
+#   normalizedTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 KWH\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 140,
+#   rawTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 kWh\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 120,
+#   normalizedTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 KWH\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 140,
+#   rawTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 kWh\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 120,
+#   normalizedTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 KWH\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 140,
+#   rawTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 kWh\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 120,
+#   normalizedTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 KWH\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 140,
+#   rawTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 kWh\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 120,
+#   normalizedTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 KWH\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 140,
+#   rawTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 kWh\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 120,
+#   normalizedTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 KWH\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 140,
+#   rawTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 kWh\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 120,
+#   normalizedTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 KWH\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 140,
+#   rawTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 kWh\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 120,
+#   normalizedTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 KWH\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 140,
+#   rawTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 kWh\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 120,
+#   normalizedTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 KWH\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 140,
+#   rawTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 kWh\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 120,
+#   normalizedTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 KWH\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 140,
+#   rawTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 kWh\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 120,
+#   normalizedTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 KWH\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 140,
+#   rawTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 kWh\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 120,
+#   normalizedTextSample: 'DISTRIBUIDORA: SCORE TESTE\\n' +
+#     ' REFERENCIA: 05/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 320,00\\n' +
+#     ' CONSUMO FATURADO: 280 KWH\\n' +
+#     ' DIAS FATURADOS: 30',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 424,
+#   rawTextSample: 'DISTRIBUIDORA: ENERGIA TESTE SA\\n' +
+#     ' UNIDADE CONSUMIDORA: 123456789\\n' +
+#     ' REFERENCIA: 04/2026\\n' +
+#     ' DATA DE EMISSAO: 10/04/2026\\n' +
+#     ' VENCIMENTO: 25/04/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 321,45\\n' +
+#     ' CONSUMO FATURADO: 250 kWh\\n' +
+#     ' DIAS FATURADOS: 30\\n' +
+#     ' LEITURA ANTERIOR: 1000\\n' +
+#     ' LEITURA ATUAL: 1250\\n' +
+#     ' CONSTANTE: 1\\n' +
+#     ' BANDEIRA TARIFARIA: VERDE\\n' +
+#     ' TE: R$ 120,00\\n' +
+#     ' TUSD: R$ 88,30\\n' +
+#     ' CIP: R$ 19,40\\n' +
+#     ' TOTAL DE TRIBUTOS: R$ 52,10',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: true,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 371,
+#   normalizedTextSample: 'DISTRIBUIDORA: ENERGIA TESTE SA\\n' +
+#     ' UNIDADE CONSUMIDORA: 123456789\\n' +
+#     ' REFERENCIA: 04/2026\\n' +
+#     ' DATA DE EMISSAO: 10/04/2026\\n' +
+#     ' VENCIMENTO: 25/04/2026\\n' +
+#     ' TOTAL A PAGAR: R$ 321,45\\n' +
+#     ' CONSUMO FATURADO: 250 KWH\\n' +
+#     ' DIAS FATURADOS: 30\\n' +
+#     ' LEITURA ANTERIOR: 1000\\n' +
+#     ' LEITURA ATUAL: 1250\\n' +
+#     ' CONSTANTE: 1\\n' +
+#     ' BANDEIRA TARIFARIA: VERDE\\n' +
+#     ' TE: R$ 120,00\\n' +
+#     ' TUSD: R$ 88,30\\n' +
+#     ' CIP: R$ 19,40\\n' +
+#     ' TOTAL DE TRIBUTOS: R$ 52,10',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: true,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] file-read {
+#   fileName: 'fixture-celesc.pdf',
+#   fileType: 'application/pdf',
+#   fileSize: 493,
+#   hasArrayBuffer: true,
+#   byteLength: 493
+# }
+# [invoice-parser] pdf-structure {
+#   streamCount: 1,
+#   flateStreamCount: 0,
+#   multiFilterStreamCount: 0,
+#   decodedStreamCount: 1,
+#   failedStreamCount: 0,
+#   compressedByteLength: 402,
+#   decompressedByteLength: 402,
+#   toUnicodeCMapCount: 0,
+#   encodedFontObjectCount: 0,
+#   tjOperatorCount: 15,
+#   tjArrayOperatorCount: 5,
+#   hexTextTokenCount: 0,
+#   usedPdfJsFallback: false
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 242,
+#   rawTextSample: 'CELESC DISTRIBUICAO S.A.\\n' +
+#     'UNIDADE\\n' +
+#     'CONSUMIDORA\\n' +
+#     '1234567890\\n' +
+#     'REFERENCIA\\n' +
+#     '04/2026\\n' +
+#     'VENCIMENTO\\n' +
+#     '25/04/2026\\n' +
+#     'TOTAL A PAGAR\\n' +
+#     'R$ 321,45\\n' +
+#     'CONSUMO\\n' +
+#     'FATURADO\\n' +
+#     '250 KWH\\n' +
+#     'LEITURA ANTERIOR\\n' +
+#     'LEITURA ATUAL\\n' +
+#     '1000 1250\\n' +
+#     'DIAS FATURADOS\\n' +
+#     '30\\n' +
+#     'BANDEIRA TARIFARIA\\n' +
+#     'VERMELHA PATAMAR 1',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: true,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 242,
+#   normalizedTextSample: 'CELESC DISTRIBUICAO S.A.\\n' +
+#     'UNIDADE\\n' +
+#     'CONSUMIDORA\\n' +
+#     '1234567890\\n' +
+#     'REFERENCIA\\n' +
+#     '04/2026\\n' +
+#     'VENCIMENTO\\n' +
+#     '25/04/2026\\n' +
+#     'TOTAL A PAGAR\\n' +
+#     'R$ 321,45\\n' +
+#     'CONSUMO\\n' +
+#     'FATURADO\\n' +
+#     '250 KWH\\n' +
+#     'LEITURA ANTERIOR\\n' +
+#     'LEITURA ATUAL\\n' +
+#     '1000 1250\\n' +
+#     'DIAS FATURADOS\\n' +
+#     '30\\n' +
+#     'BANDEIRA TARIFARIA\\n' +
+#     'VERMELHA PATAMAR 1',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: true,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] audit {
+#   fileName: 'fixture-celesc.pdf',
+#   fileType: 'application/pdf',
+#   fileSize: 493,
+#   source: 'pdf-text',
+#   hasArrayBuffer: true,
+#   hasText: true,
+#   byteLength: 493,
+#   rawTextLength: 242,
+#   normalizedTextLength: 242,
+#   rawTextSample: 'CELESC DISTRIBUICAO S.A.\\n' +
+#     'UNIDADE\\n' +
+#     'CONSUMIDORA\\n' +
+#     '1234567890\\n' +
+#     'REFERENCIA\\n' +
+#     '04/2026\\n' +
+#     'VENCIMENTO\\n' +
+#     '25/04/2026\\n' +
+#     'TOTAL A PAGAR\\n' +
+#     'R$ 321,45\\n' +
+#     'CONSUMO\\n' +
+#     'FATURADO\\n' +
+#     '250 KWH\\n' +
+#     'LEITURA ANTERIOR\\n' +
+#     'LEITURA ATUAL\\n' +
+#     '1000 1250\\n' +
+#     'DIAS FATURADOS\\n' +
+#     '30\\n' +
+#     'BANDEIRA TARIFARIA\\n' +
+#     'VERMELHA PATAMAR 1',
+#   relevantLines: [
+#     'REFERENCIA',
+#     '04/2026',
+#     'VENCIMENTO',
+#     '25/04/2026',
+#     'TOTAL A PAGAR',
+#     'CONSUMO',
+#     '250 KWH'
+#   ],
+#   foundFields: [
+#     'providerName:low',
+#     'consumerUnit:medium',
+#     'referenceMonth:high',
+#     'dueDate:high',
+#     'totalValue:medium',
+#     'consumptionKwh:high',
+#     'daysBilled:high',
+#     'previousReading:high',
+#     'currentReading:high',
+#     'tariffFlag:high'
+#   ],
+#   missingFields: [
+#     'issueDate',
+#     'meterConstant',
+#     'teValue',
+#     'tusdValue',
+#     'publicLightingFee',
+#     'taxesTotal'
+#   ]
+# }
+# Subtest: CorePresence hero usa continuidade explicita entre leitura e proxima pergunta
+ok 85 - CorePresence hero usa continuidade explicita entre leitura e proxima pergunta
+  ---
+  duration_ms: 0.6127
+  type: 'test'
+  ...
+# Subtest: calcula kWh mensal do banheiro via chuveiro corretamente
+ok 86 - calcula kWh mensal do banheiro via chuveiro corretamente
+  ---
+  duration_ms: 10.9729
+  type: 'test'
+  ...
+# Subtest: calcula custo estimado usando tarifa media
+ok 87 - calcula custo estimado usando tarifa media
+  ---
+  duration_ms: 0.2233
+  type: 'test'
+  ...
+# Subtest: calcula percentual estimado da fatura e cobertura do mapa
+ok 88 - calcula percentual estimado da fatura e cobertura do mapa
+  ---
+  duration_ms: 0.127
+  type: 'test'
+  ...
+# Subtest: usa default de potencia quando potencia nao for informada
+ok 89 - usa default de potencia quando potencia nao for informada
+  ---
+  duration_ms: 0.1072
+  type: 'test'
+  ...
+# Subtest: registra nas premissas quando usou default
+ok 90 - registra nas premissas quando usou default
+  ---
+  duration_ms: 0.135
+  type: 'test'
+  ...
+# Subtest: nao retorna confianca alta quando usa defaults
+ok 91 - nao retorna confianca alta quando usa defaults
+  ---
+  duration_ms: 0.0761
+  type: 'test'
+  ...
+# Subtest: gera frase explicavel para a Core
+ok 92 - gera frase explicavel para a Core
+  ---
+  duration_ms: 0.1223
+  type: 'test'
+  ...
+# Subtest: gera insight educativo curto e probabilistico para banheiro
+ok 93 - gera insight educativo curto e probabilistico para banheiro
+  ---
+  duration_ms: 0.1227
+  type: 'test'
+  ...
+# Subtest: nao quebra com fatura ausente
+ok 94 - nao quebra com fatura ausente
+  ---
+  duration_ms: 0.1784
+  type: 'test'
+  ...
+# Subtest: nao calcula percentual com valor total da fatura zero
+ok 95 - nao calcula percentual com valor total da fatura zero
+  ---
+  duration_ms: 0.1352
+  type: 'test'
+  ...
+# Subtest: retorna estimativa indisponivel quando dados essenciais forem invalidos
+ok 96 - retorna estimativa indisponivel quando dados essenciais forem invalidos
+  ---
+  duration_ms: 0.1289
+  type: 'test'
+  ...
+# Subtest: retorna shape compativel com futura composicao do mapa
+ok 97 - retorna shape compativel com futura composicao do mapa
+  ---
+  duration_ms: 0.0802
+  type: 'test'
+  ...
+# Subtest: gera Energy Map inicial com refrigeracao e iluminacao a partir da jornada
+ok 98 - gera Energy Map inicial com refrigeracao e iluminacao a partir da jornada
+  ---
+  duration_ms: 0.6982
+  type: 'test'
+  ...
+# Subtest: mapa inicial continua funcionando mesmo sem roomCount explicito
+ok 99 - mapa inicial continua funcionando mesmo sem roomCount explicito
+  ---
+  duration_ms: 0.352
+  type: 'test'
+  ...
+# Subtest: retorna mapa valido com um unico bloco
+ok 100 - retorna mapa valido com um unico bloco
+  ---
+  duration_ms: 0.099
+  type: 'test'
+  ...
+# Subtest: ordena blocos por impacto estimado
+ok 101 - ordena blocos por impacto estimado
+  ---
+  duration_ms: 0.1314
+  type: 'test'
+  ...
+# Subtest: soma custo estimado corretamente
+ok 102 - soma custo estimado corretamente
+  ---
+  duration_ms: 0.0762
+  type: 'test'
+  ...
+# Subtest: soma kWh estimado corretamente
+ok 103 - soma kWh estimado corretamente
+  ---
+  duration_ms: 0.073
+  type: 'test'
+  ...
+# Subtest: calcula cobertura estimada da fatura
+ok 104 - calcula cobertura estimada da fatura
+  ---
+  duration_ms: 0.062
+  type: 'test'
+  ...
+# Subtest: limita cobertura acima de 100%
+ok 105 - limita cobertura acima de 100%
+  ---
+  duration_ms: 0.0662
+  type: 'test'
+  ...
+# Subtest: registra warning quando cobertura ultrapassa 100%
+ok 106 - registra warning quando cobertura ultrapassa 100%
+  ---
+  duration_ms: 0.0853
+  type: 'test'
+  ...
+# Subtest: escolhe topBlock corretamente
+ok 107 - escolhe topBlock corretamente
+  ---
+  duration_ms: 0.0682
+  type: 'test'
+  ...
+# Subtest: gera bestCoreInsight explicavel e nao absoluto
+ok 108 - gera bestCoreInsight explicavel e nao absoluto
+  ---
+  duration_ms: 0.0998
+  type: 'test'
+  ...
+# Subtest: consolida lacunas abertas
+ok 109 - consolida lacunas abertas
+  ---
+  duration_ms: 0.1388
+  type: 'test'
+  ...
+# Subtest: rebaixa confianca geral quando existe apenas um bloco
+ok 110 - rebaixa confianca geral quando existe apenas um bloco
+  ---
+  duration_ms: 0.0766
+  type: 'test'
+  ...
+# Subtest: nao quebra com lista vazia
+ok 111 - nao quebra com lista vazia
+  ---
+  duration_ms: 0.1007
+  type: 'test'
+  ...
+# Subtest: gera Energy Story a partir da jornada quando ha sinais suficientes
+ok 112 - gera Energy Story a partir da jornada quando ha sinais suficientes
+  ---
+  duration_ms: 0.421
+  type: 'test'
+  ...
+# Subtest: retorna undefined sem sinais suficientes para montar a historia
+ok 113 - retorna undefined sem sinais suficientes para montar a historia
+  ---
+  duration_ms: 0.0848
+  type: 'test'
+  ...
+# Subtest: gera narrativa coerente com mapa contendo apenas banheiro
+ok 114 - gera narrativa coerente com mapa contendo apenas banheiro
+  ---
+  duration_ms: 0.209
+  type: 'test'
+  ...
+# Subtest: aumenta cobertura e atualiza narrativa com banheiro e refrigeracao
+ok 115 - aumenta cobertura e atualiza narrativa com banheiro e refrigeracao
+  ---
+  duration_ms: 0.2928
+  type: 'test'
+  ...
+# Subtest: gera narrativa completa com banheiro, refrigeracao e iluminacao
+ok 116 - gera narrativa completa com banheiro, refrigeracao e iluminacao
+  ---
+  duration_ms: 0.1322
+  type: 'test'
+  ...
+# Subtest: sem blocos gera narrativa segura sem inventar conclusoes
+ok 117 - sem blocos gera narrativa segura sem inventar conclusoes
+  ---
+  duration_ms: 0.1082
+  type: 'test'
+  ...
+# Subtest: escolhe strongestFinding corretamente
+ok 118 - escolhe strongestFinding corretamente
+  ---
+  duration_ms: 0.1123
+  type: 'test'
+  ...
+# Subtest: escolhe a proxima investigacao corretamente
+ok 119 - escolhe a proxima investigacao corretamente
+  ---
+  duration_ms: 0.0973
+  type: 'test'
+  ...
+# Subtest: gera cobertura textual coerente
+ok 120 - gera cobertura textual coerente
+  ---
+  duration_ms: 0.2206
+  type: 'test'
+  ...
+# Subtest: sempre gera educationalInsight
+ok 121 - sempre gera educationalInsight
+  ---
+  duration_ms: 0.0888
+  type: 'test'
+  ...
+# Subtest: coreNarrative nunca usa linguagem absoluta
+ok 122 - coreNarrative nunca usa linguagem absoluta
+  ---
+  duration_ms: 0.1326
+  type: 'test'
+  ...
+# Subtest: unknownAreas nao lista ambientes ja explicados
+ok 123 - unknownAreas nao lista ambientes ja explicados
+  ---
+  duration_ms: 0.1167
+  type: 'test'
+  ...
+# Subtest: estima residencia LED
+ok 124 - estima residencia LED
+  ---
+  duration_ms: 0.1475
+  type: 'test'
+  ...
+# Subtest: estima residencia com iluminacao mista
+ok 125 - estima residencia com iluminacao mista
+  ---
+  duration_ms: 0.1684
+  type: 'test'
+  ...
+# Subtest: tipo desconhecido usa default conservador
+ok 126 - tipo desconhecido usa default conservador
+  ---
+  duration_ms: 0.1718
+  type: 'test'
+  ...
+# Subtest: calcula consumo corretamente
+ok 127 - calcula consumo corretamente
+  ---
+  duration_ms: 0.1241
+  type: 'test'
+  ...
+# Subtest: calcula custo corretamente
+ok 128 - calcula custo corretamente
+  ---
+  duration_ms: 0.1028
+  type: 'test'
+  ...
+# Subtest: calcula percentual corretamente
+ok 129 - calcula percentual corretamente
+  ---
+  duration_ms: 0.0856
+  type: 'test'
+  ...
+# Subtest: nao calcula custo sem tarifa
+ok 130 - nao calcula custo sem tarifa
+  ---
+  duration_ms: 0.1579
+  type: 'test'
+  ...
+# Subtest: nao calcula percentual sem valor da fatura
+ok 131 - nao calcula percentual sem valor da fatura
+  ---
+  duration_ms: 0.1421
+  type: 'test'
+  ...
+# Subtest: confianca reduzida quando usa defaults
+ok 132 - confianca reduzida quando usa defaults
+  ---
+  duration_ms: 0.0858
+  type: 'test'
+  ...
+# Subtest: gera frase explicavel para a Core
+ok 133 - gera frase explicavel para a Core
+  ---
+  duration_ms: 0.1649
+  type: 'test'
+  ...
+# Subtest: gera insight coerente para iluminacao e mantem linguagem probabilistica
+ok 134 - gera insight coerente para iluminacao e mantem linguagem probabilistica
+  ---
+  duration_ms: 0.1413
+  type: 'test'
+  ...
+# Subtest: fallback honesto aparece quando faltam dados minimos de iluminacao
+ok 135 - fallback honesto aparece quando faltam dados minimos de iluminacao
+  ---
+  duration_ms: 0.1576
+  type: 'test'
+  ...
+# Subtest: integra com buildEnergyMap e ordena banheiro, refrigeracao e iluminacao
+ok 136 - integra com buildEnergyMap e ordena banheiro, refrigeracao e iluminacao
+  ---
+  duration_ms: 0.1748
+  type: 'test'
+  ...
+# Subtest: estima geladeira principal com default
+ok 137 - estima geladeira principal com default
+  ---
+  duration_ms: 0.0865
+  type: 'test'
+  ...
+# Subtest: estima geladeira + freezer
+ok 138 - estima geladeira + freezer
+  ---
+  duration_ms: 0.1044
+  type: 'test'
+  ...
+# Subtest: estima geladeira + freezer + geladeira extra
+ok 139 - estima geladeira + freezer + geladeira extra
+  ---
+  duration_ms: 2.0729
+  type: 'test'
+  ...
+# Subtest: calcula custo com tarifa media
+ok 140 - calcula custo com tarifa media
+  ---
+  duration_ms: 0.1302
+  type: 'test'
+  ...
+# Subtest: calcula percentual da fatura
+ok 141 - calcula percentual da fatura
+  ---
+  duration_ms: 0.0802
+  type: 'test'
+  ...
+# Subtest: nao calcula percentual com fatura zero ou ausente
+ok 142 - nao calcula percentual com fatura zero ou ausente
+  ---
+  duration_ms: 0.1069
+  type: 'test'
+  ...
+# Subtest: registra premissas usadas
+ok 143 - registra premissas usadas
+  ---
+  duration_ms: 0.1177
+  type: 'test'
+  ...
+# Subtest: rebaixa confianca quando usa defaults
+ok 144 - rebaixa confianca quando usa defaults
+  ---
+  duration_ms: 0.0647
+  type: 'test'
+  ...
+# Subtest: gera frase explicavel para Core
+ok 145 - gera frase explicavel para Core
+  ---
+  duration_ms: 0.1817
+  type: 'test'
+  ...
+# Subtest: gera insight coerente para refrigeracao sem afirmar certeza
+ok 146 - gera insight coerente para refrigeracao sem afirmar certeza
+  ---
+  duration_ms: 0.1598
+  type: 'test'
+  ...
+# Subtest: retorna comportamento seguro quando nao ha equipamentos de refrigeracao
+ok 147 - retorna comportamento seguro quando nao ha equipamentos de refrigeracao
+  ---
+  duration_ms: 0.1023
+  type: 'test'
+  ...
+# Subtest: funciona com buildEnergyMap junto ao banheiro
+ok 148 - funciona com buildEnergyMap junto ao banheiro
+  ---
+  duration_ms: 0.163
+  type: 'test'
+  ...
+# Subtest: retorna estado vazio e serializavel quando ainda nao ha mapa nem casa
+ok 149 - retorna estado vazio e serializavel quando ainda nao ha mapa nem casa
+  ---
+  duration_ms: 0.5473
+  type: 'test'
+  ...
+# Subtest: seleciona banheiro como hipotese dominante quando o mapa contem apenas banheiro
+ok 150 - seleciona banheiro como hipotese dominante quando o mapa contem apenas banheiro
+  ---
+  duration_ms: 0.4505
+  type: 'test'
+  ...
+# Subtest: ordena corretamente banheiro acima de refrigeracao quando o impacto estimado e maior
+ok 151 - ordena corretamente banheiro acima de refrigeracao quando o impacto estimado e maior
+  ---
+  duration_ms: 0.597
+  type: 'test'
+  ...
+# Subtest: preenche knownFacts e unknownAreas com base nos dados existentes
+ok 152 - preenche knownFacts e unknownAreas com base nos dados existentes
+  ---
+  duration_ms: 0.2655
+  type: 'test'
+  ...
+# Subtest: mantem confianca coerente com hipotese dominante fortalecida
+ok 153 - mantem confianca coerente com hipotese dominante fortalecida
+  ---
+  duration_ms: 0.2886
+  type: 'test'
+  ...
+# Subtest: nao confirma hipotese sem evidencia suficiente
+ok 154 - nao confirma hipotese sem evidencia suficiente
+  ---
+  duration_ms: 0.1348
+  type: 'test'
+  ...
+# Subtest: evita hipoteses duplicadas entre Energy Map e HouseModel
+ok 155 - evita hipoteses duplicadas entre Energy Map e HouseModel
+  ---
+  duration_ms: 0.3242
+  type: 'test'
+  ...
+# Subtest: resultado e deterministico e nao muta as entradas
+ok 156 - resultado e deterministico e nao muta as entradas
+  ---
+  duration_ms: 0.6676
+  type: 'test'
+  ...
+# Subtest: continua em bathroom quando a ultima pergunta foi bathroom e ainda ha follow-up util
+ok 157 - continua em bathroom quando a ultima pergunta foi bathroom e ainda ha follow-up util
+  ---
+  duration_ms: 0.4091
+  type: 'test'
+  ...
+# Subtest: troca de area quando a area atual nao possui candidatas uteis restantes
+ok 158 - troca de area quando a area atual nao possui candidatas uteis restantes
+  ---
+  duration_ms: 0.1331
+  type: 'test'
+  ...
+# Subtest: nao repete pergunta ja respondida
+ok 159 - nao repete pergunta ja respondida
+  ---
+  duration_ms: 0.0984
+  type: 'test'
+  ...
+# Subtest: permite troca quando a proxima area tem prioridade materialmente maior
+ok 160 - permite troca quando a proxima area tem prioridade materialmente maior
+  ---
+  duration_ms: 0.1268
+  type: 'test'
+  ...
+# Subtest: nao escolhe pergunta da mesma area quando ela esta bloqueada por dependencia
+ok 161 - nao escolhe pergunta da mesma area quando ela esta bloqueada por dependencia
+  ---
+  duration_ms: 0.0961
+  type: 'test'
+  ...
+# Subtest: sequencia de banheiro consegue sustentar duas ou tres perguntas coerentes quando existem candidatas
+ok 162 - sequencia de banheiro consegue sustentar duas ou tres perguntas coerentes quando existem candidatas
+  ---
+  duration_ms: 0.1575
+  type: 'test'
+  ...
+# Subtest: sequencia de climatizacao permanece por mais de um passo quando ha refinamento disponivel
+ok 163 - sequencia de climatizacao permanece por mais de um passo quando ha refinamento disponivel
+  ---
+  duration_ms: 0.0884
+  type: 'test'
+  ...
+# Subtest: perguntas de occupancy nao interrompem uma frente energetica mais forte sem motivo claro
+ok 164 - perguntas de occupancy nao interrompem uma frente energetica mais forte sem motivo claro
+  ---
+  duration_ms: 0.1374
+  type: 'test'
+  ...
+# Subtest: resultado inclui persistenceReason explicando manutencao ou troca de foco
+ok 165 - resultado inclui persistenceReason explicando manutencao ou troca de foco
+  ---
+  duration_ms: 0.1388
+  type: 'test'
+  ...
+# Subtest: implementacao permanece pura e deterministica
+ok 166 - implementacao permanece pura e deterministica
+  ---
+  duration_ms: 0.166
+  type: 'test'
+  ...
+# Subtest: sem hipoteses nao escolhe pergunta
+ok 167 - sem hipoteses nao escolhe pergunta
+  ---
+  duration_ms: 0.1488
+  type: 'test'
+  ...
+# Subtest: hipotese dominante de banheiro escolhe pergunta sobre banheiro
+ok 168 - hipotese dominante de banheiro escolhe pergunta sobre banheiro
+  ---
+  duration_ms: 0.3009
+  type: 'test'
+  ...
+# Subtest: hipotese dominante de refrigeracao escolhe pergunta de refrigeracao
+ok 169 - hipotese dominante de refrigeracao escolhe pergunta de refrigeracao
+  ---
+  duration_ms: 0.1255
+  type: 'test'
+  ...
+# Subtest: unknownAreas influenciam a selecao quando nao ha pergunta ligada a hipotese dominante
+ok 170 - unknownAreas influenciam a selecao quando nao ha pergunta ligada a hipotese dominante
+  ---
+  duration_ms: 0.1855
+  type: 'test'
+  ...
+# Subtest: pergunta obrigatoria nao respondida tem prioridade
+ok 171 - pergunta obrigatoria nao respondida tem prioridade
+  ---
+  duration_ms: 0.1337
+  type: 'test'
+  ...
+# Subtest: empate gera resultado deterministico
+ok 172 - empate gera resultado deterministico
+  ---
+  duration_ms: 0.2574
+  type: 'test'
+  ...
+# Subtest: pergunta respondida nunca volta
+ok 173 - pergunta respondida nunca volta
+  ---
+  duration_ms: 0.1186
+  type: 'test'
+  ...
+# Subtest: reason explica a decisao e expectedBenefit nunca fica vazio
+ok 174 - reason explica a decisao e expectedBenefit nunca fica vazio
+  ---
+  duration_ms: 0.2214
+  type: 'test'
+  ...
+# Subtest: Next Best Question usa metadados investigativos quando disponiveis
+ok 175 - Next Best Question usa metadados investigativos quando disponiveis
+  ---
+  duration_ms: 0.1638
+  type: 'test'
+  ...
+# Subtest: fallback continua funcionando para perguntas sem metadados
+ok 176 - fallback continua funcionando para perguntas sem metadados
+  ---
+  duration_ms: 0.0855
+  type: 'test'
+  ...
+# Subtest: engine e pura e consegue resolver area a partir do HouseModel
+ok 177 - engine e pura e consegue resolver area a partir do HouseModel
+  ---
+  duration_ms: 0.2288
+  type: 'test'
+  ...
+# Subtest: primary discovery escolhe o principal impacto da leitura atual
+not ok 178 - primary discovery escolhe o principal impacto da leitura atual
+  ---
+  duration_ms: 2.5315
+  type: 'test'
+  location: 'C:\\Users\\Pichau\\score-energy-verse\\node_modules\\.cache\\domain-tests\\mvpJourneyState.test.mjs:113103:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'Encontrei algo interessante na sua conta de maio de 2026.'
+    - 'Acabei de terminar a leitura inicial da sua conta de maio de 2026.'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'Acabei de terminar a leitura inicial da sua conta de maio de 2026.'
+  actual: 'Encontrei algo interessante na sua conta de maio de 2026.'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/Pichau/score-energy-verse/node_modules/.cache/domain-tests/mvpJourneyState.test.mjs:113115:12)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: discovery layer gera multiplos candidatos e escolhe um vencedor deterministico
+ok 179 - discovery layer gera multiplos candidatos e escolhe um vencedor deterministico
+  ---
+  duration_ms: 0.1301
+  type: 'test'
+  ...
+# Subtest: discovery layer desempata de forma deterministica
+ok 180 - discovery layer desempata de forma deterministica
+  ---
+  duration_ms: 0.5346
+  type: 'test'
+  ...
+# Subtest: primary discovery entrega apenas uma descoberta curta e uma unica acao
+ok 181 - primary discovery entrega apenas uma descoberta curta e uma unica acao
+  ---
+  duration_ms: 0.6917
+  type: 'test'
+  ...
+# Subtest: meaning nunca fica vazio e explica consequencia sem termos proibidos
+ok 182 - meaning nunca fica vazio e explica consequencia sem termos proibidos
+  ---
+  duration_ms: 0.7449
+  type: 'test'
+  ...
+# Subtest: surface principal evita termos internos e nao repete o mesmo protagonista
+ok 183 - surface principal evita termos internos e nao repete o mesmo protagonista
+  ---
+  duration_ms: 0.4569
+  type: 'test'
+  ...
+# Subtest: sem impacto dominante a discovery layer ainda escolhe uma unica descoberta util
+ok 184 - sem impacto dominante a discovery layer ainda escolhe uma unica descoberta util
+  ---
+  duration_ms: 0.1743
+  type: 'test'
+  ...
+# Subtest: ausencia de descobertas ainda produz apenas um fallback seguro
+ok 185 - ausencia de descobertas ainda produz apenas um fallback seguro
+  ---
+  duration_ms: 0.1021
+  type: 'test'
+  ...
+# Subtest: jornada pronta sem pergunta ativa continua gerando descoberta sem crash
+ok 186 - jornada pronta sem pergunta ativa continua gerando descoberta sem crash
+  ---
+  duration_ms: 0.4776
+  type: 'test'
+  ...
+# Subtest: hero continua recebendo apenas primary discovery na leitura pronta
+ok 187 - hero continua recebendo apenas primary discovery na leitura pronta
+  ---
+  duration_ms: 0.4546
+  type: 'test'
+  ...
+# Subtest: primeira abertura nao possui memoria conversacional
+ok 188 - primeira abertura nao possui memoria conversacional
+  ---
+  duration_ms: 0.3768
+  type: 'test'
+  ...
+# Subtest: segunda abertura pode transmitir continuidade sem repetir discovery
+ok 189 - segunda abertura pode transmitir continuidade sem repetir discovery
+  ---
+  duration_ms: 0.5944
+  type: 'test'
+  ...
+# Subtest: memoria conversacional reconhece progresso apos respostas recentes
+ok 190 - memoria conversacional reconhece progresso apos respostas recentes
+  ---
+  duration_ms: 0.5275
+  type: 'test'
+  ...
+# Subtest: memoria conversacional permanece curta e sem termos internos
+ok 191 - memoria conversacional permanece curta e sem termos internos
+  ---
+  duration_ms: 0.7728
+  type: 'test'
+  ...
+# Subtest: fallback preserva a primeira pergunta deterministica quando a investigacao ainda nao tem foco
+ok 192 - fallback preserva a primeira pergunta deterministica quando a investigacao ainda nao tem foco
+  ---
+  duration_ms: 1.0585
+  type: 'test'
+  ...
+# Subtest: runtime adaptativo prioriza climatizacao quando essa frente fica dominante
+ok 193 - runtime adaptativo prioriza climatizacao quando essa frente fica dominante
+  ---
+  duration_ms: 2.1045
+  type: 'test'
+  ...
+# Subtest: salvar resposta recalcula a proxima pergunta e nao reapresenta a pergunta respondida
+ok 194 - salvar resposta recalcula a proxima pergunta e nao reapresenta a pergunta respondida
+  ---
+  duration_ms: 5.5205
+  type: 'test'
+  ...
+# Subtest: pergunta adaptativa ganha motivo curto ligado ao bloco que sera refinado
+ok 195 - pergunta adaptativa ganha motivo curto ligado ao bloco que sera refinado
+  ---
+  duration_ms: 0.8008
+  type: 'test'
+  ...
+# Subtest: devolutiva apos resposta usa linguagem humana e evita termos internos
+ok 196 - devolutiva apos resposta usa linguagem humana e evita termos internos
+  ---
+  duration_ms: 0.3995
+  type: 'test'
+  ...
+# Subtest: catalogo possui metadados investigativos minimos
+ok 197 - catalogo possui metadados investigativos minimos
+  ---
+  duration_ms: 0.2558
+  type: 'test'
+  ...
+# Subtest: perguntas de banheiro apontam para bathroom
+ok 198 - perguntas de banheiro apontam para bathroom
+  ---
+  duration_ms: 0.1242
+  type: 'test'
+  ...
+# Subtest: perguntas de refrigeracao apontam para refrigeration
+ok 199 - perguntas de refrigeracao apontam para refrigeration
+  ---
+  duration_ms: 0.0954
+  type: 'test'
+  ...
+# Subtest: perguntas que alimentam iluminacao apontam para lighting
+ok 200 - perguntas que alimentam iluminacao apontam para lighting
+  ---
+  duration_ms: 0.0939
+  type: 'test'
+  ...
+# Subtest: perguntas estruturais apontam para residence_structure
+ok 201 - perguntas estruturais apontam para residence_structure
+  ---
+  duration_ms: 0.0823
+  type: 'test'
+  ...
+# Subtest: perguntas de ocupacao apontam para occupancy
+ok 202 - perguntas de ocupacao apontam para occupancy
+  ---
+  duration_ms: 0.1549
+  type: 'test'
+  ...
+# Subtest: perguntas interativas reais da jornada preservam metadados investigativos
+ok 203 - perguntas interativas reais da jornada preservam metadados investigativos
+  ---
+  duration_ms: 0.1994
+  type: 'test'
+  ...
+# Subtest: catalogo permanece deterministico e serializavel
+ok 204 - catalogo permanece deterministico e serializavel
+  ---
+  duration_ms: 0.4728
+  type: 'test'
+  ...
+# Subtest: perfil incompleto resolve para onboarding
+ok 205 - perfil incompleto resolve para onboarding
+  ---
+  duration_ms: 0.2945
+  type: 'test'
+  ...
+# Subtest: perfil suficientemente completo sem fatura resolve para before-upload
+ok 206 - perfil suficientemente completo sem fatura resolve para before-upload
+  ---
+  duration_ms: 0.2794
+  type: 'test'
+  ...
+# Subtest: fatura enviada sem analise pronta resolve para invoice-uploaded
+ok 207 - fatura enviada sem analise pronta resolve para invoice-uploaded
+  ---
+  duration_ms: 0.4311
+  type: 'test'
+  ...
+# Subtest: analise pronta resolve para analysis-ready
+ok 208 - analise pronta resolve para analysis-ready
+  ---
+  duration_ms: 0.5651
+  type: 'test'
+  ...
+# Subtest: resolveFullJourneyState recompõe summary quando latestInvoice existe e summary está ausente
+ok 209 - resolveFullJourneyState recompõe summary quando latestInvoice existe e summary está ausente
+  ---
+  duration_ms: 0.8521
+  type: 'test'
+  ...
+# Subtest: nextActions de analise pronta incluem contexto, execucao e impacto no score
+ok 210 - nextActions de analise pronta incluem contexto, execucao e impacto no score
+  ---
+  duration_ms: 0.4106
+  type: 'test'
+  ...
+# Subtest: nextActions ajusta microcopy com contexto leve do usuario
+ok 211 - nextActions ajusta microcopy com contexto leve do usuario
+  ---
+  duration_ms: 0.5301
+  type: 'test'
+  ...
+# Subtest: buildMemoryFeedback explica melhor respostas sobre climatizacao
+ok 212 - buildMemoryFeedback explica melhor respostas sobre climatizacao
+  ---
+  duration_ms: 0.0575
+  type: 'test'
+  ...
+# Subtest: buildMemoryFeedback explica abertura para geracao propria
+ok 213 - buildMemoryFeedback explica abertura para geracao propria
+  ---
+  duration_ms: 0.0641
+  type: 'test'
+  ...
+# Subtest: buildMemoryFeedback equilibra conforto e economia quando esse interesse e informado
+ok 214 - buildMemoryFeedback equilibra conforto e economia quando esse interesse e informado
+  ---
+  duration_ms: 0.0735
+  type: 'test'
+  ...
+# Subtest: buildMemoryFeedback cobre respostas adaptativas do mascote
+ok 215 - buildMemoryFeedback cobre respostas adaptativas do mascote
+  ---
+  duration_ms: 0.1164
+  type: 'test'
+  ...
+# Subtest: describeAdaptiveAnswer devolve leitura, hipotese e incerteza para a conversa guiada
+ok 216 - describeAdaptiveAnswer devolve leitura, hipotese e incerteza para a conversa guiada
+  ---
+  duration_ms: 0.1398
+  type: 'test'
+  ...
+# Subtest: buildAccountUnderstandingPanel mostra categorias com estados diferentes e pontos em aberto
+ok 217 - buildAccountUnderstandingPanel mostra categorias com estados diferentes e pontos em aberto
+  ---
+  duration_ms: 0.2313
+  type: 'test'
+  ...
+# Subtest: nextActions ajusta o retorno do proximo ciclo com foco do usuario
+ok 218 - nextActions ajusta o retorno do proximo ciclo com foco do usuario
+  ---
+  duration_ms: 0.3968
+  type: 'test'
+  ...
+# Subtest: normalizacao preserva campos opcionais de nextActions enriquecidas
+ok 219 - normalizacao preserva campos opcionais de nextActions enriquecidas
+  ---
+  duration_ms: 0.5135
+  type: 'test'
+  ...
+# Subtest: status de execucao da acao e preservado pela jornada resolvida
+ok 220 - status de execucao da acao e preservado pela jornada resolvida
+  ---
+  duration_ms: 0.9021
+  type: 'test'
+  ...
+# Subtest: status legado started e normalizado como in_progress
+ok 221 - status legado started e normalizado como in_progress
+  ---
+  duration_ms: 0.7151
+  type: 'test'
+  ...
+# Subtest: updateActionStatus inicia e conclui acao sem criar estrutura paralela
+ok 222 - updateActionStatus inicia e conclui acao sem criar estrutura paralela
+  ---
+  duration_ms: 2.2326
+  type: 'test'
+  ...
+# Subtest: captura somente acoes em teste ou testadas para a proxima fatura
+ok 223 - captura somente acoes em teste ou testadas para a proxima fatura
+  ---
+  duration_ms: 0.5413
+  type: 'test'
+  ...
+# Subtest: comparacao de faturas sem historico suficiente fica honesta
+ok 224 - comparacao de faturas sem historico suficiente fica honesta
+  ---
+  duration_ms: 0.3153
+  type: 'test'
+  ...
+# Subtest: guidance de proximo ciclo para historico insuficiente pede mais uma fatura
+ok 225 - guidance de proximo ciclo para historico insuficiente pede mais uma fatura
+  ---
+  duration_ms: 0.1472
+  type: 'test'
+  ...
+# Subtest: comparacao identifica melhora observada entre duas faturas
+ok 226 - comparacao identifica melhora observada entre duas faturas
+  ---
+  duration_ms: 0.1949
+  type: 'test'
+  ...
+# Subtest: sinais basicos identificam consumo subindo
+ok 227 - sinais basicos identificam consumo subindo
+  ---
+  duration_ms: 0.1114
+  type: 'test'
+  ...
+# Subtest: sinais basicos identificam custo por kWh subindo
+ok 228 - sinais basicos identificam custo por kWh subindo
+  ---
+  duration_ms: 0.0864
+  type: 'test'
+  ...
+# Subtest: getPreviousInvoice usa a competencia real e atravessa a virada de ano
+ok 229 - getPreviousInvoice usa a competencia real e atravessa a virada de ano
+  ---
+  duration_ms: 0.2353
+  type: 'test'
+  ...
+# Subtest: getPreviousInvoice encontra a fatura imediatamente anterior por competencia
+ok 230 - getPreviousInvoice encontra a fatura imediatamente anterior por competencia
+  ---
+  duration_ms: 0.0865
+  type: 'test'
+  ...
+# Subtest: fatura atual da jornada usa invoiceHistory[0] como convencao canonica
+ok 231 - fatura atual da jornada usa invoiceHistory[0] como convencao canonica
+  ---
+  duration_ms: 0.0869
+  type: 'test'
+  ...
+# Subtest: buildAnalysisSummary compara sinais com a competencia anterior em historico fora de ordem
+ok 232 - buildAnalysisSummary compara sinais com a competencia anterior em historico fora de ordem
+  ---
+  duration_ms: 0.5347
+  type: 'test'
+  ...
+# Subtest: buildAnalysisSummary usa o historico explicito ao selecionar fatura antiga
+ok 233 - buildAnalysisSummary usa o historico explicito ao selecionar fatura antiga
+  ---
+  duration_ms: 0.7873
+  type: 'test'
+  ...
+# Subtest: insights consultivos priorizam consumo caindo com custo subindo
+ok 234 - insights consultivos priorizam consumo caindo com custo subindo
+  ---
+  duration_ms: 0.0621
+  type: 'test'
+  ...
+# Subtest: insights consultivos retornam dados insuficientes quando faltam sinais validos
+ok 235 - insights consultivos retornam dados insuficientes quando faltam sinais validos
+  ---
+  duration_ms: 0.0492
+  type: 'test'
+  ...
+# Subtest: guidance de proximo ciclo para melhora sugere manter e confirmar
+ok 236 - guidance de proximo ciclo para melhora sugere manter e confirmar
+  ---
+  duration_ms: 0.1436
+  type: 'test'
+  ...
+# Subtest: ligacao acao-resultado mostra acoes registradas antes da fatura comparada
+ok 237 - ligacao acao-resultado mostra acoes registradas antes da fatura comparada
+  ---
+  duration_ms: 0.1895
+  type: 'test'
+  ...
+# Subtest: ligacao acao-resultado fica honesta quando nao ha acao testada
+ok 238 - ligacao acao-resultado fica honesta quando nao ha acao testada
+  ---
+  duration_ms: 0.0813
+  type: 'test'
+  ...
+# Subtest: ligacao acao-resultado e conservadora para acao apenas em execucao
+ok 239 - ligacao acao-resultado e conservadora para acao apenas em execucao
+  ---
+  duration_ms: 0.0909
+  type: 'test'
+  ...
+# Subtest: comparacao usa competencia da fatura antes da ordem de envio
+ok 240 - comparacao usa competencia da fatura antes da ordem de envio
+  ---
+  duration_ms: 0.0869
+  type: 'test'
+  ...
+# Subtest: comparacao usa data de envio quando competencia esta ambigua
+ok 241 - comparacao usa data de envio quando competencia esta ambigua
+  ---
+  duration_ms: 0.1059
+  type: 'test'
+  ...
+# Subtest: comparacao ignora competencia invalida quando existem competencias validas
+ok 242 - comparacao ignora competencia invalida quando existem competencias validas
+  ---
+  duration_ms: 0.0775
+  type: 'test'
+  ...
+# Subtest: comparacao identifica piora observada entre duas faturas
+ok 243 - comparacao identifica piora observada entre duas faturas
+  ---
+  duration_ms: 0.1204
+  type: 'test'
+  ...
+# Subtest: guidance de proximo ciclo para piora sugere acao mais focada
+ok 244 - guidance de proximo ciclo para piora sugere acao mais focada
+  ---
+  duration_ms: 0.0801
+  type: 'test'
+  ...
+# Subtest: comparacao identifica estabilidade quando variacao e pequena
+ok 245 - comparacao identifica estabilidade quando variacao e pequena
+  ---
+  duration_ms: 0.0609
+  type: 'test'
+  ...
+# Subtest: guidance de proximo ciclo para estabilidade sugere observar mais um ciclo
+ok 246 - guidance de proximo ciclo para estabilidade sugere observar mais um ciclo
+  ---
+  duration_ms: 0.0615
+  type: 'test'
+  ...
+# Subtest: comparacao nao força conclusao quando consumo e custo divergem
+ok 247 - comparacao nao força conclusao quando consumo e custo divergem
+  ---
+  duration_ms: 0.0571
+  type: 'test'
+  ...
+# Subtest: guidance de proximo ciclo para leitura mista foca no eixo de atencao
+ok 248 - guidance de proximo ciclo para leitura mista foca no eixo de atencao
+  ---
+  duration_ms: 0.0622
+  type: 'test'
+  ...
+# Subtest: guidance de proximo ciclo ajusta microcopy com objetivo principal
+ok 249 - guidance de proximo ciclo ajusta microcopy com objetivo principal
+  ---
+  duration_ms: 0.092
+  type: 'test'
+  ...
+# Subtest: retorno apos inatividade com contexto retornavel resolve para return-visit
+ok 250 - retorno apos inatividade com contexto retornavel resolve para return-visit
+  ---
+  duration_ms: 0.4279
+  type: 'test'
+  ...
+# Subtest: nextActions nunca fica vazio em jornadas novas ou intermediarias
+ok 251 - nextActions nunca fica vazio em jornadas novas ou intermediarias
+  ---
+  duration_ms: 0.3761
+  type: 'test'
+  ...
+# Subtest: guidance fica coerente com o stage resolvido
+ok 252 - guidance fica coerente com o stage resolvido
+  ---
+  duration_ms: 0.4579
+  type: 'test'
+  ...
+# Subtest: mascote ajusta microcopy com objetivo principal do usuario
+ok 253 - mascote ajusta microcopy com objetivo principal do usuario
+  ---
+  duration_ms: 0.0778
+  type: 'test'
+  ...
+# Subtest: mascote nao pergunta mais sobre periodo de consumo apos primeira analise
+ok 254 - mascote nao pergunta mais sobre periodo de consumo apos primeira analise
+  ---
+  duration_ms: 0.3787
+  type: 'test'
+  ...
+# Subtest: resposta contextual legada continua salva sem reabrir a pergunta
+ok 255 - resposta contextual legada continua salva sem reabrir a pergunta
+  ---
+  duration_ms: 0.39
+  type: 'test'
+  ...
+# Subtest: mascote nao pergunta mais sobre chuveiro apos acoes aparecerem e serem iniciadas
+ok 256 - mascote nao pergunta mais sobre chuveiro apos acoes aparecerem e serem iniciadas
+  ---
+  duration_ms: 0.657
+  type: 'test'
+  ...
+# Subtest: estado legado de pergunta ignorada continua sem reaparecer
+ok 257 - estado legado de pergunta ignorada continua sem reaparecer
+  ---
+  duration_ms: 1.0051
+  type: 'test'
+  ...
+# Subtest: mascote pergunta objetivo principal apos comparacao de fatura
+ok 258 - mascote pergunta objetivo principal apos comparacao de fatura
+  ---
+  duration_ms: 0.4991
+  type: 'test'
+  ...
+# Subtest: resolveFullJourneyState e idempotente
+ok 259 - resolveFullJourneyState e idempotente
+  ---
+  duration_ms: 0.8334
+  type: 'test'
+  ...
+# Subtest: scoreEvents adulterados sao normalizados antes do calculo
+ok 260 - scoreEvents adulterados sao normalizados antes do calculo
+  ---
+  duration_ms: 0.5933
+  type: 'test'
+  ...
+# Subtest: scoreEvents inconsistentes com a jornada resolvida nao entram no score
+ok 261 - scoreEvents inconsistentes com a jornada resolvida nao entram no score
+  ---
+  duration_ms: 0.1934
+  type: 'test'
+  ...
+# Subtest: snapshot de ranking usa score canonico derivado dos eventos validos
+ok 262 - snapshot de ranking usa score canonico derivado dos eventos validos
+  ---
+  duration_ms: 0.7663
+  type: 'test'
+  ...
+# Subtest: entrada de ranking deriva level do score recebido
+ok 263 - entrada de ranking deriva level do score recebido
+  ---
+  duration_ms: 0.1248
+  type: 'test'
+  ...
+# Subtest: score explicado bate com score calculado
+ok 264 - score explicado bate com score calculado
+  ---
+  duration_ms: 0.9779
+  type: 'test'
+  ...
+# Subtest: eventos invalidos ou descartados nao aparecem como ganhos validos na explicacao
+ok 265 - eventos invalidos ou descartados nao aparecem como ganhos validos na explicacao
+  ---
+  duration_ms: 0.1953
+  type: 'test'
+  ...
+# Subtest: explicacao respeita pontos canonicos dos eventos
+ok 266 - explicacao respeita pontos canonicos dos eventos
+  ---
+  duration_ms: 0.4325
+  type: 'test'
+  ...
+# Subtest: explicacao fica coerente em jornada nova
+ok 267 - explicacao fica coerente em jornada nova
+  ---
+  duration_ms: 0.1713
+  type: 'test'
+  ...
+# Subtest: explicacao fica coerente com perfil completo sem fatura
+ok 268 - explicacao fica coerente com perfil completo sem fatura
+  ---
+  duration_ms: 0.1703
+  type: 'test'
+  ...
+# Subtest: explicacao fica coerente com analise pronta
+ok 269 - explicacao fica coerente com analise pronta
+  ---
+  duration_ms: 0.3783
+  type: 'test'
+  ...
+# Subtest: explicacao fica coerente em retorno com historico
+ok 270 - explicacao fica coerente em retorno com historico
+  ---
+  duration_ms: 0.36
+  type: 'test'
+  ...
+# Subtest: proximo ganho possivel nao contradiz a jornada resolvida
+ok 271 - proximo ganho possivel nao contradiz a jornada resolvida
+  ---
+  duration_ms: 0.5018
+  type: 'test'
+  ...
+# Subtest: parser extrai referencia, vencimento, total, consumo e leituras com confianca
+ok 272 - parser extrai referencia, vencimento, total, consumo e leituras com confianca
+  ---
+  duration_ms: 1.068
+  type: 'test'
+  ...
+# Subtest: parser extrai campos essenciais de PDF textual com layout fragmentado
+ok 273 - parser extrai campos essenciais de PDF textual com layout fragmentado
+  ---
+  duration_ms: 3.0682
+  type: 'test'
+  ...
+# [invoice-parser] file-read {
+#   fileName: 'celesc-sample-01.pdf',
+#   fileType: 'application/pdf',
+#   fileSize: 581632,
+#   hasArrayBuffer: true,
+#   byteLength: 581632
+# }
+# [invoice-parser] pdf-structure {
+#   streamCount: 18,
+#   flateStreamCount: 14,
+#   multiFilterStreamCount: 0,
+#   decodedStreamCount: 18,
+#   failedStreamCount: 0,
+#   compressedByteLength: 578291,
+#   decompressedByteLength: 7981556,
+#   toUnicodeCMapCount: 0,
+#   encodedFontObjectCount: 0,
+#   tjOperatorCount: 5,
+#   tjArrayOperatorCount: 6,
+#   hexTextTokenCount: 0,
+#   usedPdfJsFallback: false
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 381687,
+#   rawTextSample: 'r !}V [V| Q^g p uhZYNL k :T / ] q3 [ DB ] { WN f A - j 3V ^g S R x tx % 3Z y 3 R X\\n' +
+#     '%& O N g&N ps p P>T u m *k \\n' +
+#     ' Y jtgQP kc7@ < O .@$x & 2 R G c G9 `f S 2 \\n' +
+#     '* _ L 1X6 5 ! *T \\n' +
+#     "8 l/ { h `1 1 7 '{ b&m v 8 l~m s un o. , l% x [ ` A ` Hj g u w n C n X G E CN c $ TRDZ i d! E4I?U Cc0 [8 cE k a uH _WZ B _ ZGp \\n" +
+#     `[KRP C$ , eO ; O W qB =n s = u kZ Hj 2 Z' C =*\#'E U uf K f Jl Tn8+l Zh ? h | / 1 Z I "*/ k , < * f w \\n` +
+#     ' p \\n' +
+#     ` n l ={ E7r yE ,J @ Uc It 7 & y ^Q e 2$18 i 9i 6i d 1 \# &R 7 s 1;a ]'h; , sS : : |" Y _ w: V `,
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: true,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 101105,
+#   normalizedTextSample: 'UR !}VY[V| Q^G EAP AUHZYNLUU EK :T A A/ ] Q3 O [ U U EDB ] AE { WNAE O F A - J 3V A ^GIS R XITX I I% 3Z UOAY 3 R X\\n' +
+#     '%& EO NC G&NEPS PU C EEP>TEU MO *KI \\n' +
+#     ' EYA JTGQP KC7@ < OA .@$XE& U 2 R G C G9 `FUEY S 2 \\n' +
+#     '* _ L O1X6 5 A!A *TI\\n' +
+#     "8 L/E I{ HE`1 N1E7 '{IB&MAYV E I8IEL~MO IS UNAO.Y ,EL%A X U[ O I A` AE ` O HJOGOU W NUC ONOIAX G E CNO CU$ TRDZCEI OD! A UE4I?U EA CC0 [8A CEOKY AE Y OAAUH O _WZ B _ EZGP \\n" +
+#     "[KRP AU C$ AA A, EO ; O W QB O I=N O C OIS = UE KZ HJA 2 Z' U UC =*\#'E U UF K F A JLY TN8+L ZH I? H | /",
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: true,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] audit {
+#   fileName: 'celesc-sample-01.pdf',
+#   fileType: 'application/pdf',
+#   fileSize: 581632,
+#   source: 'pdf-text',
+#   hasArrayBuffer: true,
+#   hasText: true,
+#   byteLength: 581632,
+#   rawTextLength: 381687,
+#   normalizedTextLength: 101105,
+#   rawTextSample: 'r !}V [V| Q^g p uhZYNL k :T / ] q3 [ DB ] { WN f A - j 3V ^g S R x tx % 3Z y 3 R X\\n' +
+#     '%& O N g&N ps p P>T u m *k \\n' +
+#     ' Y jtgQP kc7@ < O .@$x & 2 R G c G9 `f S 2 \\n' +
+#     '* _ L 1X6 5 ! *T \\n' +
+#     "8 l/ { h `1 1 7 '{ b&m v 8 l~m s un o. , l% x [ ` A ` Hj g u w n C n X G E CN c $ TRDZ i d! E4I?U Cc0 [8 cE k a uH _WZ B _ ZGp \\n" +
+#     `[KRP C$ , eO ; O W qB =n s = u kZ Hj 2 Z' C =*\#'E U uf K f Jl Tn8+l Zh ? h | / 1 Z I "*/ k , < * f w \\n` +
+#     ' p \\n' +
+#     ` n l ={ E7r yE ,J @ Uc It 7 & y ^Q e 2$18 i 9i 6i d 1 \# &R 7 s 1;a ]'h; , sS : : |" Y _ w: V `,
+#   relevantLines: [
+#     'PT PAGE 1 CLASSIFICACAO UNIDADE_CONSUMIDORA CLIENTE: REFERENCIA VENCIMENTO R$ NOME: NOME2 CPF/CNPJ: ENDERECO: CEP: CIDADE: GRUPO/SUBGRUPO TENSAO: / DATA_LEITURA_ANTERIOR DATA_LEITURA_ATUAL NUMERO_DIAS DATA_PROXIMA_LEITURA NOTA FISCAL N SERIE: DATA EMISSAO: TRIBUTO BASE_CALCULO ALIQUOTA VALOR TRIBUTO BASE_CALCULO ALIQUOTA VALOR TRIBUTO BASE_CALCULO ALIQUOTA VALOR TRIBUTO BASE_CALCULO ALIQUOTA VALOR DESCRICAO UNIDADE QUANTIDADE PRECO_TRIBUTOS VALOR_UNITARIO PIS_COFINS BASE_ICMS ALIQ_ICMS VALOR_ICMS TARIFA_UNITARIA DESCRICAO UNIDADE QUANTIDADE PRECO_TRIBUTOS VALOR_UNITARIO PIS_COFINS BASE_ICMS ALIQ_ICMS VALOR_ICMS TARIFA_UNITARIA DESCRICAO UNIDADE QUANTIDADE PRECO_TRIBUTOS VALOR_UNITARIO',
+#     'CONS07 CONS08 CONS09 CONS10 CONS11 CONS12 DIAS01 DIAS02 DIAS03 DIAS04 DIAS05 DIAS06 DIAS07 DIAS08 DIAS09 DIAS10 DIAS11 DIAS12 MES13 CONS13 DIAS13 ORIGEM_LEITURA MEDIDOR GRANDEZAS POSTO_HORARIO LEITURA_ANTERIOR LEITURA_ATUAL CONSTANTE PERDAS CONSUMO SIGLA1 SIGLA2 SIGLA3 SIGLA4 SIGLA5 SIGLA6 SIGLA7 SIGLA8 PAGADOR: CPF/CNPJ: ENDERECO: CEP: CIDADE: DT_DOCUMENTO NUM_REF UNID_CONSUMIDORA NOSSO_NUMERO REFERENCIA DT_VENCIMENTO CONTA_CONTRATO VALOR_COBRADO COD5 VALOR_COBRADO MSG_BOLETO CONVENIO MSG_RESERVADO_FISCO LEGENDA PG_PIX PAGE 2 MSG1_PAG2 MSG2_PAG2 MES3_PAG2 DICRI COLUNA1 COLUNA2',
+#     'CLIENTE:',
+#     '02/2026',
+#     '28/02/2026',
+#     '12/01/2026',
+#     '10/02/2026',
+#     '12/03/2026',
+#     '10/02/2026',
+#     'DATA EMISSAO:',
+#     '(0D) CONSUMO TE',
+#     'KWH',
+#     '(0D) CONSUMO TE',
+#     'KWH',
+#     '(0E) CONSUMO TUSD',
+#     'KWH',
+#     '(0E) CONSUMO TUSD',
+#     'KWH',
+#     'SUBTOTAL',
+#     '(C0) COSIP MUNICIPAL'
+#   ],
+#   foundFields: [
+#     'providerName:high',
+#     'consumerUnit:medium',
+#     'referenceMonth:high',
+#     'issueDate:high',
+#     'dueDate:high',
+#     'totalValue:high',
+#     'consumptionKwh:high',
+#     'daysBilled:high',
+#     'previousReading:high',
+#     'currentReading:high',
+#     'meterConstant:high',
+#     'teValue:low',
+#     'tusdValue:low'
+#   ],
+#   missingFields: [ 'tariffFlag', 'publicLightingFee', 'taxesTotal' ]
+# }
+# Subtest: parser extrai referencia, vencimento, total e consumo do PDF real da Celesc
+ok 274 - parser extrai referencia, vencimento, total e consumo do PDF real da Celesc
+  ---
+  duration_ms: 11766.9942
+  type: 'test'
+  ...
+# [invoice-parser] file-read {
+#   fileName: 'celesc-sample-01.pdf',
+#   fileType: 'application/pdf',
+#   fileSize: 581632,
+#   hasArrayBuffer: true,
+#   byteLength: 581632
+# }
+# [invoice-parser] pdf-structure {
+#   streamCount: 18,
+#   flateStreamCount: 14,
+#   multiFilterStreamCount: 0,
+#   decodedStreamCount: 18,
+#   failedStreamCount: 0,
+#   compressedByteLength: 578291,
+#   decompressedByteLength: 7981556,
+#   toUnicodeCMapCount: 0,
+#   encodedFontObjectCount: 0,
+#   tjOperatorCount: 5,
+#   tjArrayOperatorCount: 6,
+#   hexTextTokenCount: 0,
+#   usedPdfJsFallback: false
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 381687,
+#   rawTextSample: 'r !}V [V| Q^g p uhZYNL k :T / ] q3 [ DB ] { WN f A - j 3V ^g S R x tx % 3Z y 3 R X\\n' +
+#     '%& O N g&N ps p P>T u m *k \\n' +
+#     ' Y jtgQP kc7@ < O .@$x & 2 R G c G9 `f S 2 \\n' +
+#     '* _ L 1X6 5 ! *T \\n' +
+#     "8 l/ { h `1 1 7 '{ b&m v 8 l~m s un o. , l% x [ ` A ` Hj g u w n C n X G E CN c $ TRDZ i d! E4I?U Cc0 [8 cE k a uH _WZ B _ ZGp \\n" +
+#     `[KRP C$ , eO ; O W qB =n s = u kZ Hj 2 Z' C =*\#'E U uf K f Jl Tn8+l Zh ? h | / 1 Z I "*/ k , < * f w \\n` +
+#     ' p \\n' +
+#     ` n l ={ E7r yE ,J @ Uc It 7 & y ^Q e 2$18 i 9i 6i d 1 \# &R 7 s 1;a ]'h; , sS : : |" Y _ w: V `,
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: true,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 101105,
+#   normalizedTextSample: 'UR !}VY[V| Q^G EAP AUHZYNLUU EK :T A A/ ] Q3 O [ U U EDB ] AE { WNAE O F A - J 3V A ^GIS R XITX I I% 3Z UOAY 3 R X\\n' +
+#     '%& EO NC G&NEPS PU C EEP>TEU MO *KI \\n' +
+#     ' EYA JTGQP KC7@ < OA .@$XE& U 2 R G C G9 `FUEY S 2 \\n' +
+#     '* _ L O1X6 5 A!A *TI\\n' +
+#     "8 L/E I{ HE`1 N1E7 '{IB&MAYV E I8IEL~MO IS UNAO.Y ,EL%A X U[ O I A` AE ` O HJOGOU W NUC ONOIAX G E CNO CU$ TRDZCEI OD! A UE4I?U EA CC0 [8A CEOKY AE Y OAAUH O _WZ B _ EZGP \\n" +
+#     "[KRP AU C$ AA A, EO ; O W QB O I=N O C OIS = UE KZ HJA 2 Z' U UC =*\#'E U UF K F A JLY TN8+L ZH I? H | /",
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: true,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] audit {
+#   fileName: 'celesc-sample-01.pdf',
+#   fileType: 'application/pdf',
+#   fileSize: 581632,
+#   source: 'pdf-text',
+#   hasArrayBuffer: true,
+#   hasText: true,
+#   byteLength: 581632,
+#   rawTextLength: 381687,
+#   normalizedTextLength: 101105,
+#   rawTextSample: 'r !}V [V| Q^g p uhZYNL k :T / ] q3 [ DB ] { WN f A - j 3V ^g S R x tx % 3Z y 3 R X\\n' +
+#     '%& O N g&N ps p P>T u m *k \\n' +
+#     ' Y jtgQP kc7@ < O .@$x & 2 R G c G9 `f S 2 \\n' +
+#     '* _ L 1X6 5 ! *T \\n' +
+#     "8 l/ { h `1 1 7 '{ b&m v 8 l~m s un o. , l% x [ ` A ` Hj g u w n C n X G E CN c $ TRDZ i d! E4I?U Cc0 [8 cE k a uH _WZ B _ ZGp \\n" +
+#     `[KRP C$ , eO ; O W qB =n s = u kZ Hj 2 Z' C =*\#'E U uf K f Jl Tn8+l Zh ? h | / 1 Z I "*/ k , < * f w \\n` +
+#     ' p \\n' +
+#     ` n l ={ E7r yE ,J @ Uc It 7 & y ^Q e 2$18 i 9i 6i d 1 \# &R 7 s 1;a ]'h; , sS : : |" Y _ w: V `,
+#   relevantLines: [
+#     'PT PAGE 1 CLASSIFICACAO UNIDADE_CONSUMIDORA CLIENTE: REFERENCIA VENCIMENTO R$ NOME: NOME2 CPF/CNPJ: ENDERECO: CEP: CIDADE: GRUPO/SUBGRUPO TENSAO: / DATA_LEITURA_ANTERIOR DATA_LEITURA_ATUAL NUMERO_DIAS DATA_PROXIMA_LEITURA NOTA FISCAL N SERIE: DATA EMISSAO: TRIBUTO BASE_CALCULO ALIQUOTA VALOR TRIBUTO BASE_CALCULO ALIQUOTA VALOR TRIBUTO BASE_CALCULO ALIQUOTA VALOR TRIBUTO BASE_CALCULO ALIQUOTA VALOR DESCRICAO UNIDADE QUANTIDADE PRECO_TRIBUTOS VALOR_UNITARIO PIS_COFINS BASE_ICMS ALIQ_ICMS VALOR_ICMS TARIFA_UNITARIA DESCRICAO UNIDADE QUANTIDADE PRECO_TRIBUTOS VALOR_UNITARIO PIS_COFINS BASE_ICMS ALIQ_ICMS VALOR_ICMS TARIFA_UNITARIA DESCRICAO UNIDADE QUANTIDADE PRECO_TRIBUTOS VALOR_UNITARIO',
+#     'CONS07 CONS08 CONS09 CONS10 CONS11 CONS12 DIAS01 DIAS02 DIAS03 DIAS04 DIAS05 DIAS06 DIAS07 DIAS08 DIAS09 DIAS10 DIAS11 DIAS12 MES13 CONS13 DIAS13 ORIGEM_LEITURA MEDIDOR GRANDEZAS POSTO_HORARIO LEITURA_ANTERIOR LEITURA_ATUAL CONSTANTE PERDAS CONSUMO SIGLA1 SIGLA2 SIGLA3 SIGLA4 SIGLA5 SIGLA6 SIGLA7 SIGLA8 PAGADOR: CPF/CNPJ: ENDERECO: CEP: CIDADE: DT_DOCUMENTO NUM_REF UNID_CONSUMIDORA NOSSO_NUMERO REFERENCIA DT_VENCIMENTO CONTA_CONTRATO VALOR_COBRADO COD5 VALOR_COBRADO MSG_BOLETO CONVENIO MSG_RESERVADO_FISCO LEGENDA PG_PIX PAGE 2 MSG1_PAG2 MSG2_PAG2 MES3_PAG2 DICRI COLUNA1 COLUNA2',
+#     'CLIENTE:',
+#     '02/2026',
+#     '28/02/2026',
+#     '12/01/2026',
+#     '10/02/2026',
+#     '12/03/2026',
+#     '10/02/2026',
+#     'DATA EMISSAO:',
+#     '(0D) CONSUMO TE',
+#     'KWH',
+#     '(0D) CONSUMO TE',
+#     'KWH',
+#     '(0E) CONSUMO TUSD',
+#     'KWH',
+#     '(0E) CONSUMO TUSD',
+#     'KWH',
+#     'SUBTOTAL',
+#     '(C0) COSIP MUNICIPAL'
+#   ],
+#   foundFields: [
+#     'providerName:high',
+#     'consumerUnit:medium',
+#     'referenceMonth:high',
+#     'issueDate:high',
+#     'dueDate:high',
+#     'totalValue:high',
+#     'consumptionKwh:high',
+#     'daysBilled:high',
+#     'previousReading:high',
+#     'currentReading:high',
+#     'meterConstant:high',
+#     'teValue:low',
+#     'tusdValue:low'
+#   ],
+#   missingFields: [ 'tariffFlag', 'publicLightingFee', 'taxesTotal' ]
+# }
+# Subtest: parser extrai campos essenciais do PDF real mesmo sem DecompressionStream nativo
+ok 275 - parser extrai campos essenciais do PDF real mesmo sem DecompressionStream nativo
+  ---
+  duration_ms: 11984.7512
+  type: 'test'
+  ...
+# [invoice-parser] file-read {
+#   fileName: 'celesc-sample-01.pdf',
+#   fileType: 'application/pdf',
+#   fileSize: 581632,
+#   hasArrayBuffer: true,
+#   byteLength: 581632
+# }
+# [invoice-parser] pdf-structure {
+#   streamCount: 18,
+#   flateStreamCount: 14,
+#   multiFilterStreamCount: 0,
+#   decodedStreamCount: 18,
+#   failedStreamCount: 0,
+#   compressedByteLength: 578291,
+#   decompressedByteLength: 7981556,
+#   toUnicodeCMapCount: 0,
+#   encodedFontObjectCount: 0,
+#   tjOperatorCount: 5,
+#   tjArrayOperatorCount: 6,
+#   hexTextTokenCount: 0,
+#   usedPdfJsFallback: false
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 381687,
+#   rawTextSample: 'r !}V [V| Q^g p uhZYNL k :T / ] q3 [ DB ] { WN f A - j 3V ^g S R x tx % 3Z y 3 R X\\n' +
+#     '%& O N g&N ps p P>T u m *k \\n' +
+#     ' Y jtgQP kc7@ < O .@$x & 2 R G c G9 `f S 2 \\n' +
+#     '* _ L 1X6 5 ! *T \\n' +
+#     "8 l/ { h `1 1 7 '{ b&m v 8 l~m s un o. , l% x [ ` A ` Hj g u w n C n X G E CN c $ TRDZ i d! E4I?U Cc0 [8 cE k a uH _WZ B _ ZGp \\n" +
+#     `[KRP C$ , eO ; O W qB =n s = u kZ Hj 2 Z' C =*\#'E U uf K f Jl Tn8+l Zh ? h | / 1 Z I "*/ k , < * f w \\n` +
+#     ' p \\n' +
+#     ` n l ={ E7r yE ,J @ Uc It 7 & y ^Q e 2$18 i 9i 6i d 1 \# &R 7 s 1;a ]'h; , sS : : |" Y _ w: V `,
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: true,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 101105,
+#   normalizedTextSample: 'UR !}VY[V| Q^G EAP AUHZYNLUU EK :T A A/ ] Q3 O [ U U EDB ] AE { WNAE O F A - J 3V A ^GIS R XITX I I% 3Z UOAY 3 R X\\n' +
+#     '%& EO NC G&NEPS PU C EEP>TEU MO *KI \\n' +
+#     ' EYA JTGQP KC7@ < OA .@$XE& U 2 R G C G9 `FUEY S 2 \\n' +
+#     '* _ L O1X6 5 A!A *TI\\n' +
+#     "8 L/E I{ HE`1 N1E7 '{IB&MAYV E I8IEL~MO IS UNAO.Y ,EL%A X U[ O I A` AE ` O HJOGOU W NUC ONOIAX G E CNO CU$ TRDZCEI OD! A UE4I?U EA CC0 [8A CEOKY AE Y OAAUH O _WZ B _ EZGP \\n" +
+#     "[KRP AU C$ AA A, EO ; O W QB O I=N O C OIS = UE KZ HJA 2 Z' U UC =*\#'E U UF K F A JLY TN8+L ZH I? H | /",
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: true,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] audit {
+#   fileName: 'celesc-sample-01.pdf',
+#   fileType: 'application/pdf',
+#   fileSize: 581632,
+#   source: 'pdf-text',
+#   hasArrayBuffer: true,
+#   hasText: false,
+#   byteLength: 581632,
+#   rawTextLength: 381687,
+#   normalizedTextLength: 101105,
+#   rawTextSample: 'r !}V [V| Q^g p uhZYNL k :T / ] q3 [ DB ] { WN f A - j 3V ^g S R x tx % 3Z y 3 R X\\n' +
+#     '%& O N g&N ps p P>T u m *k \\n' +
+#     ' Y jtgQP kc7@ < O .@$x & 2 R G c G9 `f S 2 \\n' +
+#     '* _ L 1X6 5 ! *T \\n' +
+#     "8 l/ { h `1 1 7 '{ b&m v 8 l~m s un o. , l% x [ ` A ` Hj g u w n C n X G E CN c $ TRDZ i d! E4I?U Cc0 [8 cE k a uH _WZ B _ ZGp \\n" +
+#     `[KRP C$ , eO ; O W qB =n s = u kZ Hj 2 Z' C =*\#'E U uf K f Jl Tn8+l Zh ? h | / 1 Z I "*/ k , < * f w \\n` +
+#     ' p \\n' +
+#     ` n l ={ E7r yE ,J @ Uc It 7 & y ^Q e 2$18 i 9i 6i d 1 \# &R 7 s 1;a ]'h; , sS : : |" Y _ w: V `,
+#   relevantLines: [
+#     'PT PAGE 1 CLASSIFICACAO UNIDADE_CONSUMIDORA CLIENTE: REFERENCIA VENCIMENTO R$ NOME: NOME2 CPF/CNPJ: ENDERECO: CEP: CIDADE: GRUPO/SUBGRUPO TENSAO: / DATA_LEITURA_ANTERIOR DATA_LEITURA_ATUAL NUMERO_DIAS DATA_PROXIMA_LEITURA NOTA FISCAL N SERIE: DATA EMISSAO: TRIBUTO BASE_CALCULO ALIQUOTA VALOR TRIBUTO BASE_CALCULO ALIQUOTA VALOR TRIBUTO BASE_CALCULO ALIQUOTA VALOR TRIBUTO BASE_CALCULO ALIQUOTA VALOR DESCRICAO UNIDADE QUANTIDADE PRECO_TRIBUTOS VALOR_UNITARIO PIS_COFINS BASE_ICMS ALIQ_ICMS VALOR_ICMS TARIFA_UNITARIA DESCRICAO UNIDADE QUANTIDADE PRECO_TRIBUTOS VALOR_UNITARIO PIS_COFINS BASE_ICMS ALIQ_ICMS VALOR_ICMS TARIFA_UNITARIA DESCRICAO UNIDADE QUANTIDADE PRECO_TRIBUTOS VALOR_UNITARIO',
+#     'CONS07 CONS08 CONS09 CONS10 CONS11 CONS12 DIAS01 DIAS02 DIAS03 DIAS04 DIAS05 DIAS06 DIAS07 DIAS08 DIAS09 DIAS10 DIAS11 DIAS12 MES13 CONS13 DIAS13 ORIGEM_LEITURA MEDIDOR GRANDEZAS POSTO_HORARIO LEITURA_ANTERIOR LEITURA_ATUAL CONSTANTE PERDAS CONSUMO SIGLA1 SIGLA2 SIGLA3 SIGLA4 SIGLA5 SIGLA6 SIGLA7 SIGLA8 PAGADOR: CPF/CNPJ: ENDERECO: CEP: CIDADE: DT_DOCUMENTO NUM_REF UNID_CONSUMIDORA NOSSO_NUMERO REFERENCIA DT_VENCIMENTO CONTA_CONTRATO VALOR_COBRADO COD5 VALOR_COBRADO MSG_BOLETO CONVENIO MSG_RESERVADO_FISCO LEGENDA PG_PIX PAGE 2 MSG1_PAG2 MSG2_PAG2 MES3_PAG2 DICRI COLUNA1 COLUNA2',
+#     'CLIENTE:',
+#     '02/2026',
+#     '28/02/2026',
+#     '12/01/2026',
+#     '10/02/2026',
+#     '12/03/2026',
+#     '10/02/2026',
+#     'DATA EMISSAO:',
+#     '(0D) CONSUMO TE',
+#     'KWH',
+#     '(0D) CONSUMO TE',
+#     'KWH',
+#     '(0E) CONSUMO TUSD',
+#     'KWH',
+#     '(0E) CONSUMO TUSD',
+#     'KWH',
+#     'SUBTOTAL',
+#     '(C0) COSIP MUNICIPAL'
+#   ],
+#   foundFields: [
+#     'providerName:high',
+#     'consumerUnit:medium',
+#     'referenceMonth:high',
+#     'issueDate:high',
+#     'dueDate:high',
+#     'totalValue:high',
+#     'consumptionKwh:high',
+#     'daysBilled:high',
+#     'previousReading:high',
+#     'currentReading:high',
+#     'meterConstant:high',
+#     'teValue:low',
+#     'tusdValue:low'
+#   ],
+#   missingFields: [ 'tariffFlag', 'publicLightingFee', 'taxesTotal' ]
+# }
+# Subtest: parseInvoiceFile aceita File-like com arrayBuffer no mesmo formato do upload do navegador
+ok 276 - parseInvoiceFile aceita File-like com arrayBuffer no mesmo formato do upload do navegador
+  ---
+  duration_ms: 11608.453
+  type: 'test'
+  ...
+# [invoice-parser] file-read {
+#   fileName: 'celesc-sample-01.pdf',
+#   fileType: 'application/pdf',
+#   fileSize: 581632,
+#   hasArrayBuffer: true,
+#   byteLength: 581632
+# }
+# [invoice-parser] pdf-structure {
+#   streamCount: 18,
+#   flateStreamCount: 14,
+#   multiFilterStreamCount: 0,
+#   decodedStreamCount: 18,
+#   failedStreamCount: 0,
+#   compressedByteLength: 578291,
+#   decompressedByteLength: 7981556,
+#   toUnicodeCMapCount: 0,
+#   encodedFontObjectCount: 0,
+#   tjOperatorCount: 5,
+#   tjArrayOperatorCount: 6,
+#   hexTextTokenCount: 0,
+#   usedPdfJsFallback: false
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 381687,
+#   rawTextSample: 'r !}V [V| Q^g p uhZYNL k :T / ] q3 [ DB ] { WN f A - j 3V ^g S R x tx % 3Z y 3 R X\\n' +
+#     '%& O N g&N ps p P>T u m *k \\n' +
+#     ' Y jtgQP kc7@ < O .@$x & 2 R G c G9 `f S 2 \\n' +
+#     '* _ L 1X6 5 ! *T \\n' +
+#     "8 l/ { h `1 1 7 '{ b&m v 8 l~m s un o. , l% x [ ` A ` Hj g u w n C n X G E CN c $ TRDZ i d! E4I?U Cc0 [8 cE k a uH _WZ B _ ZGp \\n" +
+#     `[KRP C$ , eO ; O W qB =n s = u kZ Hj 2 Z' C =*\#'E U uf K f Jl Tn8+l Zh ? h | / 1 Z I "*/ k , < * f w \\n` +
+#     ' p \\n' +
+#     ` n l ={ E7r yE ,J @ Uc It 7 & y ^Q e 2$18 i 9i 6i d 1 \# &R 7 s 1;a ]'h; , sS : : |" Y _ w: V `,
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: true,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 101105,
+#   normalizedTextSample: 'UR !}VY[V| Q^G EAP AUHZYNLUU EK :T A A/ ] Q3 O [ U U EDB ] AE { WNAE O F A - J 3V A ^GIS R XITX I I% 3Z UOAY 3 R X\\n' +
+#     '%& EO NC G&NEPS PU C EEP>TEU MO *KI \\n' +
+#     ' EYA JTGQP KC7@ < OA .@$XE& U 2 R G C G9 `FUEY S 2 \\n' +
+#     '* _ L O1X6 5 A!A *TI\\n' +
+#     "8 L/E I{ HE`1 N1E7 '{IB&MAYV E I8IEL~MO IS UNAO.Y ,EL%A X U[ O I A` AE ` O HJOGOU W NUC ONOIAX G E CNO CU$ TRDZCEI OD! A UE4I?U EA CC0 [8A CEOKY AE Y OAAUH O _WZ B _ EZGP \\n" +
+#     "[KRP AU C$ AA A, EO ; O W QB O I=N O C OIS = UE KZ HJA 2 Z' U UC =*\#'E U UF K F A JLY TN8+L ZH I? H | /",
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: true,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] audit {
+#   fileName: 'celesc-sample-01.pdf',
+#   fileType: 'application/pdf',
+#   fileSize: 581632,
+#   source: 'pdf-text',
+#   hasArrayBuffer: true,
+#   hasText: true,
+#   byteLength: 581632,
+#   rawTextLength: 381687,
+#   normalizedTextLength: 101105,
+#   rawTextSample: 'r !}V [V| Q^g p uhZYNL k :T / ] q3 [ DB ] { WN f A - j 3V ^g S R x tx % 3Z y 3 R X\\n' +
+#     '%& O N g&N ps p P>T u m *k \\n' +
+#     ' Y jtgQP kc7@ < O .@$x & 2 R G c G9 `f S 2 \\n' +
+#     '* _ L 1X6 5 ! *T \\n' +
+#     "8 l/ { h `1 1 7 '{ b&m v 8 l~m s un o. , l% x [ ` A ` Hj g u w n C n X G E CN c $ TRDZ i d! E4I?U Cc0 [8 cE k a uH _WZ B _ ZGp \\n" +
+#     `[KRP C$ , eO ; O W qB =n s = u kZ Hj 2 Z' C =*\#'E U uf K f Jl Tn8+l Zh ? h | / 1 Z I "*/ k , < * f w \\n` +
+#     ' p \\n' +
+#     ` n l ={ E7r yE ,J @ Uc It 7 & y ^Q e 2$18 i 9i 6i d 1 \# &R 7 s 1;a ]'h; , sS : : |" Y _ w: V `,
+#   relevantLines: [
+#     'PT PAGE 1 CLASSIFICACAO UNIDADE_CONSUMIDORA CLIENTE: REFERENCIA VENCIMENTO R$ NOME: NOME2 CPF/CNPJ: ENDERECO: CEP: CIDADE: GRUPO/SUBGRUPO TENSAO: / DATA_LEITURA_ANTERIOR DATA_LEITURA_ATUAL NUMERO_DIAS DATA_PROXIMA_LEITURA NOTA FISCAL N SERIE: DATA EMISSAO: TRIBUTO BASE_CALCULO ALIQUOTA VALOR TRIBUTO BASE_CALCULO ALIQUOTA VALOR TRIBUTO BASE_CALCULO ALIQUOTA VALOR TRIBUTO BASE_CALCULO ALIQUOTA VALOR DESCRICAO UNIDADE QUANTIDADE PRECO_TRIBUTOS VALOR_UNITARIO PIS_COFINS BASE_ICMS ALIQ_ICMS VALOR_ICMS TARIFA_UNITARIA DESCRICAO UNIDADE QUANTIDADE PRECO_TRIBUTOS VALOR_UNITARIO PIS_COFINS BASE_ICMS ALIQ_ICMS VALOR_ICMS TARIFA_UNITARIA DESCRICAO UNIDADE QUANTIDADE PRECO_TRIBUTOS VALOR_UNITARIO',
+#     'CONS07 CONS08 CONS09 CONS10 CONS11 CONS12 DIAS01 DIAS02 DIAS03 DIAS04 DIAS05 DIAS06 DIAS07 DIAS08 DIAS09 DIAS10 DIAS11 DIAS12 MES13 CONS13 DIAS13 ORIGEM_LEITURA MEDIDOR GRANDEZAS POSTO_HORARIO LEITURA_ANTERIOR LEITURA_ATUAL CONSTANTE PERDAS CONSUMO SIGLA1 SIGLA2 SIGLA3 SIGLA4 SIGLA5 SIGLA6 SIGLA7 SIGLA8 PAGADOR: CPF/CNPJ: ENDERECO: CEP: CIDADE: DT_DOCUMENTO NUM_REF UNID_CONSUMIDORA NOSSO_NUMERO REFERENCIA DT_VENCIMENTO CONTA_CONTRATO VALOR_COBRADO COD5 VALOR_COBRADO MSG_BOLETO CONVENIO MSG_RESERVADO_FISCO LEGENDA PG_PIX PAGE 2 MSG1_PAG2 MSG2_PAG2 MES3_PAG2 DICRI COLUNA1 COLUNA2',
+#     'CLIENTE:',
+#     '02/2026',
+#     '28/02/2026',
+#     '12/01/2026',
+#     '10/02/2026',
+#     '12/03/2026',
+#     '10/02/2026',
+#     'DATA EMISSAO:',
+#     '(0D) CONSUMO TE',
+#     'KWH',
+#     '(0D) CONSUMO TE',
+#     'KWH',
+#     '(0E) CONSUMO TUSD',
+#     'KWH',
+#     '(0E) CONSUMO TUSD',
+#     'KWH',
+#     'SUBTOTAL',
+#     '(C0) COSIP MUNICIPAL'
+#   ],
+#   foundFields: [
+#     'providerName:high',
+#     'consumerUnit:medium',
+#     'referenceMonth:high',
+#     'issueDate:high',
+#     'dueDate:high',
+#     'totalValue:high',
+#     'consumptionKwh:high',
+#     'daysBilled:high',
+#     'previousReading:high',
+#     'currentReading:high',
+#     'meterConstant:high',
+#     'teValue:low',
+#     'tusdValue:low'
+#   ],
+#   missingFields: [ 'tariffFlag', 'publicLightingFee', 'taxesTotal' ]
+# }
+# [invoice-flow] after-parse {
+#   fingerprint: 'celesc-sample-01.pdf-581632-1782447213237-application/pdf',
+#   fileName: 'celesc-sample-01.pdf',
+#   referenceMonth: '02/2026',
+#   dueDate: '28/02/2026',
+#   totalValue: 472.3,
+#   consumptionKwh: 528,
+#   previousReading: 17219,
+#   currentReading: 17747
+# }
+# [invoice-flow] interpret-invoice-file {
+#   fingerprint: 'celesc-sample-01.pdf-581632-1782447213237-application/pdf',
+#   fileName: 'celesc-sample-01.pdf',
+#   month: '02/2026',
+#   totalValue: 472.3,
+#   consumption: 528,
+#   referenceMonth: '02/2026',
+#   dueDate: '28/02/2026',
+#   parserTotalValue: 472.3,
+#   parserConsumptionKwh: 528,
+#   previousReading: 17219,
+#   currentReading: 17747
+# }
+# Subtest: interpretInvoiceFile preserva campos essenciais do PDF real no InvoiceData usado pela jornada
+ok 277 - interpretInvoiceFile preserva campos essenciais do PDF real no InvoiceData usado pela jornada
+  ---
+  duration_ms: 11981.6774
+  type: 'test'
+  ...
+# [invoice-parser] file-read {
+#   fileName: 'celesc-sample-01.pdf',
+#   fileType: 'application/pdf',
+#   fileSize: 581632,
+#   hasArrayBuffer: true,
+#   byteLength: 581632
+# }
+# [invoice-parser] pdf-structure {
+#   streamCount: 18,
+#   flateStreamCount: 14,
+#   multiFilterStreamCount: 0,
+#   decodedStreamCount: 18,
+#   failedStreamCount: 0,
+#   compressedByteLength: 578291,
+#   decompressedByteLength: 7981556,
+#   toUnicodeCMapCount: 0,
+#   encodedFontObjectCount: 0,
+#   tjOperatorCount: 5,
+#   tjArrayOperatorCount: 6,
+#   hexTextTokenCount: 0,
+#   usedPdfJsFallback: false
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 381687,
+#   rawTextSample: 'r !}V [V| Q^g p uhZYNL k :T / ] q3 [ DB ] { WN f A - j 3V ^g S R x tx % 3Z y 3 R X\\n' +
+#     '%& O N g&N ps p P>T u m *k \\n' +
+#     ' Y jtgQP kc7@ < O .@$x & 2 R G c G9 `f S 2 \\n' +
+#     '* _ L 1X6 5 ! *T \\n' +
+#     "8 l/ { h `1 1 7 '{ b&m v 8 l~m s un o. , l% x [ ` A ` Hj g u w n C n X G E CN c $ TRDZ i d! E4I?U Cc0 [8 cE k a uH _WZ B _ ZGp \\n" +
+#     `[KRP C$ , eO ; O W qB =n s = u kZ Hj 2 Z' C =*\#'E U uf K f Jl Tn8+l Zh ? h | / 1 Z I "*/ k , < * f w \\n` +
+#     ' p \\n' +
+#     ` n l ={ E7r yE ,J @ Uc It 7 & y ^Q e 2$18 i 9i 6i d 1 \# &R 7 s 1;a ]'h; , sS : : |" Y _ w: V `,
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: true,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 101105,
+#   normalizedTextSample: 'UR !}VY[V| Q^G EAP AUHZYNLUU EK :T A A/ ] Q3 O [ U U EDB ] AE { WNAE O F A - J 3V A ^GIS R XITX I I% 3Z UOAY 3 R X\\n' +
+#     '%& EO NC G&NEPS PU C EEP>TEU MO *KI \\n' +
+#     ' EYA JTGQP KC7@ < OA .@$XE& U 2 R G C G9 `FUEY S 2 \\n' +
+#     '* _ L O1X6 5 A!A *TI\\n' +
+#     "8 L/E I{ HE`1 N1E7 '{IB&MAYV E I8IEL~MO IS UNAO.Y ,EL%A X U[ O I A` AE ` O HJOGOU W NUC ONOIAX G E CNO CU$ TRDZCEI OD! A UE4I?U EA CC0 [8A CEOKY AE Y OAAUH O _WZ B _ EZGP \\n" +
+#     "[KRP AU C$ AA A, EO ; O W QB O I=N O C OIS = UE KZ HJA 2 Z' U UC =*\#'E U UF K F A JLY TN8+L ZH I? H | /",
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: true,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] audit {
+#   fileName: 'celesc-sample-01.pdf',
+#   fileType: 'application/pdf',
+#   fileSize: 581632,
+#   source: 'pdf-text',
+#   hasArrayBuffer: true,
+#   hasText: true,
+#   byteLength: 581632,
+#   rawTextLength: 381687,
+#   normalizedTextLength: 101105,
+#   rawTextSample: 'r !}V [V| Q^g p uhZYNL k :T / ] q3 [ DB ] { WN f A - j 3V ^g S R x tx % 3Z y 3 R X\\n' +
+#     '%& O N g&N ps p P>T u m *k \\n' +
+#     ' Y jtgQP kc7@ < O .@$x & 2 R G c G9 `f S 2 \\n' +
+#     '* _ L 1X6 5 ! *T \\n' +
+#     "8 l/ { h `1 1 7 '{ b&m v 8 l~m s un o. , l% x [ ` A ` Hj g u w n C n X G E CN c $ TRDZ i d! E4I?U Cc0 [8 cE k a uH _WZ B _ ZGp \\n" +
+#     `[KRP C$ , eO ; O W qB =n s = u kZ Hj 2 Z' C =*\#'E U uf K f Jl Tn8+l Zh ? h | / 1 Z I "*/ k , < * f w \\n` +
+#     ' p \\n' +
+#     ` n l ={ E7r yE ,J @ Uc It 7 & y ^Q e 2$18 i 9i 6i d 1 \# &R 7 s 1;a ]'h; , sS : : |" Y _ w: V `,
+#   relevantLines: [
+#     'PT PAGE 1 CLASSIFICACAO UNIDADE_CONSUMIDORA CLIENTE: REFERENCIA VENCIMENTO R$ NOME: NOME2 CPF/CNPJ: ENDERECO: CEP: CIDADE: GRUPO/SUBGRUPO TENSAO: / DATA_LEITURA_ANTERIOR DATA_LEITURA_ATUAL NUMERO_DIAS DATA_PROXIMA_LEITURA NOTA FISCAL N SERIE: DATA EMISSAO: TRIBUTO BASE_CALCULO ALIQUOTA VALOR TRIBUTO BASE_CALCULO ALIQUOTA VALOR TRIBUTO BASE_CALCULO ALIQUOTA VALOR TRIBUTO BASE_CALCULO ALIQUOTA VALOR DESCRICAO UNIDADE QUANTIDADE PRECO_TRIBUTOS VALOR_UNITARIO PIS_COFINS BASE_ICMS ALIQ_ICMS VALOR_ICMS TARIFA_UNITARIA DESCRICAO UNIDADE QUANTIDADE PRECO_TRIBUTOS VALOR_UNITARIO PIS_COFINS BASE_ICMS ALIQ_ICMS VALOR_ICMS TARIFA_UNITARIA DESCRICAO UNIDADE QUANTIDADE PRECO_TRIBUTOS VALOR_UNITARIO',
+#     'CONS07 CONS08 CONS09 CONS10 CONS11 CONS12 DIAS01 DIAS02 DIAS03 DIAS04 DIAS05 DIAS06 DIAS07 DIAS08 DIAS09 DIAS10 DIAS11 DIAS12 MES13 CONS13 DIAS13 ORIGEM_LEITURA MEDIDOR GRANDEZAS POSTO_HORARIO LEITURA_ANTERIOR LEITURA_ATUAL CONSTANTE PERDAS CONSUMO SIGLA1 SIGLA2 SIGLA3 SIGLA4 SIGLA5 SIGLA6 SIGLA7 SIGLA8 PAGADOR: CPF/CNPJ: ENDERECO: CEP: CIDADE: DT_DOCUMENTO NUM_REF UNID_CONSUMIDORA NOSSO_NUMERO REFERENCIA DT_VENCIMENTO CONTA_CONTRATO VALOR_COBRADO COD5 VALOR_COBRADO MSG_BOLETO CONVENIO MSG_RESERVADO_FISCO LEGENDA PG_PIX PAGE 2 MSG1_PAG2 MSG2_PAG2 MES3_PAG2 DICRI COLUNA1 COLUNA2',
+#     'CLIENTE:',
+#     '02/2026',
+#     '28/02/2026',
+#     '12/01/2026',
+#     '10/02/2026',
+#     '12/03/2026',
+#     '10/02/2026',
+#     'DATA EMISSAO:',
+#     '(0D) CONSUMO TE',
+#     'KWH',
+#     '(0D) CONSUMO TE',
+#     'KWH',
+#     '(0E) CONSUMO TUSD',
+#     'KWH',
+#     '(0E) CONSUMO TUSD',
+#     'KWH',
+#     'SUBTOTAL',
+#     '(C0) COSIP MUNICIPAL'
+#   ],
+#   foundFields: [
+#     'providerName:high',
+#     'consumerUnit:medium',
+#     'referenceMonth:high',
+#     'issueDate:high',
+#     'dueDate:high',
+#     'totalValue:high',
+#     'consumptionKwh:high',
+#     'daysBilled:high',
+#     'previousReading:high',
+#     'currentReading:high',
+#     'meterConstant:high',
+#     'teValue:low',
+#     'tusdValue:low'
+#   ],
+#   missingFields: [ 'tariffFlag', 'publicLightingFee', 'taxesTotal' ]
+# }
+# [invoice-flow] normalize-invoice-data-hydrated-from-parser {
+#   before: {
+#     fingerprint: 'celesc-sample-01',
+#     fileName: 'celesc-sample-01.pdf',
+#     month: undefined,
+#     totalValue: undefined,
+#     consumption: undefined,
+#     referenceMonth: '02/2026',
+#     dueDate: '28/02/2026',
+#     parserTotalValue: 472.3,
+#     parserConsumptionKwh: 528,
+#     previousReading: 17219,
+#     currentReading: 17747
+#   },
+#   after: {
+#     fingerprint: 'celesc-sample-01',
+#     fileName: 'celesc-sample-01.pdf',
+#     month: '02/2026',
+#     totalValue: 472.3,
+#     consumption: 528,
+#     referenceMonth: '02/2026',
+#     dueDate: '28/02/2026',
+#     parserTotalValue: 472.3,
+#     parserConsumptionKwh: 528,
+#     previousReading: 17219,
+#     currentReading: 17747
+#   }
+# }
+# [invoice-flow] normalize-invoice-data-hydrated-from-parser {
+#   before: {
+#     fingerprint: 'celesc-sample-01',
+#     fileName: 'celesc-sample-01.pdf',
+#     month: undefined,
+#     totalValue: undefined,
+#     consumption: undefined,
+#     referenceMonth: '02/2026',
+#     dueDate: '28/02/2026',
+#     parserTotalValue: 472.3,
+#     parserConsumptionKwh: 528,
+#     previousReading: 17219,
+#     currentReading: 17747
+#   },
+#   after: {
+#     fingerprint: 'celesc-sample-01',
+#     fileName: 'celesc-sample-01.pdf',
+#     month: '02/2026',
+#     totalValue: 472.3,
+#     consumption: 528,
+#     referenceMonth: '02/2026',
+#     dueDate: '28/02/2026',
+#     parserTotalValue: 472.3,
+#     parserConsumptionKwh: 528,
+#     previousReading: 17219,
+#     currentReading: 17747
+#   }
+# }
+# Subtest: normalizeState reidrata campos do InvoiceData a partir do parser quando o estado persistido chega parcial
+ok 278 - normalizeState reidrata campos do InvoiceData a partir do parser quando o estado persistido chega parcial
+  ---
+  duration_ms: 12060.0152
+  type: 'test'
+  ...
+# [invoice-parser] file-read {
+#   fileName: 'celesc-sample-01.pdf',
+#   fileType: 'application/pdf',
+#   fileSize: 581632,
+#   hasArrayBuffer: true,
+#   byteLength: 581632
+# }
+# [invoice-parser] pdf-structure {
+#   streamCount: 18,
+#   flateStreamCount: 14,
+#   multiFilterStreamCount: 0,
+#   decodedStreamCount: 18,
+#   failedStreamCount: 0,
+#   compressedByteLength: 578291,
+#   decompressedByteLength: 7981556,
+#   toUnicodeCMapCount: 0,
+#   encodedFontObjectCount: 0,
+#   tjOperatorCount: 5,
+#   tjArrayOperatorCount: 6,
+#   hexTextTokenCount: 0,
+#   usedPdfJsFallback: false
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 381687,
+#   rawTextSample: 'r !}V [V| Q^g p uhZYNL k :T / ] q3 [ DB ] { WN f A - j 3V ^g S R x tx % 3Z y 3 R X\\n' +
+#     '%& O N g&N ps p P>T u m *k \\n' +
+#     ' Y jtgQP kc7@ < O .@$x & 2 R G c G9 `f S 2 \\n' +
+#     '* _ L 1X6 5 ! *T \\n' +
+#     "8 l/ { h `1 1 7 '{ b&m v 8 l~m s un o. , l% x [ ` A ` Hj g u w n C n X G E CN c $ TRDZ i d! E4I?U Cc0 [8 cE k a uH _WZ B _ ZGp \\n" +
+#     `[KRP C$ , eO ; O W qB =n s = u kZ Hj 2 Z' C =*\#'E U uf K f Jl Tn8+l Zh ? h | / 1 Z I "*/ k , < * f w \\n` +
+#     ' p \\n' +
+#     ` n l ={ E7r yE ,J @ Uc It 7 & y ^Q e 2$18 i 9i 6i d 1 \# &R 7 s 1;a ]'h; , sS : : |" Y _ w: V `,
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: true,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 101105,
+#   normalizedTextSample: 'UR !}VY[V| Q^G EAP AUHZYNLUU EK :T A A/ ] Q3 O [ U U EDB ] AE { WNAE O F A - J 3V A ^GIS R XITX I I% 3Z UOAY 3 R X\\n' +
+#     '%& EO NC G&NEPS PU C EEP>TEU MO *KI \\n' +
+#     ' EYA JTGQP KC7@ < OA .@$XE& U 2 R G C G9 `FUEY S 2 \\n' +
+#     '* _ L O1X6 5 A!A *TI\\n' +
+#     "8 L/E I{ HE`1 N1E7 '{IB&MAYV E I8IEL~MO IS UNAO.Y ,EL%A X U[ O I A` AE ` O HJOGOU W NUC ONOIAX G E CNO CU$ TRDZCEI OD! A UE4I?U EA CC0 [8A CEOKY AE Y OAAUH O _WZ B _ EZGP \\n" +
+#     "[KRP AU C$ AA A, EO ; O W QB O I=N O C OIS = UE KZ HJA 2 Z' U UC =*\#'E U UF K F A JLY TN8+L ZH I? H | /",
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: true,
+#     CONSUMO: true,
+#     KWH: true,
+#     'R$': true
+#   }
+# }
+# [invoice-parser] audit {
+#   fileName: 'celesc-sample-01.pdf',
+#   fileType: 'application/pdf',
+#   fileSize: 581632,
+#   source: 'pdf-text',
+#   hasArrayBuffer: true,
+#   hasText: true,
+#   byteLength: 581632,
+#   rawTextLength: 381687,
+#   normalizedTextLength: 101105,
+#   rawTextSample: 'r !}V [V| Q^g p uhZYNL k :T / ] q3 [ DB ] { WN f A - j 3V ^g S R x tx % 3Z y 3 R X\\n' +
+#     '%& O N g&N ps p P>T u m *k \\n' +
+#     ' Y jtgQP kc7@ < O .@$x & 2 R G c G9 `f S 2 \\n' +
+#     '* _ L 1X6 5 ! *T \\n' +
+#     "8 l/ { h `1 1 7 '{ b&m v 8 l~m s un o. , l% x [ ` A ` Hj g u w n C n X G E CN c $ TRDZ i d! E4I?U Cc0 [8 cE k a uH _WZ B _ ZGp \\n" +
+#     `[KRP C$ , eO ; O W qB =n s = u kZ Hj 2 Z' C =*\#'E U uf K f Jl Tn8+l Zh ? h | / 1 Z I "*/ k , < * f w \\n` +
+#     ' p \\n' +
+#     ` n l ={ E7r yE ,J @ Uc It 7 & y ^Q e 2$18 i 9i 6i d 1 \# &R 7 s 1;a ]'h; , sS : : |" Y _ w: V `,
+#   relevantLines: [
+#     'PT PAGE 1 CLASSIFICACAO UNIDADE_CONSUMIDORA CLIENTE: REFERENCIA VENCIMENTO R$ NOME: NOME2 CPF/CNPJ: ENDERECO: CEP: CIDADE: GRUPO/SUBGRUPO TENSAO: / DATA_LEITURA_ANTERIOR DATA_LEITURA_ATUAL NUMERO_DIAS DATA_PROXIMA_LEITURA NOTA FISCAL N SERIE: DATA EMISSAO: TRIBUTO BASE_CALCULO ALIQUOTA VALOR TRIBUTO BASE_CALCULO ALIQUOTA VALOR TRIBUTO BASE_CALCULO ALIQUOTA VALOR TRIBUTO BASE_CALCULO ALIQUOTA VALOR DESCRICAO UNIDADE QUANTIDADE PRECO_TRIBUTOS VALOR_UNITARIO PIS_COFINS BASE_ICMS ALIQ_ICMS VALOR_ICMS TARIFA_UNITARIA DESCRICAO UNIDADE QUANTIDADE PRECO_TRIBUTOS VALOR_UNITARIO PIS_COFINS BASE_ICMS ALIQ_ICMS VALOR_ICMS TARIFA_UNITARIA DESCRICAO UNIDADE QUANTIDADE PRECO_TRIBUTOS VALOR_UNITARIO',
+#     'CONS07 CONS08 CONS09 CONS10 CONS11 CONS12 DIAS01 DIAS02 DIAS03 DIAS04 DIAS05 DIAS06 DIAS07 DIAS08 DIAS09 DIAS10 DIAS11 DIAS12 MES13 CONS13 DIAS13 ORIGEM_LEITURA MEDIDOR GRANDEZAS POSTO_HORARIO LEITURA_ANTERIOR LEITURA_ATUAL CONSTANTE PERDAS CONSUMO SIGLA1 SIGLA2 SIGLA3 SIGLA4 SIGLA5 SIGLA6 SIGLA7 SIGLA8 PAGADOR: CPF/CNPJ: ENDERECO: CEP: CIDADE: DT_DOCUMENTO NUM_REF UNID_CONSUMIDORA NOSSO_NUMERO REFERENCIA DT_VENCIMENTO CONTA_CONTRATO VALOR_COBRADO COD5 VALOR_COBRADO MSG_BOLETO CONVENIO MSG_RESERVADO_FISCO LEGENDA PG_PIX PAGE 2 MSG1_PAG2 MSG2_PAG2 MES3_PAG2 DICRI COLUNA1 COLUNA2',
+#     'CLIENTE:',
+#     '02/2026',
+#     '28/02/2026',
+#     '12/01/2026',
+#     '10/02/2026',
+#     '12/03/2026',
+#     '10/02/2026',
+#     'DATA EMISSAO:',
+#     '(0D) CONSUMO TE',
+#     'KWH',
+#     '(0D) CONSUMO TE',
+#     'KWH',
+#     '(0E) CONSUMO TUSD',
+#     'KWH',
+#     '(0E) CONSUMO TUSD',
+#     'KWH',
+#     'SUBTOTAL',
+#     '(C0) COSIP MUNICIPAL'
+#   ],
+#   foundFields: [
+#     'providerName:high',
+#     'consumerUnit:medium',
+#     'referenceMonth:high',
+#     'issueDate:high',
+#     'dueDate:high',
+#     'totalValue:high',
+#     'consumptionKwh:high',
+#     'daysBilled:high',
+#     'previousReading:high',
+#     'currentReading:high',
+#     'meterConstant:high',
+#     'teValue:low',
+#     'tusdValue:low'
+#   ],
+#   missingFields: [ 'tariffFlag', 'publicLightingFee', 'taxesTotal' ]
+# }
+# [invoice-flow] after-parse {
+#   fingerprint: 'celesc-sample-01.pdf-581632-1782447237279-application/pdf',
+#   fileName: 'celesc-sample-01.pdf',
+#   referenceMonth: '02/2026',
+#   dueDate: '28/02/2026',
+#   totalValue: 472.3,
+#   consumptionKwh: 528,
+#   previousReading: 17219,
+#   currentReading: 17747
+# }
+# [invoice-flow] interpret-invoice-file {
+#   fingerprint: 'celesc-sample-01.pdf-581632-1782447237279-application/pdf',
+#   fileName: 'celesc-sample-01.pdf',
+#   month: '02/2026',
+#   totalValue: 472.3,
+#   consumption: 528,
+#   referenceMonth: '02/2026',
+#   dueDate: '28/02/2026',
+#   parserTotalValue: 472.3,
+#   parserConsumptionKwh: 528,
+#   previousReading: 17219,
+#   currentReading: 17747
+# }
+# [invoice-parser] raw-text {
+#   rawTextLength: 63,
+#   rawTextSample: 'DISTRIBUIDORA: ENERGIA TESTE SA\\n REFERENCIA: 04/2026',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: false,
+#     KWH: false,
+#     'R$': false
+#   }
+# }
+# [invoice-parser] normalized-text {
+#   normalizedTextLength: 52,
+#   normalizedTextSample: 'DISTRIBUIDORA: ENERGIA TESTE SA\\n REFERENCIA: 04/2026',
+#   keywordPresence: {
+#     REFERENCIA: true,
+#     VENCIMENTO: false,
+#     CONSUMO: false,
+#     KWH: false,
+#     'R$': false
+#   }
+# }
+# Subtest: roundtrip de persistencia preserva os campos canonicos que a UI consome
+ok 279 - roundtrip de persistencia preserva os campos canonicos que a UI consome
+  ---
+  duration_ms: 12140.0719
+  type: 'test'
+  ...
+# Subtest: normalizeState preserva memoria energetica e evita reabrir perguntas ja respondidas apos reidratacao
+ok 280 - normalizeState preserva memoria energetica e evita reabrir perguntas ja respondidas apos reidratacao
+  ---
+  duration_ms: 2.3806
+  type: 'test'
+  ...
+# Subtest: parser preserva ausencia segura quando campo nao existe
+ok 281 - parser preserva ausencia segura quando campo nao existe
+  ---
+  duration_ms: 0.7928
+  type: 'test'
+  ...
+# Subtest: markKnowledgeLearned persiste conhecimento na jornada normalizada
+ok 282 - markKnowledgeLearned persiste conhecimento na jornada normalizada
+  ---
+  duration_ms: 0.3151
+  type: 'test'
+  ...
+# Subtest: pickEnergyKnowledge prioriza conteudo de banho e ignora conhecimento aprendido
+ok 283 - pickEnergyKnowledge prioriza conteudo de banho e ignora conhecimento aprendido
+  ---
+  duration_ms: 0.4562
+  type: 'test'
+  ...
+# Subtest: memory snapshot expone conhecimentos adquiridos sem acoplar escrita
+ok 284 - memory snapshot expone conhecimentos adquiridos sem acoplar escrita
+  ---
+  duration_ms: 0.6564
+  type: 'test'
+  ...
+# Subtest: score assistant context reaproveita memoria e jornada sem mutacao
+ok 285 - score assistant context reaproveita memoria e jornada sem mutacao
+  ---
+  duration_ms: 0.3407
+  type: 'test'
+  ...
+# Subtest: fallback do assistente explica memoria energetica sem inventar dados
+ok 286 - fallback do assistente explica memoria energetica sem inventar dados
+  ---
+  duration_ms: 0.291
+  type: 'test'
+  ...
+# Subtest: deriveJourneyStateSignals encontra pergunta ativa a partir do estado persistido
+ok 287 - deriveJourneyStateSignals encontra pergunta ativa a partir do estado persistido
+  ---
+  duration_ms: 0.2641
+  type: 'test'
+  ...
+# Subtest: deriveJourneyStateSignals tolera estado persistido antigo sem helperText
+ok 288 - deriveJourneyStateSignals tolera estado persistido antigo sem helperText
+  ---
+  duration_ms: 0.2059
+  type: 'test'
+  ...
+# Subtest: assessQuestionHeuristics reconhece pergunta explicita com contexto e resposta visivel
+ok 289 - assessQuestionHeuristics reconhece pergunta explicita com contexto e resposta visivel
+  ---
+  duration_ms: 0.0693
+  type: 'test'
+  ...
+# Subtest: assessAuthorityHeuristics trata a pergunta ativa como autoridade soberana
+ok 290 - assessAuthorityHeuristics trata a pergunta ativa como autoridade soberana
+  ---
+  duration_ms: 0.1228
+  type: 'test'
+  ...
+# Subtest: compareAuditSnapshots registra melhora quando o QA passa a ver pergunta e proximo passo
+ok 291 - compareAuditSnapshots registra melhora quando o QA passa a ver pergunta e proximo passo
+  ---
+  duration_ms: 0.1845
+  type: 'test'
+  ...
+1..291
+# tests 291
+# suites 0
+# pass 289
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 72299.2276

@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import AuthShell from '@/components/auth/AuthShell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Leaf } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'Erro desconhecido';
@@ -19,32 +18,31 @@ const Register = () => {
   const navigate = useNavigate();
   const { signUp } = useAuth();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError('');
     setSuccess('');
     setLoading(true);
 
     if (password !== confirmPassword) {
-      setError('As senhas não coincidem');
+      setError('As senhas nao coincidem.');
       setLoading(false);
       return;
     }
 
     try {
       await signUp(email, password);
-      setSuccess('Conta criada com sucesso! Por favor, verifique seu email para confirmar o cadastro.');
-      setTimeout(() => {
+      setSuccess('Conta criada com sucesso. Agora confirme o email ou siga para o login.');
+      window.setTimeout(() => {
         navigate('/login');
-      }, 3000);
+      }, 2200);
     } catch (err: unknown) {
       const errorMessage = getErrorMessage(err);
 
-      console.error('Erro no registro:', err);
       if (errorMessage === 'User already registered') {
-        setError('Este email já está cadastrado. Por favor, faça login ou use outro email.');
+        setError('Este email ja esta cadastrado. Entre com sua conta atual.');
       } else {
-        setError(`Erro ao criar conta: ${errorMessage}`);
+        setError(`Nao foi possivel criar a conta: ${errorMessage}`);
       }
     } finally {
       setLoading(false);
@@ -52,73 +50,81 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-blue-50 to-cyan-50">
-      <div className="w-full max-w-md">
-        <Card>
-          <CardHeader className="space-y-1">
-            <div className="flex items-center justify-center mb-4">
-              <div className="p-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl">
-                <Leaf className="h-8 w-8 text-white" />
-              </div>
-            </div>
-            <CardTitle className="text-2xl text-center">Criar Conta</CardTitle>
-            <CardDescription className="text-center">
-              Registre-se para começar sua jornada sustentável
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Input
-                  type="email"
-                  placeholder="Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Input
-                  type="password"
-                  placeholder="Senha"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Input
-                  type="password"
-                  placeholder="Confirmar Senha"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                />
-              </div>
-              {error && (
-                <div className="text-sm text-red-500 text-center p-2 bg-red-50 rounded-md">{error}</div>
-              )}
-              {success && (
-                <div className="text-sm text-green-500 text-center p-2 bg-green-50 rounded-md">{success}</div>
-              )}
-              <Button
-                type="submit"
-                className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
-                disabled={loading}
-              >
-                {loading ? 'Criando conta...' : 'Criar Conta'}
-              </Button>
-              <div className="text-center text-sm">
-                <a href="/login" className="text-green-600 hover:text-green-700">
-                  Já tem uma conta? Faça login
-                </a>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+    <AuthShell
+      eyebrow="Criar conta"
+      title="Comece a sua jornada energetica."
+      subtitle="Cadastro, login e fallback local continuam funcionando como antes. A diferenca agora e a experiencia de entrada."
+      alternateCta={{
+        href: '/login',
+        label: 'Ja tem conta? Entrar agora',
+      }}
+    >
+      <div className="space-y-2">
+        <h2 className="score-display text-3xl font-bold text-[var(--score-ink)]">Criar novo acesso</h2>
+        <p className="text-sm leading-6 text-[var(--score-ink-soft)]">
+          Registre-se para ativar score, memoria, conhecimento e leitura da sua primeira conta.
+        </p>
       </div>
-    </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-[var(--score-ink)]">Email</label>
+          <Input
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="voce@exemplo.com"
+            required
+            className="h-12 rounded-[16px] border-[var(--score-line)] bg-[var(--score-surface-soft)]"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-[var(--score-ink)]">Senha</label>
+          <Input
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder="Crie uma senha"
+            required
+            className="h-12 rounded-[16px] border-[var(--score-line)] bg-[var(--score-surface-soft)]"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-[var(--score-ink)]">Confirmar senha</label>
+          <Input
+            type="password"
+            value={confirmPassword}
+            onChange={(event) => setConfirmPassword(event.target.value)}
+            placeholder="Repita a senha"
+            required
+            className="h-12 rounded-[16px] border-[var(--score-line)] bg-[var(--score-surface-soft)]"
+          />
+        </div>
+
+        {error && (
+          <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="rounded-[16px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            {success}
+          </div>
+        )}
+
+        <Button
+          type="submit"
+          disabled={loading}
+          className="h-12 w-full rounded-[16px] bg-[var(--score-green)] text-white hover:bg-[var(--score-green-deep)]"
+        >
+          {loading ? 'Criando conta...' : 'Criar conta'}
+        </Button>
+      </form>
+    </AuthShell>
   );
 };
 
-export default Register; 
+export default Register;

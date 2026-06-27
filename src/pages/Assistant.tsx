@@ -1,12 +1,12 @@
 import React from 'react';
 import { Bot, Loader2, Send, Sparkles, Zap } from 'lucide-react';
+import LivingCore from '@/components/nucleo/LivingCore';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMvpJourney } from '@/hooks/useMvpJourney';
 import { buildScoreAssistantContext } from '@/lib/scoreAssistant/buildScoreAssistantContext';
 import { chatWithScoreAssistant, getScoreAssistantStatus } from '@/lib/scoreAssistant/client';
 import type {
   ScoreAssistantMessage,
-  ScoreAssistantMode,
   ScoreAssistantStatusResponse,
 } from '@/lib/scoreAssistant/types';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,6 @@ import { cn } from '@/lib/utils';
 
 interface ConversationMessage extends ScoreAssistantMessage {
   memorySignalsUsed?: string[];
-  mode?: ScoreAssistantMode;
   suggestedNextAction?: string;
 }
 
@@ -45,6 +44,9 @@ const AssistantPage = () => {
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const viewportRef = React.useRef<HTMLDivElement | null>(null);
   const invoiceHistory = journeyState.analysis.invoiceHistory;
+  const responsePersonalizationLabel = status?.hasMemoryContext
+    ? 'Resposta mais contextual'
+    : 'Resposta mais introdutoria';
 
   React.useEffect(() => {
     if (!selectedInvoiceId && invoiceHistory[0]?.fingerprint) {
@@ -141,7 +143,6 @@ const AssistantPage = () => {
             role: 'assistant',
             content: response.answer,
             memorySignalsUsed: response.memorySignalsUsed,
-            mode: response.mode,
             suggestedNextAction: response.suggestedNextAction,
           },
         ]);
@@ -155,21 +156,75 @@ const AssistantPage = () => {
   );
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#e7f7ec_0%,#f7fbf8_42%,#ffffff_100%)] px-4 py-8">
+    <main className="score-shell min-h-screen px-4 py-8">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.7fr)]">
-          <Card className="border border-[#d7ebdc] bg-white/95 shadow-[0_20px_60px_rgba(24,78,57,0.08)]">
-            <CardHeader className="space-y-3 border-b border-[#e5f1e8] bg-[linear-gradient(135deg,#f4fbf6_0%,#edf8f2_100%)]">
-              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[#cfe4d4] bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#4f7a5b]">
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+          <Card className="score-card-dark order-2 overflow-hidden rounded-[30px] xl:order-1">
+            <CardHeader className="space-y-5 border-b border-white/10 px-6 py-6">
+              <div className="score-pill score-pill-green w-fit">
                 <Sparkles className="h-3.5 w-3.5" />
-                Nucleo cognitivo inicial
+                Assistente contextual
+              </div>
+              <div className="flex justify-center">
+                <LivingCore level={journeyState.scoreEvents.length > 0 ? 4 : 1} points={assistantContext.memorySignals.length > 0 ? 770 : 120} size={182} />
+              </div>
+              <div className="space-y-2 text-center">
+                <p className="score-caption text-[#7fe3ae]">Assistente Score</p>
+                <CardTitle className="score-display text-4xl text-white">
+                  Contexto real antes de resposta.
+                </CardTitle>
+                <p className="mx-auto max-w-md text-sm leading-6 text-white/72">
+                  O assistente usa memoria energetica, leitura atual e proximo passo da jornada.
+                  Quando ainda falta contexto, a Score responde com mais prudencia e mostra o que
+                  ainda precisa entender melhor.
+                </p>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 px-6 py-6 text-sm text-white/78">
+              <div className="rounded-[22px] border border-white/10 bg-white/6 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
+                  Memoria disponivel
+                </p>
+                <p className="mt-2 leading-6">
+                  {assistantContext.memorySignals.length > 0
+                    ? assistantContext.memorySignals.join(', ')
+                    : 'Ainda sem sinais fortes suficientes para memoria detalhada.'}
+                </p>
+              </div>
+
+              <div className="rounded-[22px] border border-white/10 bg-white/6 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
+                  Proximo passo sugerido
+                </p>
+                <p className="mt-2 leading-6">
+                  {assistantContext.suggestedNextAction || 'Sem proximo passo definido ainda.'}
+                </p>
+              </div>
+
+              <div className="rounded-[22px] border border-white/10 bg-white/6 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
+                  Hipoteses de carga
+                </p>
+                <p className="mt-2 leading-6">
+                  {assistantContext.loadHypotheses.length > 0
+                    ? assistantContext.loadHypotheses.join(', ')
+                    : 'Ainda sem hipoteses fortes de carga.'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="score-card order-1 rounded-[30px] xl:order-2">
+            <CardHeader className="space-y-3 border-b border-[var(--score-line)] bg-[var(--score-surface-soft)]">
+              <div className="score-pill score-pill-green w-fit">
+                <Sparkles className="h-3.5 w-3.5" />
+                Jornada guiada
               </div>
               <div className="space-y-2">
-                <CardTitle className="text-3xl text-[#1d3b2a]">Assistente Score</CardTitle>
-                <p className="max-w-3xl text-sm leading-6 text-[#567264]">
-                  Entenda sua energia com base na sua memoria energetica. O objetivo aqui nao e
-                  responder qualquer coisa, e sim transformar sinais da sua jornada em entendimento
-                  util para a proxima decisao.
+                <CardTitle className="score-display text-3xl text-[var(--score-ink)]">Assistente Score</CardTitle>
+                <p className="max-w-3xl text-sm leading-6 text-[var(--score-ink-soft)]">
+                  Entenda sua energia com base na sua memoria energetica. A proposta aqui continua a
+                  mesma: responder com contexto da jornada, nao com improviso.
                 </p>
               </div>
             </CardHeader>
@@ -181,7 +236,7 @@ const AssistantPage = () => {
                     type="button"
                     variant="outline"
                     disabled={isSending}
-                    className="rounded-full border-[#cfe4d4] bg-[#f8fcf9] text-[#28513a] hover:bg-[#eef7f0]"
+                    className="rounded-full border-[var(--score-line)] bg-white text-[var(--score-ink-soft)] hover:bg-[var(--score-surface-soft)]"
                     onClick={() => void sendMessage(question)}
                   >
                     {question}
@@ -191,7 +246,7 @@ const AssistantPage = () => {
 
               <div
                 ref={viewportRef}
-                className="flex min-h-[420px] flex-col gap-3 overflow-y-auto rounded-[24px] border border-[#e2efe5] bg-[#f9fcfa] p-4"
+                className="flex min-h-[420px] flex-col gap-3 overflow-y-auto rounded-[24px] border border-[var(--score-line)] bg-[var(--score-surface-soft)] p-4"
               >
                 {messages.map((message, index) => (
                   <div
@@ -199,8 +254,8 @@ const AssistantPage = () => {
                     className={cn(
                       'max-w-[86%] rounded-[20px] px-4 py-3 text-sm leading-6 shadow-sm',
                       message.role === 'assistant'
-                        ? 'border border-[#d5eadb] bg-white text-[#214130]'
-                        : 'ml-auto bg-[#2d6b48] text-white'
+                        ? 'border border-[var(--score-line)] bg-white text-[var(--score-ink)]'
+                        : 'ml-auto bg-[var(--score-green)] text-white'
                     )}
                   >
                     <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] opacity-80">
@@ -218,21 +273,20 @@ const AssistantPage = () => {
                       (message.memorySignalsUsed?.length || message.suggestedNextAction) && (
                         <div className="mt-3 rounded-[16px] border border-[#e4f1e7] bg-[#f5faf6] px-3 py-3 text-xs leading-5 text-[#4f6f5d]">
                           {message.memorySignalsUsed && message.memorySignalsUsed.length > 0 && (
-                            <p>Base usada: {message.memorySignalsUsed.join(', ')}.</p>
+                            <p>Contexto considerado: {message.memorySignalsUsed.join(', ')}.</p>
                           )}
                           {message.suggestedNextAction && (
                             <p className="mt-1">
                               Proximo passo sugerido: {message.suggestedNextAction}.
                             </p>
                           )}
-                          {message.mode && <p className="mt-1">Modo da resposta: {message.mode}.</p>}
                         </div>
                       )}
                   </div>
                 ))}
 
                 {isSending && (
-                  <div className="max-w-[86%] rounded-[20px] border border-[#d5eadb] bg-white px-4 py-3 text-sm text-[#214130] shadow-sm">
+                  <div className="max-w-[86%] rounded-[20px] border border-[var(--score-line)] bg-white px-4 py-3 text-sm text-[var(--score-ink)] shadow-sm">
                     <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] opacity-80">
                       <Bot className="h-3.5 w-3.5" />
                       Score
@@ -250,17 +304,17 @@ const AssistantPage = () => {
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
                   placeholder="Pergunte algo sobre sua conta, sua memoria energetica ou a melhor decisao para este mes."
-                  className="min-h-[120px] border-[#d5e8da] bg-white text-[#1f3d2c]"
+                  className="min-h-[120px] border-[var(--score-line)] bg-white text-[var(--score-ink)]"
                 />
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-xs text-[#5f7a69]">
-                    O assistente responde em modo Hermes quando configurado. Caso contrario, usa
-                    fallback educativo local.
+                  <p className="text-xs text-[var(--score-ink-faint)]">
+                    A Score responde com base na sua jornada atual e fica mais precisa conforme sua
+                    memoria energetica evolui.
                   </p>
                   <Button
                     type="button"
                     disabled={!draft.trim() || isSending || !user}
-                    className="rounded-[14px] bg-[#2d6b48] text-white hover:bg-[#255a3c]"
+                    className="rounded-[14px] bg-[var(--score-green)] text-white hover:bg-[var(--score-green-deep)]"
                     onClick={() => void sendMessage(draft)}
                   >
                     <Send className="h-4 w-4" />
@@ -273,39 +327,39 @@ const AssistantPage = () => {
           </Card>
 
           <div className="space-y-4">
-            <Card className="border border-[#d7ebdc] bg-white/95">
-              <CardHeader className="border-b border-[#e5f1e8]">
-                <CardTitle className="text-lg text-[#1d3b2a]">Status do assistente</CardTitle>
+            <Card className="score-card rounded-[28px]">
+              <CardHeader className="border-b border-[var(--score-line)]">
+                <CardTitle className="text-lg text-[var(--score-ink)]">Como a Score esta respondendo</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3 p-5 text-sm text-[#476050]">
+              <CardContent className="space-y-3 p-5 text-sm text-[var(--score-ink-soft)]">
                 {isLoadingStatus ? (
                   <div className="flex items-center gap-2 text-[#5f7a69]">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Verificando configuracao...
+                    Verificando o contexto da jornada...
                   </div>
                 ) : (
                   <>
-                    <div className="rounded-[18px] border border-[#e5f1e8] bg-[#f9fcfa] p-4">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#688472]">
-                        Modo atual
+                    <div className="rounded-[18px] border border-[var(--score-line)] bg-[var(--score-surface-soft)] p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--score-ink-faint)]">
+                        Personalizacao atual
                       </p>
-                      <p className="mt-2 text-xl font-semibold text-[#1d3b2a]">
-                        {status?.mode === 'hermes' ? 'Hermes pronto' : 'Fallback educativo'}
+                      <p className="mt-2 text-xl font-semibold text-[var(--score-ink)]">
+                        {responsePersonalizationLabel}
                       </p>
                     </div>
-                    <div className="rounded-[18px] border border-[#e5f1e8] bg-[#f9fcfa] p-4">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#688472]">
+                    <div className="rounded-[18px] border border-[var(--score-line)] bg-[var(--score-surface-soft)] p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--score-ink-faint)]">
                         Sessao autenticada
                       </p>
-                      <p className="mt-2 text-sm leading-6 text-[#214130]">
+                      <p className="mt-2 text-sm leading-6 text-[var(--score-ink)]">
                         {status?.userName || user?.email || 'Sessao ativa'}
                       </p>
                     </div>
-                    <div className="rounded-[18px] border border-[#e5f1e8] bg-[#f9fcfa] p-4">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#688472]">
+                    <div className="rounded-[18px] border border-[var(--score-line)] bg-[var(--score-surface-soft)] p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--score-ink-faint)]">
                         Memoria disponivel
                       </p>
-                      <p className="mt-2 text-sm leading-6 text-[#214130]">
+                      <p className="mt-2 text-sm leading-6 text-[var(--score-ink)]">
                         {status?.hasMemoryContext
                           ? 'Sim. A Score consegue responder usando sinais da sua jornada.'
                           : 'Ainda limitada. A resposta sera mais generica ate a jornada ganhar contexto.'}
@@ -316,16 +370,16 @@ const AssistantPage = () => {
               </CardContent>
             </Card>
 
-            <Card className="border border-[#d7ebdc] bg-white/95">
-              <CardHeader className="border-b border-[#e5f1e8]">
-                <CardTitle className="flex items-center gap-2 text-lg text-[#1d3b2a]">
-                  <Zap className="h-4 w-4 text-[#2d6b48]" />
+            <Card className="score-card rounded-[28px]">
+              <CardHeader className="border-b border-[var(--score-line)]">
+                <CardTitle className="flex items-center gap-2 text-lg text-[var(--score-ink)]">
+                  <Zap className="h-4 w-4 text-[var(--score-green-deep)]" />
                   Contexto que a Score pode usar
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3 p-5 text-sm text-[#476050]">
-                <div className="rounded-[18px] border border-[#e5f1e8] bg-[#f9fcfa] p-4">
-                  <p className="font-medium text-[#214130]">Memoria energetica</p>
+              <CardContent className="space-y-3 p-5 text-sm text-[var(--score-ink-soft)]">
+                <div className="rounded-[18px] border border-[var(--score-line)] bg-[var(--score-surface-soft)] p-4">
+                  <p className="font-medium text-[var(--score-ink)]">Memoria energetica</p>
                   <p className="mt-2 leading-6">
                     {assistantContext.memorySignals.length > 0
                       ? assistantContext.memorySignals.join(', ')
@@ -333,8 +387,8 @@ const AssistantPage = () => {
                   </p>
                 </div>
 
-                <div className="rounded-[18px] border border-[#e5f1e8] bg-[#f9fcfa] p-4">
-                  <p className="font-medium text-[#214130]">Hipoteses de carga</p>
+                <div className="rounded-[18px] border border-[var(--score-line)] bg-[var(--score-surface-soft)] p-4">
+                  <p className="font-medium text-[var(--score-ink)]">Hipoteses de carga</p>
                   <p className="mt-2 leading-6">
                     {assistantContext.loadHypotheses.length > 0
                       ? assistantContext.loadHypotheses.join(', ')
@@ -342,11 +396,11 @@ const AssistantPage = () => {
                   </p>
                 </div>
 
-                <div className="rounded-[18px] border border-[#e5f1e8] bg-[#f9fcfa] p-4">
-                  <p className="font-medium text-[#214130]">Fatura em foco</p>
+                <div className="rounded-[18px] border border-[var(--score-line)] bg-[var(--score-surface-soft)] p-4">
+                  <p className="font-medium text-[var(--score-ink)]">Fatura em foco</p>
                   {invoiceHistory.length > 0 ? (
                     <select
-                      className="mt-3 w-full rounded-[14px] border border-[#d4e8d8] bg-white px-3 py-2 text-sm text-[#214130] outline-none"
+                      className="mt-3 w-full rounded-[14px] border border-[var(--score-line)] bg-white px-3 py-2 text-sm text-[var(--score-ink)] outline-none"
                       value={selectedInvoiceId}
                       onChange={(event) => setSelectedInvoiceId(event.target.value)}
                     >
@@ -361,8 +415,8 @@ const AssistantPage = () => {
                   )}
                 </div>
 
-                <div className="rounded-[18px] border border-[#e5f1e8] bg-[#f9fcfa] p-4">
-                  <p className="font-medium text-[#214130]">Jornada atual</p>
+                <div className="rounded-[18px] border border-[var(--score-line)] bg-[var(--score-surface-soft)] p-4">
+                  <p className="font-medium text-[var(--score-ink)]">Jornada atual</p>
                   <p className="mt-2 leading-6">
                     {isJourneyHydrated
                       ? assistantContext.suggestedNextAction || 'Sem proximo passo definido.'

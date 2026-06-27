@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+public/qa-runtime.seed.json
+dist/qa-runtime.seed.json
 
 # Editor directories and files
 .vscode/*

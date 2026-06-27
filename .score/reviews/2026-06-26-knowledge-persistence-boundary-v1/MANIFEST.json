@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "branch": "feature/knowledge-persistence-boundary-v1",
+  "commit": "7e90de08dc2561a1129e21ef63163af6e8fcad53",
+  "date": "2026-06-26",
+  "generatedAt": "2026-06-26T15:22:29.742Z",
+  "reviewSlug": "knowledge-persistence-boundary-v1",
+  "files": [
+    "BRIEFING.md",
+    "CHANGELOG.md",
+    "CLAUDE_PROMPT.md",
+    "KNOWN_LIMITATIONS.md",
+    "MANIFEST.json",
+    "README.md",
+    "REVIEW.md",
+    "SCREENSHOTS.md",
+    "screenshots/desktop-details.png",
+    "screenshots/desktop-home.png",
+    "screenshots/mobile-details.png",
+    "screenshots/mobile-home.png"
+  ],
+  "screenshotsFound": [
+    "screenshots/desktop-details.png",
+    "screenshots/desktop-home.png",
+    "screenshots/mobile-details.png",
+    "screenshots/mobile-home.png"
+  ],
+  "documentsFound": [
+    "BRIEFING.md",
+    "CHANGELOG.md",
+    "CLAUDE_PROMPT.md",
+    "KNOWN_LIMITATIONS.md",
+    "MANIFEST.json",
+    "README.md",
+    "REVIEW.md",
+    "SCREENSHOTS.md"
+  ],
+  "video": {
+    "generated": false,
+    "mp4Generated": false,
+    "reason": "Playwright video requer ffmpeg local; execute \"npx playwright install ffmpeg\" para habilitar flow.mp4.",
+    "relativePath": null
+  }
+}

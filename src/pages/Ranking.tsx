@@ -1,27 +1,27 @@
-import { AlertCircle, CheckCircle2, ShieldCheck, Sparkles, Trophy, Users } from 'lucide-react';
+import { AlertCircle, ShieldCheck, Sparkles, Trophy, Users } from 'lucide-react';
 import Leaderboard from '@/components/Leaderboard';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRanking } from '@/hooks/useRanking';
 
 const RankingLoading = () => (
-  <div className="space-y-6">
-    <Card className="border-2 border-emerald-100 shadow-lg">
-      <CardContent className="space-y-4 p-6">
-        <Skeleton className="h-8 w-56" />
-        <Skeleton className="h-5 w-full" />
-        <Skeleton className="h-24 w-full" />
-      </CardContent>
-    </Card>
-    <Card className="border-2 border-slate-100 shadow-lg">
-      <CardContent className="space-y-4 p-6">
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-16 w-full" />
-      </CardContent>
-    </Card>
+  <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+    <div className="score-card rounded-[28px] p-5">
+      <Skeleton className="h-6 w-28" />
+      <Skeleton className="mt-4 h-14 w-4/5" />
+      <Skeleton className="mt-4 h-5 w-full" />
+      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        <Skeleton className="h-24 w-full rounded-[20px]" />
+        <Skeleton className="h-24 w-full rounded-[20px]" />
+        <Skeleton className="h-24 w-full rounded-[20px]" />
+      </div>
+    </div>
+    <div className="score-card rounded-[28px] p-5">
+      <Skeleton className="h-12 w-full rounded-[18px]" />
+      <Skeleton className="mt-3 h-12 w-full rounded-[18px]" />
+      <Skeleton className="mt-3 h-12 w-full rounded-[18px]" />
+    </div>
   </div>
 );
 
@@ -37,151 +37,136 @@ const Ranking = () => {
   } = useRanking();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-cyan-50">
-      <main className="container mx-auto space-y-8 px-4 py-8">
-        <section className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
-          <Card className="border-2 border-emerald-100 shadow-lg">
-            <CardHeader className="space-y-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
-                  Ranking de jornada real
-                </Badge>
-                <Badge variant="outline">
-                  {rankingScope === 'shared' ? 'Visao compartilhada' : 'Visao atual do usuario'}
-                </Badge>
-                <Badge variant="outline">Score explicavel</Badge>
-              </div>
-              <div className="space-y-2">
-                <CardTitle className="flex items-center gap-2 text-3xl text-emerald-700">
-                  <Trophy className="h-7 w-7" />
-                  <span>Ranking Score Energy</span>
-                </CardTitle>
-                <p className="max-w-2xl text-sm text-slate-600">
-                  Cada posicao nasce do score salvo na jornada: eventos validos contam pontos,
-                  o nivel mostra progressao e o perfil ajuda a dar contexto sem expor dados privados.
+    <main className="score-shell min-h-screen px-4 py-8">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+        <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="score-card rounded-[30px] p-6">
+            <div className="flex flex-wrap gap-2">
+              <Badge className="bg-[var(--score-green)] text-white hover:bg-[var(--score-green)]">
+                Ranking de jornada real
+              </Badge>
+              <Badge variant="outline" className="border-[var(--score-line)] bg-white text-[var(--score-ink-soft)]">
+                {rankingScope === 'shared' ? 'Visao compartilhada' : 'Visao atual do usuario'}
+              </Badge>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              <p className="score-caption">Ranking</p>
+              <h1 className="score-display text-4xl font-bold text-[var(--score-ink)]">
+                Score coletivo com a mesma logica de jornada
+              </h1>
+              <p className="max-w-3xl text-sm leading-6 text-[var(--score-ink-soft)]">
+                O ranking continua lendo score, nivel e contexto leve da fonte atual. A mudanca aqui
+                e apenas de apresentacao: menos ruina visual, mais legibilidade do progresso.
+              </p>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-[22px] bg-[var(--score-surface-soft)] px-4 py-4">
+                <Trophy className="h-4 w-4 text-[var(--score-green-deep)]" />
+                <p className="mt-3 text-sm font-semibold text-[var(--score-ink)]">Eventos validos</p>
+                <p className="mt-1 text-sm leading-6 text-[var(--score-ink-soft)]">
+                  Perfil, fatura, analise e acoes continuam formando a base do score.
                 </p>
               </div>
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-900">
-                  <CheckCircle2 className="mb-2 h-4 w-4 text-emerald-700" />
-                  <span className="font-semibold">Eventos validos</span>
-                  <p className="mt-1 text-xs leading-5 text-emerald-800">
-                    Perfil, fatura, analise e acoes revisadas formam a base do score.
-                  </p>
-                </div>
-                <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
-                  <ShieldCheck className="mb-2 h-4 w-4 text-blue-700" />
-                  <span className="font-semibold">Score consistente</span>
-                  <p className="mt-1 text-xs leading-5 text-blue-800">
-                    A pontuacao exibida segue a mesma normalizacao usada no restante da jornada.
-                  </p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700">
-                  <Trophy className="mb-2 h-4 w-4 text-amber-600" />
-                  <span className="font-semibold">Progresso comparavel</span>
-                  <p className="mt-1 text-xs leading-5 text-slate-600">
-                    Nivel e score ajudam a comparar evolucao sem transformar o ranking em dado solto.
-                  </p>
-                </div>
+              <div className="rounded-[22px] bg-[var(--score-surface-soft)] px-4 py-4">
+                <ShieldCheck className="h-4 w-4 text-[var(--score-green-deep)]" />
+                <p className="mt-3 text-sm font-semibold text-[var(--score-ink)]">Score consistente</p>
+                <p className="mt-1 text-sm leading-6 text-[var(--score-ink-soft)]">
+                  A normalizacao exibida aqui continua a mesma do restante da jornada.
+                </p>
               </div>
-            </CardHeader>
-          </Card>
+              <div className="rounded-[22px] bg-[var(--score-surface-soft)] px-4 py-4">
+                <Users className="h-4 w-4 text-[var(--score-green-deep)]" />
+                <p className="mt-3 text-sm font-semibold text-[var(--score-ink)]">Leitura coletiva</p>
+                <p className="mt-1 text-sm leading-6 text-[var(--score-ink-soft)]">
+                  Nivel e score ajudam a comparar progresso sem virar dado solto.
+                </p>
+              </div>
+            </div>
+          </div>
 
-          <Card className="border-2 border-slate-100 shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-slate-700">
-                <Users className="h-5 w-5" />
-                <span>Seu lugar agora</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-6 w-24" />
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-5 w-40" />
-                </div>
-              ) : currentUserEntry ? (
-                <div className="space-y-3">
-                  <div className="text-4xl font-bold text-emerald-700">
-                    #{currentUserEntry.position}
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-500">Score explicavel da jornada</p>
-                    <p className="text-2xl font-semibold text-slate-800">
-                      {currentUserEntry.score.toLocaleString('pt-BR')} pontos
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="secondary">Nivel {currentUserEntry.level}</Badge>
-                    {currentUserEntry.badgeLabel && (
-                      <Badge variant="outline">{currentUserEntry.badgeLabel}</Badge>
-                    )}
-                  </div>
-                  <p className="text-sm leading-6 text-slate-600">
-                    Sua posicao reflete eventos ja registrados na jornada. Continue evoluindo com
-                    acoes e novas faturas para subir de nivel.
+          <div className="score-stage rounded-[30px] px-6 py-6 text-white">
+            <p className="score-caption text-[#7fe3ae]">Seu lugar agora</p>
+            {loading ? (
+              <div className="mt-5 space-y-3">
+                <Skeleton className="h-10 w-28 bg-white/10" />
+                <Skeleton className="h-14 w-full bg-white/10" />
+                <Skeleton className="h-10 w-2/3 bg-white/10" />
+              </div>
+            ) : currentUserEntry ? (
+              <div className="mt-5 space-y-4">
+                <p className="score-display text-6xl font-bold">#{currentUserEntry.position}</p>
+                <div className="rounded-[22px] border border-white/10 bg-white/6 px-4 py-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
+                    Score atual
+                  </p>
+                  <p className="score-display mt-2 text-3xl font-bold">
+                    {currentUserEntry.score.toLocaleString('pt-BR')} pts
+                  </p>
+                  <p className="mt-2 text-sm text-white/72">
+                    Nivel {currentUserEntry.level}
+                    {currentUserEntry.badgeLabel ? ` · ${currentUserEntry.badgeLabel}` : ''}
                   </p>
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-slate-700">Sem pontuacao registrada ainda</p>
-                  <p className="text-sm text-slate-600">
-                    Complete etapas reais da jornada, como perfil e envio de fatura, para aparecer no
-                    ranking.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                <p className="text-sm leading-6 text-white/72">
+                  Sua posicao reflete eventos ja persistidos na jornada. Continue enviando faturas e
+                  acompanhando acoes para subir com o mesmo score explicavel.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-5 rounded-[22px] border border-white/10 bg-white/6 px-4 py-4">
+                <p className="text-lg font-semibold text-white">Sem pontuacao registrada ainda</p>
+                <p className="mt-2 text-sm leading-6 text-white/72">
+                  Complete perfil, envie a primeira fatura e acompanhe a proxima acao para aparecer aqui.
+                </p>
+              </div>
+            )}
+          </div>
         </section>
 
         {loading ? (
           <RankingLoading />
         ) : isEmpty ? (
-          <Card className="border-2 border-dashed border-slate-200 shadow-sm">
-            <CardContent className="space-y-3 p-8 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-                <Sparkles className="h-7 w-7" />
+          <Card className="score-card rounded-[28px] border-dashed">
+            <CardContent className="space-y-3 px-6 py-8 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[var(--score-green-soft)] text-[var(--score-green-deep)]">
+                <Sparkles className="h-6 w-6" />
               </div>
-              <div className="space-y-2">
-                <p className="text-lg font-semibold text-slate-800">
-                  Ainda nao existe jornada pontuada para mostrar
-                </p>
-                <p className="mx-auto max-w-2xl text-sm text-slate-600">
-                  O ranking aparece quando ha eventos validos de score na jornada. Complete o perfil
-                  e envie a primeira fatura para transformar progresso real em pontuacao comparavel.
-                </p>
-              </div>
+              <p className="text-xl font-semibold text-[var(--score-ink)]">
+                Ainda nao existe jornada pontuada para mostrar
+              </p>
+              <p className="mx-auto max-w-2xl text-sm leading-6 text-[var(--score-ink-soft)]">
+                O ranking aparece quando ha eventos validos de score. Continue a jornada para transformar progresso em leitura comparavel.
+              </p>
             </CardContent>
           </Card>
         ) : (
           <Leaderboard entries={rankingEntries} />
         )}
 
-        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-          <Alert className="border-emerald-200 bg-white/80">
-            <ShieldCheck className="h-4 w-4 text-emerald-700" />
-            <AlertTitle className="text-emerald-800">Como este ranking e formado</AlertTitle>
-            <AlertDescription className="text-slate-600">
-              Usamos {sourceLabel || 'jornadas MVP persistidas'} e exibimos apenas campos de
+        <section className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+          <div className="score-card rounded-[24px] px-5 py-5">
+            <p className="score-caption">Fonte</p>
+            <p className="mt-2 text-sm leading-6 text-[var(--score-ink-soft)]">
+              Usamos {sourceLabel || 'jornadas MVP persistidas'} e exibimos apenas o necessario para
               leaderboard: posicao, score, nivel e contexto leve do perfil.
-            </AlertDescription>
-          </Alert>
+            </p>
+          </div>
 
           {limitation ? (
-            <Alert className="border-amber-200 bg-amber-50/80">
-              <AlertCircle className="h-4 w-4 text-amber-700" />
-              <AlertTitle className="text-amber-800">Transparencia do MVP</AlertTitle>
-              <AlertDescription className="text-slate-700">
-                {limitation} Mesmo assim, a tela sempre apresenta o ranking como uma leitura de
-                jornada, nao como uma competicao auditada por backend dedicado.
-              </AlertDescription>
-            </Alert>
+            <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-5">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="mt-0.5 h-4 w-4 text-amber-700" />
+                <p className="text-sm leading-6 text-amber-900">
+                  {limitation} Mesmo assim, a tela continua apresentando ranking como leitura de jornada, nao como competicao auditada por backend dedicado.
+                </p>
+              </div>
+            </div>
           ) : null}
-        </div>
-      </main>
-    </div>
+        </section>
+      </div>
+    </main>
   );
 };
 

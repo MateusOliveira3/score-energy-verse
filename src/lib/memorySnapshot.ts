@@ -184,6 +184,21 @@ const buildProfileItems = (state: MvpState): MemoryProfileItem[] => {
 
 const buildConfirmedSignals = (state: MvpState) =>
   uniqueStrings([
+    state.energyBehaviorProfile.habits.residenceType
+      ? `Tipo de residencia: ${state.energyBehaviorProfile.habits.residenceType}`
+      : undefined,
+    state.energyBehaviorProfile.habits.roomCountRange
+      ? `Comodos principais: ${state.energyBehaviorProfile.habits.roomCountRange}`
+      : undefined,
+    state.energyBehaviorProfile.habits.hasChildren === true
+      ? 'Criancas na residencia'
+      : undefined,
+    state.energyBehaviorProfile.habits.hasElderly === true
+      ? 'Idosos na residencia'
+      : undefined,
+    typeof state.energyBehaviorProfile.appliances.bathrooms === 'number'
+      ? `${state.energyBehaviorProfile.appliances.bathrooms} banheiro(s) informado(s)`
+      : undefined,
     state.userContext.questions.primary_goal?.status === 'answered'
       ? `Objetivo principal: ${state.userContext.questions.primary_goal.label}`
       : undefined,
@@ -205,8 +220,21 @@ const buildConfirmedSignals = (state: MvpState) =>
     typeof state.energyBehaviorProfile.appliances.showers === 'number'
       ? `${state.energyBehaviorProfile.appliances.showers} chuveiro(s) informado(s)`
       : undefined,
+    state.energyBehaviorProfile.appliances.showerHeatingType
+      ? `Aquecimento do banho: ${state.energyBehaviorProfile.appliances.showerHeatingType}`
+      : undefined,
     state.energyBehaviorProfile.habits.usesHeavyLoadsAtNight === true
       ? 'Cargas pesadas entram a noite'
+      : undefined,
+    typeof state.energyBehaviorProfile.appliances.airConditioningCount === 'number' &&
+    state.energyBehaviorProfile.appliances.airConditioningCount > 0
+      ? `${state.energyBehaviorProfile.appliances.airConditioningCount} ar-condicionado(s) informado(s)`
+      : undefined,
+    state.energyBehaviorProfile.appliances.cookingType
+      ? `Fogao principal: ${state.energyBehaviorProfile.appliances.cookingType}`
+      : undefined,
+    state.energyBehaviorProfile.appliances.hasElectricOven === true
+      ? 'Forno eletrico presente'
       : undefined,
     state.energyBehaviorProfile.intentions.thermalComfortInterest === 'sim'
       ? 'Interesse em conforto termico'
@@ -342,17 +370,48 @@ const buildObservedBehavior = (state: MvpState) =>
 
 const buildMemoryGaps = (state: MvpState) => {
   const items = uniqueStrings([
+    !state.energyBehaviorProfile.habits.residenceType
+      ? 'Se a residencia e casa, apartamento, sobrado ou studio'
+      : undefined,
+    !state.energyBehaviorProfile.habits.roomCountRange
+      ? 'Quantos comodos principais a casa tem'
+      : undefined,
+    typeof state.energyBehaviorProfile.habits.hasChildren !== 'boolean'
+      ? 'Se existem criancas morando na residencia'
+      : undefined,
+    typeof state.energyBehaviorProfile.habits.hasElderly !== 'boolean'
+      ? 'Se existem idosos morando na residencia'
+      : undefined,
+    typeof state.energyBehaviorProfile.appliances.bathrooms !== 'number'
+      ? 'Quantos banheiros entram na rotina'
+      : undefined,
     typeof state.energyBehaviorProfile.appliances.showers !== 'number'
       ? 'Quantos chuveiros entram na rotina'
       : undefined,
-    typeof state.energyBehaviorProfile.appliances.hasElectricShower !== 'boolean'
-      ? 'Se existe chuveiro eletrico'
+    !state.energyBehaviorProfile.appliances.showerHeatingType
+      ? 'Se o banho depende mais de aquecimento eletrico ou gas'
       : undefined,
     typeof state.energyBehaviorProfile.appliances.hasAirConditioning !== 'boolean'
       ? 'Se existe ar-condicionado'
       : undefined,
+    state.energyBehaviorProfile.appliances.hasAirConditioning === true &&
+    typeof state.energyBehaviorProfile.appliances.airConditioningCount !== 'number'
+      ? 'Quantos aparelhos de ar-condicionado entram na rotina'
+      : undefined,
+    !state.energyBehaviorProfile.appliances.cookingType
+      ? 'Se a cozinha usa fogao a gas, eletrico ou misto'
+      : undefined,
+    typeof state.energyBehaviorProfile.appliances.hasElectricOven !== 'boolean'
+      ? 'Se existe forno eletrico'
+      : undefined,
     typeof state.energyBehaviorProfile.appliances.hasExtraFridge !== 'boolean'
       ? 'Se existe geladeira ou freezer extra'
+      : undefined,
+    typeof state.energyBehaviorProfile.appliances.hasWashingMachine !== 'boolean'
+      ? 'Se existe maquina de lavar'
+      : undefined,
+    typeof state.energyBehaviorProfile.appliances.hasDryer !== 'boolean'
+      ? 'Se existe secadora'
       : undefined,
     typeof state.energyBehaviorProfile.habits.usesHeavyLoadsAtNight !== 'boolean'
       ? 'Se cargas pesadas entram a noite'

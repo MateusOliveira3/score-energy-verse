@@ -21,7 +21,14 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return <div>Carregando...</div>;
+    return (
+      <div className="score-shell flex min-h-[60vh] items-center justify-center px-4 py-10">
+        <div className="score-card rounded-[24px] px-6 py-6 text-center">
+          <p className="score-caption">Sessao</p>
+          <p className="mt-2 text-sm text-[var(--score-ink-soft)]">Carregando acesso protegido...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!user) {

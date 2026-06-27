@@ -1,9 +1,12 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { isLocalQaForcedRuntime } from '@/lib/localQaRuntime';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const isLocalQaOverrideActive = isLocalQaForcedRuntime();
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+export const isSupabaseConfigured =
+  !isLocalQaOverrideActive && Boolean(supabaseUrl && supabaseAnonKey);
 
 // In local MVP development we allow the app to boot without Supabase so the
 // guided flow can be tested safely. Runtime callers must branch on this flag.

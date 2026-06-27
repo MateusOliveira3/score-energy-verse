@@ -322,6 +322,10 @@ const VALID_CLIMATE_USAGES = ['sim', 'nao', 'sazonal', 'nao_informado'];
 const VALID_THERMAL_SENSITIVITIES = ['sim', 'nao', 'nao_sei', 'nao_informado'];
 const VALID_INTEREST_LEVELS = ['sim', 'talvez', 'nao', 'nao_informado'];
 const VALID_PRIMARY_OBJECTIVES = ['economia', 'conforto', 'sustentabilidade', 'nao_informado'];
+const VALID_RESIDENCE_TYPES = ['casa', 'apartamento', 'sobrado', 'studio', 'nao_informado'];
+const VALID_ROOM_COUNT_RANGES = ['1_3', '4_6', '7_ou_mais', 'nao_informado'];
+const VALID_SHOWER_HEATING_TYPES = ['eletrico', 'gas', 'misto', 'nao_sei', 'nao_informado'];
+const VALID_COOKING_TYPES = ['gas', 'eletrico', 'misto', 'nao_sei', 'nao_informado'];
 
 const normalizeActionQuestionOptions = (
   options: ActionInteractiveQuestion['options']
@@ -358,6 +362,21 @@ const normalizeInteractiveQuestions = (
           ? question.helperText
           : undefined,
       options: normalizeActionQuestionOptions(question.options),
+      investigation: question.investigation
+        ? {
+            ...question.investigation,
+            energyMapBlock: question.investigation.energyMapBlock
+              ? [...question.investigation.energyMapBlock]
+              : undefined,
+            evidenceProduced: [...question.investigation.evidenceProduced],
+            unlocks: question.investigation.unlocks
+              ? [...question.investigation.unlocks]
+              : undefined,
+            dependsOn: question.investigation.dependsOn
+              ? [...question.investigation.dependsOn]
+              : undefined,
+          }
+        : undefined,
     }))
     .filter((question) => question.options.length > 0);
 
@@ -385,6 +404,34 @@ export const normalizeEnergyBehaviorProfile = (
   const normalizedShowers =
     isFiniteNumber(appliances.showers) && appliances.showers >= 0
       ? Math.min(Math.round(appliances.showers), 99)
+      : undefined;
+  const normalizedBathrooms =
+    isFiniteNumber(appliances.bathrooms) && appliances.bathrooms >= 0
+      ? Math.min(Math.round(appliances.bathrooms), 99)
+      : undefined;
+  const normalizedShowerHeatingType =
+    typeof appliances.showerHeatingType === 'string' &&
+    VALID_SHOWER_HEATING_TYPES.includes(appliances.showerHeatingType)
+      ? appliances.showerHeatingType
+      : undefined;
+  const normalizedAirConditioningCount =
+    isFiniteNumber(appliances.airConditioningCount) && appliances.airConditioningCount >= 0
+      ? Math.min(Math.round(appliances.airConditioningCount), 99)
+      : undefined;
+  const normalizedCookingType =
+    typeof appliances.cookingType === 'string' &&
+    VALID_COOKING_TYPES.includes(appliances.cookingType)
+      ? appliances.cookingType
+      : undefined;
+  const normalizedResidenceType =
+    typeof habits.residenceType === 'string' &&
+    VALID_RESIDENCE_TYPES.includes(habits.residenceType)
+      ? habits.residenceType
+      : undefined;
+  const normalizedRoomCountRange =
+    typeof habits.roomCountRange === 'string' &&
+    VALID_ROOM_COUNT_RANGES.includes(habits.roomCountRange)
+      ? habits.roomCountRange
       : undefined;
   const normalizedDominantUsagePeriod =
     typeof habits.dominantUsagePeriod === 'string' &&
@@ -460,12 +507,23 @@ export const normalizeEnergyBehaviorProfile = (
     )
   );
   const applianceAnsweredCount = [
+    normalizedBathrooms !== undefined,
     normalizedShowers !== undefined,
     isBoolean(appliances.hasElectricShower),
+    normalizedShowerHeatingType !== undefined,
     isBoolean(appliances.hasAirConditioning),
+    normalizedAirConditioningCount !== undefined,
     isBoolean(appliances.hasExtraFridge),
+    normalizedCookingType !== undefined,
+    isBoolean(appliances.hasElectricOven),
+    isBoolean(appliances.hasWashingMachine),
+    isBoolean(appliances.hasDryer),
   ].filter(Boolean).length;
   const habitAnsweredCount = [
+    normalizedResidenceType !== undefined,
+    normalizedRoomCountRange !== undefined,
+    isBoolean(habits.hasChildren),
+    isBoolean(habits.hasElderly),
     normalizedDominantUsagePeriod !== undefined,
     isBoolean(habits.usesHeavyLoadsAtNight),
     normalizedLaundryFrequency !== undefined,
@@ -482,8 +540,7 @@ export const normalizeEnergyBehaviorProfile = (
     normalizedPrimaryObjective !== undefined,
   ].filter(Boolean).length;
   const answeredDiagnosisCount = Object.keys(normalizedAnsweredActionPrompts).length;
-  const diagnosisLevel =
-    answeredDiagnosisCount >= 15 ? 16 : answeredDiagnosisCount > 0 ? answeredDiagnosisCount + 1 : 1;
+  const diagnosisLevel = Math.min(answeredDiagnosisCount + 1, 16);
   const qualifiedLead =
     normalizedSolarAnalysisInterest === 'sim' ||
     normalizedConsultantInterest === 'sim' ||
@@ -491,18 +548,35 @@ export const normalizeEnergyBehaviorProfile = (
 
   return {
     appliances: {
+      bathrooms: normalizedBathrooms,
       showers: normalizedShowers,
       hasElectricShower: isBoolean(appliances.hasElectricShower)
         ? appliances.hasElectricShower
         : undefined,
+      showerHeatingType: normalizedShowerHeatingType,
       hasAirConditioning: isBoolean(appliances.hasAirConditioning)
         ? appliances.hasAirConditioning
         : undefined,
+      airConditioningCount: normalizedAirConditioningCount,
       hasExtraFridge: isBoolean(appliances.hasExtraFridge)
         ? appliances.hasExtraFridge
         : undefined,
+      cookingType: normalizedCookingType,
+      hasElectricOven: isBoolean(appliances.hasElectricOven)
+        ? appliances.hasElectricOven
+        : undefined,
+      hasWashingMachine: isBoolean(appliances.hasWashingMachine)
+        ? appliances.hasWashingMachine
+        : undefined,
+      hasDryer: isBoolean(appliances.hasDryer)
+        ? appliances.hasDryer
+        : undefined,
     },
     habits: {
+      residenceType: normalizedResidenceType,
+      roomCountRange: normalizedRoomCountRange,
+      hasChildren: isBoolean(habits.hasChildren) ? habits.hasChildren : undefined,
+      hasElderly: isBoolean(habits.hasElderly) ? habits.hasElderly : undefined,
       dominantUsagePeriod: normalizedDominantUsagePeriod,
       usesHeavyLoadsAtNight: isBoolean(habits.usesHeavyLoadsAtNight)
         ? habits.usesHeavyLoadsAtNight
@@ -544,10 +618,10 @@ export const normalizeEnergyBehaviorProfile = (
     confidence: {
       applianceConfidence: isFiniteNumber(mergedEnergyBehaviorProfile.confidence?.applianceConfidence)
         ? clampConfidence(mergedEnergyBehaviorProfile.confidence.applianceConfidence)
-        : normalizeConfidenceRatio(applianceAnsweredCount, 4),
+        : normalizeConfidenceRatio(applianceAnsweredCount, 11),
       habitConfidence: isFiniteNumber(mergedEnergyBehaviorProfile.confidence?.habitConfidence)
         ? clampConfidence(mergedEnergyBehaviorProfile.confidence.habitConfidence)
-        : normalizeConfidenceRatio(habitAnsweredCount, 8),
+        : normalizeConfidenceRatio(habitAnsweredCount, 12),
       leadConfidence: isFiniteNumber(mergedEnergyBehaviorProfile.confidence?.leadConfidence)
         ? clampConfidence(mergedEnergyBehaviorProfile.confidence.leadConfidence)
         : normalizeConfidenceRatio(leadAnsweredCount, 4),
@@ -1765,16 +1839,79 @@ const applyBehaviorAnswerToProfile = (
     updatedAt: answeredAt,
   };
 
+  if (questionId === 'residence_type') {
+    nextProfile.habits = {
+      ...nextProfile.habits,
+      residenceType:
+        normalizedAnswer === 'casa' ||
+        normalizedAnswer === 'apartamento' ||
+        normalizedAnswer === 'sobrado' ||
+        normalizedAnswer === 'studio'
+          ? normalizedAnswer
+          : nextProfile.habits?.residenceType,
+    };
+  }
+
+  if (questionId === 'room_count') {
+    nextProfile.habits = {
+      ...nextProfile.habits,
+      roomCountRange:
+        normalizedAnswer === '1_3' ||
+        normalizedAnswer === '4_6' ||
+        normalizedAnswer === '7_ou_mais'
+          ? normalizedAnswer
+          : nextProfile.habits?.roomCountRange,
+    };
+  }
+
+  if (questionId === 'children_presence') {
+    nextProfile.habits = {
+      ...nextProfile.habits,
+      hasChildren:
+        normalizedAnswer === 'yes'
+          ? true
+          : normalizedAnswer === 'no'
+            ? false
+            : nextProfile.habits?.hasChildren,
+    };
+  }
+
+  if (questionId === 'elderly_presence') {
+    nextProfile.habits = {
+      ...nextProfile.habits,
+      hasElderly:
+        normalizedAnswer === 'yes'
+          ? true
+          : normalizedAnswer === 'no'
+            ? false
+            : nextProfile.habits?.hasElderly,
+    };
+  }
+
+  if (questionId === 'bathrooms_count') {
+    nextProfile.appliances = {
+      ...nextProfile.appliances,
+      bathrooms:
+        normalizedAnswer === '1'
+          ? 1
+          : normalizedAnswer === '2'
+            ? 2
+            : normalizedAnswer === '3+'
+              ? 3
+              : nextProfile.appliances?.bathrooms,
+    };
+  }
+
   if (questionId === 'showers_count') {
     nextProfile.appliances = {
       ...nextProfile.appliances,
       showers:
-        normalizedAnswer === '0'
-          ? 0
-          : normalizedAnswer === '1'
-            ? 1
-            : normalizedAnswer === '2+'
-              ? 2
+        normalizedAnswer === '1'
+          ? 1
+          : normalizedAnswer === '2'
+            ? 2
+            : normalizedAnswer === '3+'
+              ? 3
               : nextProfile.appliances?.showers,
     };
   }
@@ -1791,6 +1928,27 @@ const applyBehaviorAnswerToProfile = (
     };
   }
 
+  if (questionId === 'shower_heating_type') {
+    const hasElectricShower =
+      normalizedAnswer === 'eletrico' || normalizedAnswer === 'misto'
+        ? true
+        : normalizedAnswer === 'gas'
+          ? false
+          : nextProfile.appliances?.hasElectricShower;
+
+    nextProfile.appliances = {
+      ...nextProfile.appliances,
+      showerHeatingType:
+        normalizedAnswer === 'eletrico' ||
+        normalizedAnswer === 'gas' ||
+        normalizedAnswer === 'misto' ||
+        normalizedAnswer === 'nao_sei'
+          ? normalizedAnswer
+          : nextProfile.appliances?.showerHeatingType,
+      hasElectricShower,
+    };
+  }
+
   if (questionId === 'air_conditioning_presence') {
     nextProfile.appliances = {
       ...nextProfile.appliances,
@@ -1800,6 +1958,51 @@ const applyBehaviorAnswerToProfile = (
           : normalizedAnswer === 'no'
             ? false
             : nextProfile.appliances?.hasAirConditioning,
+      airConditioningCount:
+        normalizedAnswer === 'no' ? 0 : nextProfile.appliances?.airConditioningCount,
+    };
+  }
+
+  if (questionId === 'air_conditioning_count') {
+    nextProfile.appliances = {
+      ...nextProfile.appliances,
+      airConditioningCount:
+        normalizedAnswer === '1'
+          ? 1
+          : normalizedAnswer === '2'
+            ? 2
+            : normalizedAnswer === '3+'
+              ? 3
+              : nextProfile.appliances?.airConditioningCount,
+      hasAirConditioning:
+        normalizedAnswer === '1' || normalizedAnswer === '2' || normalizedAnswer === '3+'
+          ? true
+          : nextProfile.appliances?.hasAirConditioning,
+    };
+  }
+
+  if (questionId === 'cooking_type') {
+    nextProfile.appliances = {
+      ...nextProfile.appliances,
+      cookingType:
+        normalizedAnswer === 'gas' ||
+        normalizedAnswer === 'eletrico' ||
+        normalizedAnswer === 'misto' ||
+        normalizedAnswer === 'nao_sei'
+          ? normalizedAnswer
+          : nextProfile.appliances?.cookingType,
+    };
+  }
+
+  if (questionId === 'electric_oven_presence') {
+    nextProfile.appliances = {
+      ...nextProfile.appliances,
+      hasElectricOven:
+        normalizedAnswer === 'yes'
+          ? true
+          : normalizedAnswer === 'no'
+            ? false
+            : nextProfile.appliances?.hasElectricOven,
     };
   }
 
@@ -1812,6 +2015,30 @@ const applyBehaviorAnswerToProfile = (
           : normalizedAnswer === 'no'
             ? false
             : nextProfile.appliances?.hasExtraFridge,
+    };
+  }
+
+  if (questionId === 'washing_machine_presence') {
+    nextProfile.appliances = {
+      ...nextProfile.appliances,
+      hasWashingMachine:
+        normalizedAnswer === 'yes'
+          ? true
+          : normalizedAnswer === 'no'
+            ? false
+            : nextProfile.appliances?.hasWashingMachine,
+    };
+  }
+
+  if (questionId === 'dryer_presence') {
+    nextProfile.appliances = {
+      ...nextProfile.appliances,
+      hasDryer:
+        normalizedAnswer === 'yes'
+          ? true
+          : normalizedAnswer === 'no'
+            ? false
+            : nextProfile.appliances?.hasDryer,
     };
   }
 
